@@ -16,6 +16,7 @@ dist/
 build/
 Payload/
 *.ipa
+*.ps1
 DerivedData/
 
 # Large local runtime zips and directories

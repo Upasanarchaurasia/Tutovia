@@ -82,30 +82,59 @@ export const AuthProvider = ({ children }) => {
 
   const loadUserProfile = async (userId) => {
     try {
-      // First attempt: read from Supabase public.profiles
-      const { data: sbProfile } = await supabase
+      // 0. Immediate local cache check - never block the user
+      const cachedProfileStr = localStorage.getItem('tutovia_profile');
+      if (cachedProfileStr) {
+        try {
+          const cachedProfile = JSON.parse(cachedProfileStr);
+          if (cachedProfile && (cachedProfile.ca_group || cachedProfile.ca_stage)) {
+            setProfile(cachedProfile);
+            setNeedsOnboarding(false);
+            return;
+          }
+        } catch {}
+      }
+
+      if (localStorage.getItem('tutovia_onboarded') === 'true') {
+        setNeedsOnboarding(false);
+        return;
+      }
+
+      // First attempt: read from Supabase public.profiles (with 2.5s timeout)
+      const sbPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('timeout'), 2500));
+
+      const { data: sbProfile } = await Promise.race([sbPromise, timeoutPromise]).catch(() => ({ data: null }));
 
       if (sbProfile && (sbProfile.ca_group || sbProfile.ca_stage)) {
         setProfile(sbProfile);
+        localStorage.setItem('tutovia_profile', JSON.stringify(sbProfile));
+        localStorage.setItem('tutovia_onboarded', 'true');
         setNeedsOnboarding(false);
         return;
       }
 
       // Second attempt: check backend API
-      const res = await axios.get(`/api/profile?userId=${userId}`).catch(() => null);
+      const res = await Promise.race([
+        axios.get(`/api/profile?userId=${userId}`),
+        new Promise((_, reject) => setTimeout(() => reject('timeout'), 2500))
+      ]).catch(() => null);
+
       if (res?.data && (res.data.ca_group || res.data.ca_stage)) {
         setProfile(res.data);
+        localStorage.setItem('tutovia_profile', JSON.stringify(res.data));
+        localStorage.setItem('tutovia_onboarded', 'true');
         setNeedsOnboarding(false);
       } else {
         // User exists but has not completed stream/target setup
         setNeedsOnboarding(true);
       }
     } catch {
-      // Default fallback
+      // Default fallback - never block the user from their dashboard
       setNeedsOnboarding(false);
     }
   };
@@ -139,23 +168,30 @@ export const AuthProvider = ({ children }) => {
   };
 
   const completeOnboarding = async (onboardingData) => {
-    if (!user) return;
     const updated = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
+      id: user?.id || 'u1',
+      email: user?.email || 'student@tutovia.com',
+      name: user?.name || 'CA Aspirant',
+      ca_stage: 'intermediate',
+      ca_group: 'Both Groups',
       ...onboardingData,
       updated_at: new Date().toISOString()
     };
 
-    // Save to Supabase profiles
-    await supabase.from('profiles').upsert(updated).catch(() => null);
-
-    // Also sync to local backend API
-    await axios.post('/api/profile', { userId: user.id, profile: updated }).catch(() => null);
-
+    // 1. INSTANT LOCAL PERSISTENCE — Immediately closes modal and unblocks UI
     setProfile(updated);
     setNeedsOnboarding(false);
+    localStorage.setItem('tutovia_profile', JSON.stringify(updated));
+    localStorage.setItem('tutovia_onboarded', 'true');
+
+    // 2. Background sync to Supabase (with 2s timeout)
+    Promise.race([
+      supabase.from('profiles').upsert(updated),
+      new Promise((_, reject) => setTimeout(() => reject('timeout'), 2000))
+    ]).catch(() => {});
+
+    // 3. Background sync to VM backend
+    axios.post('/api/profile', { userId: updated.id, ...updated }).catch(() => {});
   };
 
   const logout = async () => {

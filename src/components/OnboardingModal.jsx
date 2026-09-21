@@ -45,25 +45,23 @@ export default function OnboardingModal({ isOpen, onClose }) {
   const selectedStage = CA_STAGES.find(s => s.id === caStage);
   const showGroupSelector = caStage === 'intermediate' || caStage === 'final';
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     setIsSaving(true);
     try {
-      await completeOnboarding({
+      completeOnboarding({
         ca_stage: caStage,
-        ca_group: showGroupSelector ? caGroup : null,
+        ca_group: showGroupSelector ? caGroup : 'Both Groups',
         attempt,
         target_score: targetScore,
-        daily_study_hours: parseInt(studyHours, 10),
+        daily_study_hours: parseInt(studyHours, 10) || 8,
         wake_time: wakeTime,
         sleep_time: sleepTime,
         commitments: '09:00 - 13:00 College / Articleship'
       });
       if (onClose) onClose();
     } catch (err) {
-      console.error('Failed to save onboarding:', err);
-    } finally {
-      setIsSaving(false);
+      console.error('Failed to complete onboarding:', err);
     }
   };
 
@@ -81,6 +79,14 @@ export default function OnboardingModal({ isOpen, onClose }) {
               {step === 1 ? 'Step 1 of 2 — Select your CA Stage' : 'Step 2 of 2 — Personalize your study plan'}
             </p>
           </div>
+          {/* Skip for now option */}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white hover:bg-surface-border/50 transition-colors"
+          >
+            Skip for now
+          </button>
           {/* Step indicator */}
           <div className="flex items-center gap-1.5">
             <div className={`w-2.5 h-2.5 rounded-full transition-all ${step >= 1 ? 'bg-indigo-500' : 'bg-slate-700'}`} />

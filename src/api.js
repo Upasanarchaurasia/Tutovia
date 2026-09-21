@@ -24,6 +24,17 @@ api.interceptors.request.use(async (config) => {
   } catch {
     // Supabase offline or unreachable, continue
   }
+
+  try {
+    const cachedUser = localStorage.getItem('tutovia_user');
+    if (cachedUser) {
+      const u = JSON.parse(cachedUser);
+      if (u?.id) {
+        config.headers['x-user-id'] = u.id;
+      }
+    }
+  } catch {}
+
   return config;
 });
 
