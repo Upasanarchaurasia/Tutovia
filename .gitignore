@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing and Logs
+coverage/
+*.log
+backend.log
+backend-err.log
+frontend.log
+frontend-err.log
+
+# Build Outputs
+dist/
+build/
+Payload/
+*.ipa
+DerivedData/
+
+# Large local runtime zips and directories
+jdk17/
+jdk17.zip
+jdk21/
+jdk21.zip
+node-v20/
+node-v22/
+node.zip
+node22.zip
+tutovia.tar
+
+# Capacitor iOS generated artifacts
+ios/App/App/public/
+ios/App/Pods/
+ios/App/.build/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Environment files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor directories and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+.env
+.env*

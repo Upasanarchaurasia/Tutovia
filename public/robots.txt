@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /subject/
+Disallow: /exams
+Disallow: /flashcards
+Disallow: /wellness
+Disallow: /news
+Disallow: /community
+Disallow: /profile
+Disallow: /analytics
+Disallow: /pyq
+
+Sitemap: https://tutovia.com/sitemap.xml

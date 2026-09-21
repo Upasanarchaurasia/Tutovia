@@ -1,0 +1,81 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build Tutovia iOS App
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm install
+
+      - name: Build Web Production Assets
+        run: npm run build
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Set Xcode Version
+        run: sudo xcode-select -switch /Applications/Xcode_15.4.app || sudo xcode-select -switch /Applications/Xcode_16.0.app || true
+
+      - name: Build iOS App (.app)
+        run: |
+          xcodebuild clean build \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/DerivedData/Build/Products/Release-iphoneos/App.app Payload/
+          zip -r Tutovia.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tutovia-iOS-IPA
+          path: Tutovia.ipa
+          retention-days: 14
+
+      - name: Create GitHub Release with IPA
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/heads/')
+        with:
+          tag_name: v1.0.0-${{ github.run_number }}
+          name: Tutovia iOS App v1.0.0 (Build ${{ github.run_number }})
+          body: |
+            ## Tutovia iOS Build for Sideloadly
+            - **Bundle ID**: `org.tutovia.app`
+            - **Target**: iOS 13+ (Universal iPhone/iPad)
+            - **Backend Server**: `http://161.118.173.142`
+            - **Auth**: One-time persistent login enabled
+            
+            ### Installation Instructions with Sideloadly:
+            1. Download `Tutovia.ipa` below.
+            2. Open Sideloadly on your PC (make sure your iPhone is connected via USB).
+            3. Drag `Tutovia.ipa` into Sideloadly.
+            4. Enter your Apple ID and click **Start**.
+            5. Once installed, on your iPhone go to **Settings > General > VPN & Device Management**, tap your Apple ID and tap **Trust**.
+            6. Launch **Tutovia** on your iPhone!
+          files: Tutovia.ipa
+        continue-on-error: true

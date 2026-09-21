@@ -1,0 +1,1 @@
+const dotenv = require('dotenv'); dotenv.config(); fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Authorization': 'Bearer ' + process.env.GROQ_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'qwen/qwen3.6-27b', messages: [{role:'user',content:'hi'}] }) }).then(r=>r.json()).then(console.log).catch(console.error);

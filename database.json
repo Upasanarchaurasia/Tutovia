@@ -1,0 +1,204 @@
+{
+  "userProgressDB": {
+    "u1": {
+      "total_study_minutes": 40,
+      "completed_pomodoros": 1,
+      "completed_exams": 0,
+      "current_streak": 3
+    },
+    "u2": {
+      "total_study_minutes": 0,
+      "completed_pomodoros": 0,
+      "completed_exams": 0,
+      "current_streak": 1
+    },
+    "newuser": {
+      "total_study_minutes": 0,
+      "completed_pomodoros": 0,
+      "completed_exams": 0,
+      "current_streak": 3
+    }
+  },
+  "sleepDB": {
+    "u1": []
+  },
+  "userSettingsDB": {
+    "u1": {
+      "workDuration": 122,
+      "shortBreakDuration": 5,
+      "longBreakDuration": 15
+    }
+  },
+  "attemptsDB": [
+    {
+      "id": "att-1787381543509",
+      "user_id": "u1",
+      "user": "demo-student",
+      "exam_id": "mock-advanced-accounting-c1",
+      "exam_title": "Chapter Mock: Accounting Standards (50 Marks)",
+      "score_pct": 7,
+      "correct": 1,
+      "total": 15,
+      "time_taken_sec": 17,
+      "weak_topics": [
+        "AS 2: Inventory Valuation",
+        "AS 2: Cost Components",
+        "AS 2: Cost Formulas",
+        "AS 2: Overheads Allocation",
+        "AS 2: Definitions",
+        "AS 9: Sale of Goods",
+        "AS 9: Services",
+        "AS 9: Interest",
+        "AS 9: Uncertainty",
+        "AS 10: PPE",
+        "AS 11: Forex",
+        "AS 29: Contingencies",
+        "AS 10: Measurement",
+        "AS 29: Provisions"
+      ],
+      "strong_topics": [
+        "AS 9: Basics"
+      ],
+      "topic_stats": {
+        "AS 2: Inventory Valuation": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 2: Cost Components": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 2: Cost Formulas": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 2: Overheads Allocation": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 2: Definitions": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 9: Basics": {
+          "correct": 1,
+          "total": 1
+        },
+        "AS 9: Sale of Goods": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 9: Services": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 9: Interest": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 9: Uncertainty": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 10: PPE": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 11: Forex": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 29: Contingencies": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 10: Measurement": {
+          "correct": 0,
+          "total": 1
+        },
+        "AS 29: Provisions": {
+          "correct": 0,
+          "total": 1
+        }
+      },
+      "created_at": "2026-08-22T06:52:23.511Z"
+    }
+  ],
+  "flashcardProgressDB": {
+    "u1": {
+      "law-ch10-audit-1": "mastered",
+      "advacc-chapter-1-introduction-to-accounting-standards-1": "mastered",
+      "advacc-chapter-1-introduction-to-accounting-standards-6": "hard",
+      "advacc-chapter-1-introduction-to-accounting-standards-2": "good"
+    }
+  },
+  "importedFlashcards": [],
+  "scheduleDB": [
+    {
+      "id": "s1",
+      "time12": "09:00 AM",
+      "title": "Taxation (GST) Revision",
+      "type": "study",
+      "done": false,
+      "duration": "45 mins",
+      "link": "/subject/taxation"
+    },
+    {
+      "id": "s2",
+      "time12": "11:30 AM",
+      "title": "Auditing Standards Mock Exam",
+      "type": "exam",
+      "done": false,
+      "duration": "30 mins",
+      "link": "/exams?examId=auditing-ethics"
+    },
+    {
+      "id": "s3",
+      "time12": "02:00 PM",
+      "title": "Mindful Study Break",
+      "type": "wellness",
+      "done": false,
+      "duration": "15 mins",
+      "link": "/wellness"
+    },
+    {
+      "id": "s4",
+      "time12": "04:30 PM",
+      "title": "Corporate & Other Laws Practice",
+      "type": "study",
+      "done": false,
+      "duration": "45 mins",
+      "link": "/subject/corporate-laws"
+    }
+  ],
+  "moodDB": [],
+  "doubtsDB": [],
+  "newsDB": [],
+  "notificationsDB": [],
+  "usersDB": [
+    {
+      "id": "u1",
+      "email": "Chaurasiaupasana70@gmail.com",
+      "name": "Upasana",
+      "password": "password"
+    },
+    {
+      "id": "u2",
+      "email": "student2@icai.org",
+      "name": "Student Two",
+      "password": "password"
+    }
+  ],
+  "userProfileDB": {
+    "u1": {
+      "name": "Upasana",
+      "ca_stage": "intermediate",
+      "ca_group": "Both Groups",
+      "attempt": "May 2027",
+      "target_score": "60%",
+      "exam_date": "2027-05-10"
+    }
+  },
+  "waitlistDB": [],
+  "notesDB": {}
+}

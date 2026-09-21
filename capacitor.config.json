@@ -1,0 +1,16 @@
+{
+  "appId": "org.tutovia.app",
+  "appName": "Tutovia",
+  "webDir": "dist",
+  "server": {
+    "cleartext": true,
+    "allowNavigation": [
+      "161.118.173.142",
+      "*.supabase.co"
+    ]
+  },
+  "ios": {
+    "contentInset": "always",
+    "scheme": "Tutovia"
+  }
+}
