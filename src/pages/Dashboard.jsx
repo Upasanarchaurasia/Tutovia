@@ -293,11 +293,11 @@ export default function Dashboard({ onOpenTutor }) {
 
   const handleSaveMood = async () => {
     try {
-      await axios.post('/api/mood', { mood: selectedMood, note: moodNote });
+      await axios.post('/api/mood', { mood: selectedMood, note: moodNote, userId: user?.id });
       setShowMoodCheckIn(false);
       addToast(`Emotional Check-in saved. Have a great session!`, 'success');
       // Refresh moods
-      const moodRes = await axios.get(`/api/mood?userId=${user.id}`);
+      const moodRes = await axios.get(`/api/mood?userId=${user?.id}`);
       setMoods(moodRes.data);
     } catch (err) {
       console.error(err);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User as UserIcon, Settings, Target, Flame, Trophy, Clock, BookOpen, ChevronRight, LogOut, Shield, Edit2, Check, Loader2, Moon, Sun, AlertTriangle } from 'lucide-react';
+import { User as UserIcon, Settings, Target, Flame, Trophy, Clock, BookOpen, ChevronRight, LogOut, Shield, Edit2, Check, Loader2, Moon, Sun, AlertTriangle, Cloud, Smartphone, Laptop, RefreshCw } from 'lucide-react';
 import axios from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -13,7 +13,16 @@ export default function User() {
   const [isSaving, setIsSaving] = useState(false);
   const [progressData, setProgressData] = useState(null);
   const [icaiDates, setIcaiDates] = useState(null);
-  const { user, logout } = useAuth();
+  const { 
+    user, 
+    logout, 
+    syncStatus, 
+    lastSyncedAt, 
+    isSyncEnabled, 
+    triggerSync, 
+    toggleCloudSync, 
+    setShowSyncModal 
+  } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -67,6 +76,17 @@ export default function User() {
       addToast('Failed to save profile. Please try again.', 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleManualSync = async () => {
+    addToast('Initiating cloud sync with Supabase...', 'info');
+    const res = await triggerSync(true);
+    if (res?.success) {
+      addToast('Data successfully synced between iOS App and Website!', 'success');
+      fetchProfile();
+    } else {
+      addToast(res?.reason || 'Sync completed with local defaults.', 'info');
     }
   };
 
@@ -500,6 +520,97 @@ export default function User() {
           </div>
 
 
+
+          {/* CLOUD SYNCHRONIZATION (APP <-> WEBSITE) */}
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-indigo-500/30 mt-6 relative overflow-hidden bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                    <Cloud className="w-4 h-4" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white">Cross-Device Cloud Sync</h2>
+                </div>
+                <p className="text-slate-300 text-xs sm:text-sm">
+                  Keep your study timetable, streak, completed chapters, and mock scores synchronized between the Tutovia iOS App and Website via Supabase.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                  syncStatus === 'synced' 
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                    : syncStatus === 'syncing'
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    : 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${
+                    syncStatus === 'synced' ? 'bg-emerald-400' : syncStatus === 'syncing' ? 'bg-amber-400 animate-ping' : 'bg-indigo-400'
+                  }`} />
+                  {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'synced' ? 'Synced with Cloud' : 'Cloud Active'}
+                </span>
+              </div>
+            </div>
+
+            {/* Sync Details Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <div className="p-4 rounded-2xl bg-surface border border-surface-border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Connected Devices</span>
+                  <div className="flex items-center gap-1.5 text-indigo-400 text-xs font-medium">
+                    <Smartphone className="w-4 h-4" />
+                    <span>App</span>
+                    <span className="text-slate-500">↔</span>
+                    <Laptop className="w-4 h-4" />
+                    <span>Web</span>
+                  </div>
+                </div>
+                <p className="text-sm text-white font-medium">iOS App (org.tutovia.app) & Tutovia Web</p>
+                <p className="text-xs text-slate-400 mt-1">Changes made on your iPhone automatically appear on the website and vice versa.</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-surface border border-surface-border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sync Status</span>
+                  <span className="text-xs text-indigo-300">
+                    {lastSyncedAt ? `Last: ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Ready to sync'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-slate-300">Background Auto-Sync</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleCloudSync(!isSyncEnabled)}
+                    className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 ${isSyncEnabled ? 'bg-indigo-600' : 'bg-slate-700'}`}
+                  >
+                    <div className={`w-5 h-5 rounded-full bg-white transition-transform ${isSyncEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 mt-2">Continuous background sync keeps all study metrics identical.</p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={syncStatus === 'syncing'}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                <span>{syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now (Force Update)'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowSyncModal(true)}
+                className="px-4 py-2.5 rounded-xl bg-surface hover:bg-surface-hover text-slate-300 hover:text-white text-sm font-semibold border border-surface-border transition-colors cursor-pointer"
+              >
+                Open Sync Settings Dialog
+              </button>
+            </div>
+          </div>
 
           {/* DANGER ZONE - Hard Reset Controls */}
           <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-rose-500/30 mt-6 relative overflow-hidden bg-rose-500/5">

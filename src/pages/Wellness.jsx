@@ -101,7 +101,7 @@ export default function Wellness() {
       if (timerMode === 'work') {
         setCompletedSessions(prev => prev + 1);
         // Accumulate +25 mins to daily study hours and strike off matching schedule item in real time!
-        axios.post('/api/progress/study-hours', { minutesAdded: 25, isPomodoro: true, activityType: 'wellness' })
+        axios.post('/api/progress/study-hours', { minutesAdded: 25, isPomodoro: true, activityType: 'wellness', userId: user?.id })
           .then(() => {})
           .catch(() => {});
         alert('🎉 25-Minute Focus Session Completed! +25 mins added to Daily Study Hours & schedule updated.');

@@ -17,14 +17,18 @@ import {
   Layers,
   BarChart3,
   BookMarked,
-  Search
+  Search,
+  Cloud,
+  RefreshCw
 } from 'lucide-react';
 import axios from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useToast } from '../context/ToastContext.jsx';
 
 export function Navbar({ onOpenTutor }) {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, syncStatus, triggerSync } = useAuth();
+  const { addToast } = useToast();
   const [notifications, setNotifications] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [theme, setTheme] = useState('dark');
@@ -153,7 +157,36 @@ export function Navbar({ onOpenTutor }) {
               <span className="font-bold">{streak} <span className="hidden sm:inline">Day Streak</span><span className="sm:hidden">d</span></span>
             </div>
 
-                        {/* Theme Toggle */}
+                        {/* Cloud Sync Status & Quick-Sync Button */}
+            {user && (
+              <button
+                onClick={async () => {
+                  addToast('Syncing with Supabase Cloud...', 'info');
+                  const res = await triggerSync(true);
+                  if (res?.success) {
+                    addToast('App & Web data successfully synchronized!', 'success');
+                  } else {
+                    addToast(res?.reason || 'Synced with local data.', 'info');
+                  }
+                }}
+                className={`relative p-2 rounded-lg bg-surface-card hover:bg-slate-800 transition-colors border border-surface-border ${
+                  syncStatus === 'synced' ? 'text-emerald-400' : syncStatus === 'syncing' ? 'text-amber-400' : 'text-slate-300'
+                }`}
+                title="Cross-Device Cloud Sync (App ↔ Web)"
+                aria-label="Cross-Device Cloud Sync"
+              >
+                {syncStatus === 'syncing' ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Cloud className="w-5 h-5" />
+                )}
+                {syncStatus === 'synced' && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-background" />
+                )}
+              </button>
+            )}
+
+            {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg bg-surface-card hover:bg-slate-800 text-slate-300 transition-colors border border-surface-border"

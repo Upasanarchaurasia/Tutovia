@@ -7,6 +7,7 @@ import {
 import axios from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { SYLLABUS_BY_STAGE } from '../data/syllabusData.js';
+import { syncCompletedChapters } from '../services/syncService.js';
 
 export default function Subject() {
   const { id } = useParams();
@@ -29,12 +30,24 @@ export default function Subject() {
     } else {
       setCompletedChapters([]);
     }
+
+    // In background, sync with Supabase cloud if user is logged in
+    if (user?.id) {
+      syncCompletedChapters(user.id, id).then(synced => {
+        if (Array.isArray(synced) && synced.length > 0) {
+          setCompletedChapters(synced);
+        }
+      }).catch(() => {});
+    }
   }, [id, user?.id, userStorageKey]);
 
   const toggleChapter = (no) => {
     setCompletedChapters(prev => {
       const newList = prev.includes(no) ? prev.filter(c => c !== no) : [...prev, no];
       localStorage.setItem(userStorageKey, JSON.stringify(newList));
+      if (user?.id) {
+        syncCompletedChapters(user.id, id, newList).catch(() => {});
+      }
       return newList;
     });
   };

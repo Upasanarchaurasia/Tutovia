@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '../supabaseClient.js';
 import axios from '../api.js';
+import * as syncService from '../services/syncService.js';
 
 const AuthContext = createContext();
 
@@ -9,6 +10,12 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+
+  // Cloud Sync state
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'synced' | 'error'
+  const [lastSyncedAt, setLastSyncedAt] = useState(syncService.getLastSyncedTime());
+  const [isSyncEnabled, setIsSyncEnabled] = useState(syncService.isCloudSyncEnabled());
+  const [showSyncModal, setShowSyncModal] = useState(false);
 
   useEffect(() => {
     // 1. Initial check from persistent storage and Supabase session
@@ -80,6 +87,36 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
+  const triggerSync = async (forced = false) => {
+    if (!user?.id) return { success: false, reason: 'No user' };
+    if (!forced && !syncService.isCloudSyncEnabled()) return { success: false, reason: 'Sync disabled' };
+
+    setSyncStatus('syncing');
+    try {
+      const res = await syncService.syncAll(user.id);
+      if (res.success) {
+        setSyncStatus('synced');
+        setLastSyncedAt(res.timestamp);
+        if (res.profile) setProfile(res.profile);
+      } else {
+        setSyncStatus('idle');
+      }
+      return res;
+    } catch (err) {
+      console.error('[AuthContext] triggerSync error:', err);
+      setSyncStatus('error');
+      return { success: false, error: err };
+    }
+  };
+
+  const toggleCloudSync = (enabled) => {
+    syncService.setCloudSyncEnabled(enabled);
+    setIsSyncEnabled(enabled);
+    if (enabled && user?.id) {
+      triggerSync(true);
+    }
+  };
+
   const loadUserProfile = async (userId) => {
     if (!userId) return;
     try {
@@ -91,6 +128,7 @@ export const AuthProvider = ({ children }) => {
           if (cachedProfile && cachedProfile.id === userId && (cachedProfile.ca_group || cachedProfile.ca_stage)) {
             setProfile(cachedProfile);
             setNeedsOnboarding(false);
+            checkSyncPrompt(userId);
             return;
           }
         } catch {}
@@ -98,6 +136,7 @@ export const AuthProvider = ({ children }) => {
 
       if (localStorage.getItem(`tutovia_onboarded_${userId}`) === 'true') {
         setNeedsOnboarding(false);
+        checkSyncPrompt(userId);
         return;
       }
 
@@ -116,6 +155,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem(`tutovia_profile_${userId}`, JSON.stringify(sbProfile));
         localStorage.setItem(`tutovia_onboarded_${userId}`, 'true');
         setNeedsOnboarding(false);
+        checkSyncPrompt(userId);
         return;
       }
 
@@ -130,12 +170,23 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem(`tutovia_profile_${userId}`, JSON.stringify(res.data));
         localStorage.setItem(`tutovia_onboarded_${userId}`, 'true');
         setNeedsOnboarding(false);
+        checkSyncPrompt(userId);
       } else {
-        // Brand new user: trigger onboarding modal so they configure their own stage, group, and attempt
+        // Brand new user: trigger onboarding modal
         setNeedsOnboarding(true);
       }
     } catch {
       setNeedsOnboarding(false);
+    }
+  };
+
+  const checkSyncPrompt = (userId) => {
+    // If user has not seen the cross-device sync prompt yet, show it
+    if (!syncService.hasDismissedSyncPrompt()) {
+      setTimeout(() => setShowSyncModal(true), 1500);
+    } else if (syncService.isCloudSyncEnabled()) {
+      // Trigger background sync
+      triggerSync();
     }
   };
 
@@ -202,6 +253,26 @@ export const AuthProvider = ({ children }) => {
 
     // 3. Background sync to VM backend
     axios.post('/api/profile', { userId: updated.id, ...updated }).catch(() => {});
+
+    // 4. Prompt user to enable cross-device sync if not already prompted
+    if (!syncService.hasDismissedSyncPrompt()) {
+      setTimeout(() => setShowSyncModal(true), 1200);
+    }
+  };
+
+  const handleAcceptSync = async (autoSync) => {
+    syncService.setCloudSyncEnabled(autoSync);
+    syncService.setDismissedSyncPrompt(true);
+    setIsSyncEnabled(autoSync);
+    setShowSyncModal(false);
+    if (user?.id) {
+      await triggerSync(true);
+    }
+  };
+
+  const handleDeclineSync = () => {
+    syncService.setDismissedSyncPrompt(true);
+    setShowSyncModal(false);
   };
 
   const logout = async () => {
@@ -210,6 +281,8 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setProfile(null);
     setNeedsOnboarding(false);
+    setShowSyncModal(false);
+    setSyncStatus('idle');
     localStorage.removeItem('tutovia_user');
     localStorage.removeItem('tutovia_profile');
     localStorage.removeItem('tutovia_onboarded');
@@ -226,6 +299,15 @@ export const AuthProvider = ({ children }) => {
       profile, 
       loading,
       needsOnboarding, 
+      syncStatus,
+      lastSyncedAt,
+      isSyncEnabled,
+      showSyncModal,
+      setShowSyncModal,
+      handleAcceptSync,
+      handleDeclineSync,
+      triggerSync,
+      toggleCloudSync,
       login, 
       loginWithSupabase,
       signUpWithSupabase,

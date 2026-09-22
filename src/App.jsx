@@ -20,12 +20,13 @@ import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
 import TermsOfService from './pages/TermsOfService.jsx';
 import Contact from './pages/Contact.jsx';
 import OnboardingModal from './components/OnboardingModal.jsx';
+import CloudSyncModal from './components/CloudSyncModal.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 
 export default function App() {
   const [isTutorOpen, setIsTutorOpen] = useState(false);
-  const { user, needsOnboarding, loading } = useAuth();
+  const { user, needsOnboarding, loading, showSyncModal, handleAcceptSync, handleDeclineSync } = useAuth();
 
   // If auth state is still initializing from storage, show a minimal loading spinner to avoid route bouncing
   if (loading) {
@@ -97,6 +98,13 @@ export default function App() {
         {/* First-time Student CA Onboarding */}
         <OnboardingModal 
           isOpen={needsOnboarding} 
+        />
+
+        {/* Cross-Device Cloud Sync Prompt Modal */}
+        <CloudSyncModal 
+          isOpen={showSyncModal} 
+          onClose={handleDeclineSync} 
+          onAccept={handleAcceptSync} 
         />
 
         {/* Footer */}
