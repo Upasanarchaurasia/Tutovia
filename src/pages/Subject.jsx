@@ -37,20 +37,23 @@ export default function Subject() {
 
   useEffect(() => {
     fetchSubject();
-  }, [id]);
+  }, [id, user?.id]);
 
   const fetchSubject = async () => {
+    setLoading(true);
+    const uid = user?.id || 'u1';
+    const attempt = profile?.attempt || user?.attempt || 'September 2026';
     try {
       const [resSub, resChap, resMat, resNotes] = await Promise.all([
-        axios.get(`/api/subjects/${id}?userId=${user.id}`),
-        axios.get(`/api/chapters?subjectId=${id}`),
-        axios.get(`/api/materials?subjectId=${id}&attempt=${user.attempt || 'September 2026'}`),
-        axios.get(`/api/notes?userId=${user.id}&subjectId=${id}`).catch(() => ({ data: { notes: '' } }))
+        axios.get(`/api/subjects/${id}?userId=${uid}`).catch(() => ({ data: null })),
+        axios.get(`/api/chapters?subjectId=${id}`).catch(() => ({ data: [] })),
+        axios.get(`/api/materials?subjectId=${id}&attempt=${encodeURIComponent(attempt)}`).catch(() => ({ data: [] })),
+        axios.get(`/api/notes?userId=${uid}&subjectId=${id}`).catch(() => ({ data: { notes: '' } }))
       ]);
-      setSubject(resSub.data);
-      setChapters(resChap.data);
-      setMaterials(resMat.data);
-      setNotes(resNotes.data.notes || '');
+      if (resSub?.data) setSubject(resSub.data);
+      if (resChap?.data) setChapters(resChap.data);
+      if (resMat?.data) setMaterials(resMat.data);
+      setNotes(resNotes?.data?.notes || '');
     } catch (err) {
       console.error(err);
     } finally {
@@ -60,8 +63,9 @@ export default function Subject() {
 
   const saveNotes = async () => {
     setSavingNotes(true);
+    const uid = user?.id || 'u1';
     try {
-      await axios.post(`/api/notes?userId=${user.id}&subjectId=${id}`, { notes });
+      await axios.post(`/api/notes?userId=${uid}&subjectId=${id}`, { notes });
     } catch (err) {
       console.error(err);
     } finally {
@@ -80,9 +84,17 @@ export default function Subject() {
 
   if (!subject) {
     return (
-      <div className="text-center py-20">
-        <h2 className="text-2xl font-bold text-slate-300">Subject Not Found</h2>
-        <Link to="/" className="text-indigo-400 hover:underline mt-4 inline-block">Return to Dashboard</Link>
+      <div className="text-center py-20 space-y-4">
+        <h2 className="text-2xl font-bold text-slate-300">Subject Not Found or Loading Failed</h2>
+        <div className="flex items-center justify-center gap-4">
+          <button 
+            onClick={fetchSubject} 
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-sm transition-all"
+          >
+            Retry Loading
+          </button>
+          <Link to="/" className="text-indigo-400 hover:underline inline-block text-sm">Return to Dashboard</Link>
+        </div>
       </div>
     );
   }

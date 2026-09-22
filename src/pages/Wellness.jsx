@@ -43,22 +43,24 @@ export default function Wellness() {
 
   // Fetch Settings & Sleep Data
   useEffect(() => {
-    if (user) {
-      axios.get(`/api/settings?userId=${user.id}`).then(res => {
+    const uid = user?.id || 'u1';
+    axios.get(`/api/settings?userId=${uid}`).then(res => {
+      if (res?.data) {
         setSettings(res.data);
         setSettingsForm(res.data);
-        setTimeLeft(res.data.workDuration * 60);
-      }).catch(err => console.error(err));
+        if (res.data.workDuration) setTimeLeft(res.data.workDuration * 60);
+      }
+    }).catch(err => console.error(err));
 
-      axios.get(`/api/sleep?userId=${user.id}`).then(res => {
-        setSleepData(res.data);
-      }).catch(err => console.error(err));
-    }
-  }, [user]);
+    axios.get(`/api/sleep?userId=${uid}`).then(res => {
+      if (res?.data) setSleepData(res.data);
+    }).catch(err => console.error(err));
+  }, [user?.id]);
 
   const saveSettings = async () => {
+    const uid = user?.id || 'u1';
     try {
-      const res = await axios.post('/api/settings', { userId: user.id, settings: settingsForm });
+      const res = await axios.post('/api/settings', { userId: uid, settings: settingsForm });
       setSettings(res.data);
       setShowSettings(false);
       setTimerMode('work');
@@ -71,9 +73,10 @@ export default function Wellness() {
 
   const saveSleep = async (e) => {
     e.preventDefault();
+    const uid = user?.id || 'u1';
     try {
       const res = await axios.post('/api/sleep', {
-        userId: user.id,
+        userId: uid,
         hours: sleepHours,
         quality: sleepQuality,
         date: new Date().toLocaleDateString()

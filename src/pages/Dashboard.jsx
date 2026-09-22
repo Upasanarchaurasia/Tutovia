@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, Award, Clock, AlertTriangle, CheckCircle2, Calendar, 
   Smile, ArrowRight, Play, Sparkles, Timer, Brain, BellRing, 
-  AlertCircle, BookOpen, Target, ChevronRight, X
+  AlertCircle, BookOpen, Target, ChevronRight, X, RotateCcw
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import axios from '../api.js';
@@ -113,6 +113,7 @@ export default function Dashboard({ onOpenTutor }) {
   const [subjects, setSubjects] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const { user } = useAuth();
   const { addToast } = useToast();
@@ -153,28 +154,28 @@ export default function Dashboard({ onOpenTutor }) {
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [user?.id]);
 
   const fetchDashboardData = async () => {
+    setIsRefreshing(true);
+    const uid = user?.id || 'u1';
     try {
-      const profRes = await axios.get(`/api/profile?userId=${user.id}`);
-      setProfile(profRes.data);
-      
-      const groupParam = profRes.data.ca_group ? `&group=${encodeURIComponent(profRes.data.ca_group)}` : '';
+      const profRes = await axios.get(`/api/profile?userId=${uid}`).catch(() => ({ data: {} }));
+      if (profRes?.data) setProfile(profRes.data);
       
       const [progRes, schedRes, moodRes, subRes, analyticsRes] = await Promise.all([
-        axios.get(`/api/progress?userId=${user.id}`),
-        axios.get(`/api/schedule?userId=${user.id}`),
-        axios.get(`/api/mood?userId=${user.id}`),
-        axios.get(`/api/subjects?userId=${user.id}`),
-        axios.get(`/api/analytics?userId=${user.id}`)
+        axios.get(`/api/progress?userId=${uid}`).catch(() => ({ data: null })),
+        axios.get(`/api/schedule?userId=${uid}`).catch(() => ({ data: [] })),
+        axios.get(`/api/mood?userId=${uid}`).catch(() => ({ data: [] })),
+        axios.get(`/api/subjects?userId=${uid}`).catch(() => ({ data: [] })),
+        axios.get(`/api/analytics?userId=${uid}`).catch(() => ({ data: null }))
       ]);
       
-      setProgress(progRes.data);
-      setSchedule(schedRes.data);
-      setMoods(moodRes.data);
-      setSubjects(subRes.data);
-      setAnalytics(analyticsRes.data);
+      if (progRes?.data) setProgress(progRes.data);
+      if (schedRes?.data) setSchedule(Array.isArray(schedRes.data) ? schedRes.data : []);
+      if (moodRes?.data) setMoods(Array.isArray(moodRes.data) ? moodRes.data : []);
+      if (subRes?.data) setSubjects(Array.isArray(subRes.data) ? subRes.data : []);
+      if (analyticsRes?.data) setAnalytics(analyticsRes.data);
 
       // Show Mood Check-in if not logged today
       const today = new Date().toDateString();
@@ -210,6 +211,7 @@ export default function Dashboard({ onOpenTutor }) {
       console.error('Error fetching dashboard data:', err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -411,6 +413,15 @@ export default function Dashboard({ onOpenTutor }) {
               </div>
             )}
             <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchDashboardData()}
+              disabled={isRefreshing}
+              title="Refresh Dashboard"
+              className="px-3 py-2.5 rounded-xl bg-surface-card hover:bg-slate-800 text-slate-200 border border-surface-border flex items-center gap-2 transition-all text-sm font-semibold"
+            >
+              <RotateCcw className={`w-4 h-4 text-indigo-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
             <button
               onClick={onOpenTutor}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-static-white text-sm font-semibold shadow-lg shadow-indigo-600/20 flex items-center gap-2 transition-all hover:scale-105"

@@ -30,34 +30,34 @@ export default function Flashcards() {
 
   useEffect(() => {
     fetchData();
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     applyFilters();
   }, [flashcards, subjectFilter, progressFilter]);
 
   const fetchData = async () => {
-    if (!user?.id) return;
+    setLoading(true);
+    const uid = user?.id || 'u1';
     try {
       const [fcRes, subRes] = await Promise.all([
-        axios.get(`/api/flashcards?userId=${user.id}`),
-        axios.get(`/api/subjects?userId=${user.id}`)
+        axios.get(`/api/flashcards?userId=${uid}`).catch(() => ({ data: [] })),
+        axios.get(`/api/subjects?userId=${uid}`).catch(() => ({ data: [] }))
       ]);
-      setFlashcards(fcRes.data);
-      // Derive unique subjects from returned flashcards, cross-referenced with user's allowed subjects
-      setAvailableSubjects(subRes.data);
-      setLoading(false);
+      setFlashcards(Array.isArray(fcRes.data) ? fcRes.data : []);
+      setAvailableSubjects(Array.isArray(subRes.data) ? subRes.data : []);
     } catch (error) {
       console.error(error);
+    } finally {
       setLoading(false);
     }
   };
 
   const fetchFlashcards = async () => {
-    if (!user?.id) return;
+    const uid = user?.id || 'u1';
     try {
-      const res = await axios.get(`/api/flashcards?userId=${user.id}`);
-      setFlashcards(res.data);
+      const res = await axios.get(`/api/flashcards?userId=${uid}`).catch(() => ({ data: [] }));
+      setFlashcards(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error(error);
     }

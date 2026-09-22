@@ -37,20 +37,21 @@ export default function Exams() {
   const examIdParam = searchParams.get('examId');
   const subjectIdParam = searchParams.get('subject');
 
-  useEffect(() => {
-    if (!user?.id) return;
+  const fetchExamsData = () => {
+    setLoading(true);
+    const uid = user?.id || 'u1';
     Promise.all([
-      axios.get(`/api/exams?userId=${user.id}`),
-      axios.get(`/api/progress?userId=${user.id}`),
-      axios.get(`/api/profile?userId=${user.id}`)
+      axios.get(`/api/exams?userId=${uid}`).catch(() => ({ data: [] })),
+      axios.get(`/api/progress?userId=${uid}`).catch(() => ({ data: { attempts: [] } })),
+      axios.get(`/api/profile?userId=${uid}`).catch(() => ({ data: { ca_group: 'Both Groups' } }))
     ])
     .then(([examsRes, progRes, profileRes]) => {
-      // Filter out basic general knowledge quizzes, only keep CA related
-      const filteredExams = examsRes.data.filter(e => e.id !== 'gk-1' && e.id !== 'gk-2');
+      const examsData = Array.isArray(examsRes.data) ? examsRes.data : [];
+      const filteredExams = examsData.filter(e => e.id !== 'gk-1' && e.id !== 'gk-2');
       setExams(filteredExams);
-      setAttempts(progRes.data.attempts || []);
+      setAttempts(progRes.data?.attempts || []);
       
-      const userGroup = profileRes.data.ca_group || "Both Groups";
+      const userGroup = profileRes.data?.ca_group || "Both Groups";
       let availableSubjects = caSubjects;
       if (userGroup !== "Both Groups") {
         availableSubjects = caSubjects.filter(s => s.group === userGroup);
@@ -64,7 +65,11 @@ export default function Exams() {
     })
     .catch(err => console.error(err))
     .finally(() => setLoading(false));
-  }, [subjectIdParam, user]);
+  };
+
+  useEffect(() => {
+    fetchExamsData();
+  }, [subjectIdParam, user?.id]);
 
   useEffect(() => {
     if (examIdParam && !activeExam && !isSubmitted && exams.length > 0) {

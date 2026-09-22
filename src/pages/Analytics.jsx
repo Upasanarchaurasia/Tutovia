@@ -196,19 +196,20 @@ export default function Analytics() {
 
   useEffect(() => {
     const fetchAnalytics = async () => {
+      const uid = user?.id || 'u1';
       try {
-        if (user && user.id) {
-          const res = await axios.get(`/api/analytics?userId=${user.id}`);
+        const res = await axios.get(`/api/analytics?userId=${uid}`).catch(() => null);
+        if (res?.data) {
           setAnalyticsData(res.data);
         }
       } catch {
         // fall back to mock
       } finally {
-        setTimeout(() => setLoading(false), 600);
+        setLoading(false);
       }
     };
     fetchAnalytics();
-  }, [user]);
+  }, [user?.id]);
 
   const stats = analyticsData
     ? [

@@ -12,19 +12,24 @@ const isMobileOrLocal = typeof window !== 'undefined' && (
 const API_BASE = import.meta.env.VITE_API_URL || (isMobileOrLocal ? 'http://161.118.173.142' : '');
 
 const api = axios.create({
-  baseURL: API_BASE
+  baseURL: API_BASE,
+  timeout: 15000 // 15-second timeout ensures requests fail fast if connection drops
 });
 
 api.interceptors.request.use(async (config) => {
+  // 1. Non-blocking Supabase token check with fast 200ms timeout race
   try {
-    const { data } = await supabase.auth.getSession();
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('timeout'), 200));
+    const { data } = await Promise.race([sessionPromise, timeoutPromise]);
     if (data?.session?.access_token) {
       config.headers.Authorization = `Bearer ${data.session.access_token}`;
     }
   } catch {
-    // Supabase offline or unreachable, continue
+    // Supabase offline, paused, or timed out - proceed without blocking request
   }
 
+  // 2. Attach user ID header for resilient server-side fallback
   try {
     const cachedUser = localStorage.getItem('tutovia_user');
     if (cachedUser) {

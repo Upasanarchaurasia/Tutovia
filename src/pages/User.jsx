@@ -19,10 +19,8 @@ export default function User() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
-      fetchProfile();
-    }
-  }, [user]);
+    fetchProfile();
+  }, [user?.id]);
 
   useEffect(() => {
     if (isEditing && formData.attempt) {
@@ -33,16 +31,17 @@ export default function User() {
   }, [isEditing, formData.attempt]);
 
   const fetchProfile = async () => {
+    const uid = user?.id || 'u1';
     try {
-      const res = await axios.get(`/api/profile?userId=${user.id}`);
+      const res = await axios.get(`/api/profile?userId=${uid}`).catch(() => ({ data: {} }));
       setProfile(res.data);
       setFormData(res.data);
       
-      const progRes = await axios.get(`/api/progress?userId=${user.id}`);
-      setProgressData(progRes.data);
+      const progRes = await axios.get(`/api/progress?userId=${uid}`).catch(() => ({ data: null }));
+      if (progRes?.data) setProgressData(progRes.data);
 
-      const datesRes = await axios.get(`/api/icai-exam-dates?attempt=${encodeURIComponent(res.data.attempt || '')}`);
-      setIcaiDates(datesRes.data);
+      const datesRes = await axios.get(`/api/icai-exam-dates?attempt=${encodeURIComponent(res.data?.attempt || '')}`).catch(() => ({ data: null }));
+      if (datesRes?.data) setIcaiDates(datesRes.data);
     } catch (err) {
       console.error(err);
     }
@@ -50,11 +49,12 @@ export default function User() {
 
   const handleSave = async () => {
     setIsSaving(true);
+    const uid = user?.id || 'u1';
     try {
-      const res = await axios.post(`/api/profile?userId=${user.id}`, formData);
+      const res = await axios.post(`/api/profile?userId=${uid}`, formData);
       setProfile(res.data);
-      const datesRes = await axios.get(`/api/icai-exam-dates?attempt=${encodeURIComponent(res.data.attempt || '')}`);
-      setIcaiDates(datesRes.data);
+      const datesRes = await axios.get(`/api/icai-exam-dates?attempt=${encodeURIComponent(res.data?.attempt || '')}`).catch(() => ({ data: null }));
+      if (datesRes?.data) setIcaiDates(datesRes.data);
       setIsEditing(false);
       addToast('Profile updated successfully!', 'success');
     } catch (err) {

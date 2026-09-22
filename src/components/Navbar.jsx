@@ -57,14 +57,15 @@ export function Navbar({ onOpenTutor }) {
   };
 
   useEffect(() => {
-    axios.get('/api/notifications').then(res => setNotifications(res.data)).catch(() => {});
-    if (user?.id) {
-      axios.get(`/api/progress?userId=${user.id}`).then(res => {
-        setStudyHours(res.data.study_hours_today);
-        setStreak(res.data.current_streak);
-      }).catch(() => {});
-    }
-  }, [location.pathname, user]);
+    const uid = user?.id || 'u1';
+    axios.get('/api/notifications').then(res => setNotifications(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+    axios.get(`/api/progress?userId=${uid}`).then(res => {
+      if (res?.data) {
+        setStudyHours(res.data.study_hours_today || '0.00');
+        setStreak(res.data.current_streak || 0);
+      }
+    }).catch(() => {});
+  }, [location.pathname, user?.id]);
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },

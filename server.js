@@ -262,7 +262,7 @@ Respond ONLY with the JSON object.`
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'qwen/qwen3.6-27b',
+        model: 'openai/gpt-oss-20b',
         messages: groqMessages,
         temperature: 0.1,
         response_format: { type: "json_object" }
@@ -783,6 +783,7 @@ app.post('/api/exams/submit', (req, res) => {
 
 // Timetable Schedule API with 12-Hour Format & Auto-Overdue Reminders
 app.get('/api/schedule', (req, res) => {
+  const uid = req.user ? req.user.id : (req.query.userId || 'u1');
   const now = new Date();
   const currentTotalMins = now.getHours() * 60 + now.getMinutes();
 
@@ -1177,7 +1178,7 @@ app.get('/api/news', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'qwen/qwen3.6-27b',
+        model: 'openai/gpt-oss-20b',
         messages: groqMessages,
         temperature: 0.3,
         response_format: { type: "json_object" }
@@ -1306,7 +1307,7 @@ app.post('/api/tutor/chat', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         messages: groqMessages,
         temperature: 0.7,
         max_tokens: 1024
@@ -1351,7 +1352,7 @@ app.post('/api/counselor/chat', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         messages: groqMessages,
         temperature: 0.7,
         max_tokens: 1024
@@ -1448,7 +1449,7 @@ app.post('/api/progress/reset', (req, res) => {
     return res.json({ success: true, message: "Exam progress reset successfully." });
   } else if (type === 'flashcards') {
     // Clear flashcard progress for user
-    const userFlashcards = flashcardsProgressDB[uid] || {};
+    const userFlashcards = flashcardProgressDB[uid] || {};
     Object.keys(userFlashcards).forEach(key => {
       userFlashcards[key].status = 'pending';
       userFlashcards[key].confidence = null;
@@ -1502,20 +1503,33 @@ Each object should have the exact following structure:
   "explanation": "Brief explanation of why this is correct."
 }`;
 
-    const completion = await groq.chat.completions.create({
-      messages: [{ role: "user", content: prompt }],
-      model: "qwen-2.5-32b",
-      temperature: 0.3,
-      max_tokens: 1000,
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-20b',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 2500
+      })
     });
 
-    let rawText = completion.choices[0]?.message?.content || "[]";
+    const completion = await response.json();
+    let rawText = completion.choices && completion.choices[0]?.message?.content ? completion.choices[0].message.content : "[]";
     // Clean up potential markdown formatting
     rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     
     let questions;
     try {
-      questions = JSON.parse(rawText);
+      const match = rawText.match(/\[[\s\S]*\]/);
+      const jsonCandidate = (match ? match[0] : rawText)
+        .replace(/\/\/[^\n]*/g, '')
+        .replace(/,\s*([\]}])/g, '$1')
+        .trim();
+      questions = JSON.parse(jsonCandidate);
     } catch (e) {
       console.error("Failed to parse AI JSON:", rawText);
       return res.status(500).json({ error: 'Failed to parse AI response' });
