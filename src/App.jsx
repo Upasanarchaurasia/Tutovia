@@ -77,7 +77,7 @@ export default function App() {
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <BottomNav />
+        <BottomNav onOpenTutor={() => setIsTutorOpen(true)} />
 
         {/* Floating Slide-over AI Tutor Assistant */}
         <TutorChat 

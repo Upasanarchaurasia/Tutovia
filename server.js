@@ -26,6 +26,7 @@ const requireAuth = async (req, res, next) => {
     '/api/icai-exam-dates',
     '/api/news',
     '/api/tutor/chat', 
+    '/api/counselor/chat',
     '/api/auth/login', 
     '/api/auth/register'
   ];
@@ -1372,6 +1373,51 @@ app.post('/api/doubts/:id/replies', (req, res) => {
   res.json(doubt);
 });
 
+// Centralized Resilient Groq AI completions with automatic model fallback
+async function callGroqChat({ messages, temperature = 0.5, max_tokens = 1024, response_format = null }) {
+  const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      const payload = {
+        model,
+        messages,
+        temperature,
+        max_tokens
+      };
+      if (response_format) payload.response_format = response_format;
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.warn(`[Groq] Model ${model} returned status ${response.status}: ${errText}`);
+        lastError = new Error(`Groq status ${response.status}: ${errText}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        return content;
+      }
+    } catch (err) {
+      console.warn(`[Groq] Failed calling model ${model}:`, err.message);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("All Groq models failed");
+}
+
 // News API (Powered by Real-Time RSS + Groq)
 let newsLastFetched = 0;
 app.get('/api/news', async (req, res) => {
@@ -1433,22 +1479,12 @@ app.get('/api/news', async (req, res) => {
       }
     ];
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
-        messages: groqMessages,
-        temperature: 0.3,
-        response_format: { type: "json_object" }
-      })
+    const replyText = await callGroqChat({
+      messages: groqMessages,
+      temperature: 0.3,
+      max_tokens: 1500,
+      response_format: { type: "json_object" }
     });
-
-    const data = await response.json();
-    let replyText = data.choices[0].message.content;
     
     // Sometimes Groq wraps JSON array in an object if response_format is json_object
     let parsed = JSON.parse(replyText);
@@ -1544,47 +1580,40 @@ app.get('/api/notifications', (req, res) => res.json(notificationsDB));
 
 // AI Tutor Endpoint
 app.post('/api/tutor/chat', async (req, res) => {
-  const { messages } = req.body;
+  const { messages, userContext } = req.body;
   try {
-    const groqMessages = [
-      { role: 'system', content: 'You are Tutovia AI, a 24/7 Mindful Study & Finance Coach. You specialize in Financial Accounting, Corporate Finance, NPV/WACC formulas, and study strategies. Your answers MUST be extremely concise, effective, and straight to the point. Do not write long paragraphs that confuse the user. Provide highly actionable and brief explanations. Answer in Markdown.' }
-    ];
+    let systemPrompt = 'You are Tutovia AI, a dedicated 24/7 Mindful Study & Finance Coach for CA (Chartered Accountancy) students. You specialize in Accounting Standards (AS & Ind AS), Corporate Laws, Direct & Indirect Taxation (GST/Income Tax), Costing, Auditing, and FM-SM. Give direct, clear, accurate, and encouraging answers in clean Markdown without hallucinating. Format equations, journal entries, and steps cleanly.';
     
-    if (messages && messages.length > 0) {
+    if (userContext) {
+      if (userContext.name) systemPrompt += ` The student's name is ${userContext.name}.`;
+      if (userContext.ca_group) systemPrompt += ` Enrolled in CA Intermediate (${userContext.ca_group}).`;
+      if (userContext.attempt) systemPrompt += ` Target exam attempt: ${userContext.attempt}.`;
+    }
+
+    const groqMessages = [{ role: 'system', content: systemPrompt }];
+
+    if (Array.isArray(messages) && messages.length > 0) {
       messages.forEach(m => {
+        const text = (m.text || m.content || '').trim() || (m.image ? '[User attached a problem document image]' : 'Hello');
         groqMessages.push({
-          role: m.sender === 'bot' ? 'assistant' : 'user',
-          content: m.text
+          role: m.sender === 'bot' || m.role === 'assistant' ? 'assistant' : 'user',
+          content: text
         });
       });
     } else {
-      // Fallback if no history provided
       groqMessages.push({ role: 'user', content: 'Hello' });
     }
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
-        messages: groqMessages,
-        temperature: 0.7,
-        max_tokens: 1024
-      })
+    const reply = await callGroqChat({
+      messages: groqMessages,
+      temperature: 0.6,
+      max_tokens: 1024
     });
 
-    const data = await response.json();
-    const replyText = data.choices && data.choices[0] && data.choices[0].message.content 
-      ? data.choices[0].message.content 
-      : "I'm having trouble retrieving my notes. Please try again later.";
-    
-    res.json({ reply: replyText });
+    res.json({ reply });
   } catch (error) {
     console.error("Groq API Error (Tutor):", error);
-    res.status(500).json({ reply: "I'm sorry, my connection to the internet was interrupted." });
+    res.status(500).json({ reply: "I apologize, my AI study cloud experienced a temporary network delay. Please ask your question once more!" });
   }
 });
 
@@ -1592,44 +1621,31 @@ app.post('/api/tutor/chat', async (req, res) => {
 app.post('/api/counselor/chat', async (req, res) => {
   const { messages } = req.body;
   try {
-    const groqMessages = [
-      { role: 'system', content: 'You are Dr. Maya, a Mindful Life & Career Counselor at Tutovia. You are an empathetic counselor. You help students with exam stress, career paths in finance and business, and balancing study hours with personal wellness. IMPORTANT: Recognize the user\'s emotions. If they are anxious or overwhelmed, they will not read big paragraphs. Your replies MUST be very comforting, concise, and have a soft, human-like touch. Avoid long texts. Give short, warm, and structured advice. Answer in Markdown.' }
-    ];
+    const systemPrompt = "You are Dr. Maya, a Mindful Life & Career Counselor at Tutovia. You are an empathetic, compassionate counselor helping CA students with exam anxiety, study-life balance, motivation, and mental wellness. Answer warmly, concisely, and with encouraging, structured advice in Markdown. Avoid overwhelming the student with giant blocks of text.";
+    const groqMessages = [{ role: 'system', content: systemPrompt }];
 
-    if (messages && messages.length > 0) {
+    if (Array.isArray(messages) && messages.length > 0) {
       messages.forEach(m => {
+        const text = (m.text || m.content || '').trim() || 'Hello';
         groqMessages.push({
-          role: m.sender === 'counselor' ? 'assistant' : 'user',
-          content: m.text
+          role: m.sender === 'counselor' || m.role === 'assistant' ? 'assistant' : 'user',
+          content: text
         });
       });
     } else {
       groqMessages.push({ role: 'user', content: 'Hello' });
     }
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
-        messages: groqMessages,
-        temperature: 0.7,
-        max_tokens: 1024
-      })
+    const reply = await callGroqChat({
+      messages: groqMessages,
+      temperature: 0.7,
+      max_tokens: 1024
     });
 
-    const data = await response.json();
-    const replyText = data.choices && data.choices[0] && data.choices[0].message.content 
-      ? data.choices[0].message.content 
-      : "I'm having a hard time focusing right now. Let's take a deep breath and try again.";
-    
-    res.json({ reply: replyText, timestamp: new Date().toISOString() });
+    res.json({ reply, timestamp: new Date().toISOString() });
   } catch (error) {
     console.error("Groq API Error (Counselor):", error);
-    res.status(500).json({ reply: "I'm here for you, but my connection seems to have dropped. Can we try again?" });
+    res.status(500).json({ reply: "I'm right here with you! It seems there was a minor network hiccup. Let's take a deep breath and try sending your thought once more.", timestamp: new Date().toISOString() });
   }
 });
 
@@ -1765,22 +1781,16 @@ Each object should have the exact following structure:
   "explanation": "Brief explanation of why this is correct."
 }`;
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
+    let rawText = "[]";
+    try {
+      rawText = await callGroqChat({
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
         max_tokens: 2500
-      })
-    });
-
-    const completion = await response.json();
-    let rawText = completion.choices && completion.choices[0]?.message?.content ? completion.choices[0].message.content : "[]";
+      });
+    } catch (e) {
+      console.error("Groq Exam Generation error:", e);
+    }
     // Clean up potential markdown formatting
     rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     

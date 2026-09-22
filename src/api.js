@@ -13,7 +13,7 @@ const API_BASE = import.meta.env.VITE_API_URL || (isMobileOrLocal ? 'http://161.
 
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 15000 // 15-second timeout ensures requests fail fast if connection drops
+  timeout: 30000 // 30-second timeout allows Groq AI generation without premature abort
 });
 
 api.interceptors.request.use(async (config) => {

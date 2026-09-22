@@ -13,7 +13,9 @@ import {
   Users, 
   User,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Brain,
+  Sparkles
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -75,6 +77,28 @@ export default function BottomNav({ onOpenTutor }) {
                   <X className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Quick AI Tutor Action Button for Mobile */}
+              {onOpenTutor && (
+                <button
+                  onClick={() => { setShowMoreMenu(false); onOpenTutor(); }}
+                  className="w-full mb-3 p-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white font-bold flex items-center justify-between shadow-lg shadow-indigo-600/30 border border-indigo-400/40 hover:scale-[1.01] transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0">
+                      <Brain className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                        Ask Tutovia AI Tutor
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                      </h4>
+                      <p className="text-[11px] text-indigo-100 font-normal">24/7 answers for AS, Law, Tax & Costing</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-indigo-200" />
+                </button>
+              )}
 
               <div className="space-y-2 mb-4">
                 {moreItems.map(item => {

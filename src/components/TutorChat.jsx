@@ -130,7 +130,7 @@ export function TutorChat({ isOpen, onClose }) {
     } catch (err) {
       setMessages(prev => [...prev, {
         sender: 'bot',
-        text: "Sorry, I had trouble connecting to the local tutor service. Make sure your local `server.js` is running on port 5000."
+        text: "I apologize, my connection to the AI study cloud experienced a momentary delay. Please try asking your question again!"
       }]);
     } finally {
       setLoading(false);
