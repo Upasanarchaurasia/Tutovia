@@ -129,6 +129,9 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+  .safe-area-pb {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
 }
 .preserve-3d { transform-style: preserve-3d; }
 .backface-hidden { backface-visibility: hidden; }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, Award, Clock, AlertTriangle, CheckCircle2, Calendar, 
@@ -164,12 +164,13 @@ export default function Dashboard({ onOpenTutor }) {
       if (profRes?.data) setProfile(profRes.data);
       
       const [progRes, schedRes, moodRes, subRes, analyticsRes] = await Promise.all([
+        axios.post('/api/progress/check-in', { userId: uid }).catch(() => null),
         axios.get(`/api/progress?userId=${uid}`).catch(() => ({ data: null })),
         axios.get(`/api/schedule?userId=${uid}`).catch(() => ({ data: [] })),
         axios.get(`/api/mood?userId=${uid}`).catch(() => ({ data: [] })),
         axios.get(`/api/subjects?userId=${uid}`).catch(() => ({ data: [] })),
         axios.get(`/api/analytics?userId=${uid}`).catch(() => ({ data: null }))
-      ]);
+      ]).then(([, p, s, m, sub, a]) => [p, s, m, sub, a]);
       
       if (progRes?.data) setProgress(progRes.data);
       if (schedRes?.data) setSchedule(Array.isArray(schedRes.data) ? schedRes.data : []);
@@ -301,30 +302,43 @@ export default function Dashboard({ onOpenTutor }) {
     }
   };
 
-  // --- Exam Countdown Logic ---
+  // --- Official ICAI Exam Countdown Logic (Group-Aware) ---
   const [daysToExam, setDaysToExam] = useState(null);
+  const [officialExamMeta, setOfficialExamMeta] = useState(null);
   
   useEffect(() => {
     if (profile?.attempt) {
-      // E.g. "May 2027" -> Parse month and year
-      const [monthStr, yearStr] = profile.attempt.split(' ');
-      const monthMap = {
-        'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
-        'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11,
-        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-      };
-      const monthIndex = monthMap[monthStr] || 4; // Default May
-      const year = parseInt(yearStr, 10) || 2027;
-      
-      const targetDate = new Date(year, monthIndex, 1);
-      const todayDate = new Date();
-      
-      const diffTime = targetDate - todayDate;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      setDaysToExam(diffDays > 0 ? diffDays : 0);
+      const attempt = profile.attempt || "September 2026";
+      const group = profile.ca_group || "Both Groups";
+      const stage = profile.ca_stage || "intermediate";
+
+      axios.get(`/api/icai-exam-dates?attempt=${encodeURIComponent(attempt)}&group=${encodeURIComponent(group)}&stage=${encodeURIComponent(stage)}`)
+        .then(res => {
+          if (res?.data) {
+            setDaysToExam(res.data.daysLeft !== undefined ? res.data.daysLeft : 0);
+            setOfficialExamMeta(res.data);
+          }
+        })
+        .catch(() => {
+          const [monthStr, yearStr] = attempt.split(' ');
+          const monthMap = { 'January': 0, 'Jan': 0, 'May': 4, 'September': 8, 'Sep': 8, 'November': 10 };
+          const monthIndex = monthMap[monthStr] !== undefined ? monthMap[monthStr] : 8;
+          const year = parseInt(yearStr, 10) || 2026;
+          const day = group === 'Group 2' ? 19 : 12;
+          const targetDate = new Date(year, monthIndex, day);
+          const diffDays = Math.max(0, Math.ceil((targetDate - new Date()) / (1000 * 60 * 60 * 24)));
+          setDaysToExam(diffDays);
+        });
     }
-  }, [profile?.attempt]);
+  }, [profile?.attempt, profile?.ca_group, profile?.ca_stage]);
+
+  // Client-side strict group filter safeguard for subjects
+  const displayedSubjects = useMemo(() => {
+    if (!profile?.ca_group || profile.ca_group === 'Both Groups') {
+      return subjects;
+    }
+    return subjects.filter(s => s.group === profile.ca_group);
+  }, [subjects, profile?.ca_group]);
 
   if (loading) {
     return (
@@ -448,7 +462,7 @@ export default function Dashboard({ onOpenTutor }) {
         </div>
       </div>
 
-      {!isFocusMode && <ExamCountdown />}
+      {!isFocusMode && <ExamCountdown profile={profile} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -584,7 +598,7 @@ export default function Dashboard({ onOpenTutor }) {
                   <span className="text-[10px] text-amber-400">Calculated</span>
                 </>
               ) : (
-                <span className="text-sm font-semibold text-slate-300">Need more data</span>
+                <span className="text-sm font-medium text-slate-400">Calculating...</span>
               )}
             </div>
           </div>
@@ -595,19 +609,13 @@ export default function Dashboard({ onOpenTutor }) {
       {/* Gamification Badge Row */}
       <BadgeGallery progress={progress} compact={true} />
 
-      {/* 5. My Weaknesses Map */}
+      {/* 5. Weak Topics Spotlight */}
       {analytics?.weaknesses && analytics.weaknesses.length > 0 && (
-        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-surface-border">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
-              <AlertCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white leading-tight">My Weaknesses Map</h2>
-              <p className="text-xs text-slate-400">Topics you struggled with in recent mocks. Review these before your next exam.</p>
-            </div>
-          </div>
-
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-rose-400" />
+            Priority Focus Areas
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {analytics.weaknesses.map((weakness, idx) => (
               <div key={idx} className="p-5 rounded-2xl bg-surface-card border border-surface-border hover:border-rose-500/30 transition-all">
@@ -640,8 +648,8 @@ export default function Dashboard({ onOpenTutor }) {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {subjects.length > 0 ? (
-            subjects.map(sub => (
+          {displayedSubjects.length > 0 ? (
+            displayedSubjects.map(sub => (
               <SubjectCard key={sub.id} subject={sub} />
             ))
           ) : (

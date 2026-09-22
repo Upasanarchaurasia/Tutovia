@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Flame, TrendingUp, Award, Clock, BarChart3, Brain } from "lucide-react";
 import {
@@ -193,14 +193,21 @@ export default function Analytics() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [analyticsData, setAnalyticsData] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       const uid = user?.id || 'u1';
       try {
-        const res = await axios.get(`/api/analytics?userId=${uid}`).catch(() => null);
+        const [res, profRes] = await Promise.all([
+          axios.get(`/api/analytics?userId=${uid}`).catch(() => null),
+          axios.get(`/api/profile?userId=${uid}`).catch(() => null)
+        ]);
         if (res?.data) {
           setAnalyticsData(res.data);
+        }
+        if (profRes?.data) {
+          setUserProfile(profRes.data);
         }
       } catch {
         // fall back to mock
@@ -211,41 +218,67 @@ export default function Analytics() {
     fetchAnalytics();
   }, [user?.id]);
 
+  const displayedMasteryData = useMemo(() => {
+    if (analyticsData?.subjectMasteryData && analyticsData.subjectMasteryData.length > 0) {
+      return analyticsData.subjectMasteryData;
+    }
+    const grp = userProfile?.ca_group || "Both Groups";
+    if (grp === "Group 1") {
+      return subjectMasteryData.filter(s => 
+        s.subject.includes("Accounting") || s.subject.includes("Laws") || s.subject.includes("Taxation")
+      );
+    }
+    if (grp === "Group 2") {
+      return subjectMasteryData.filter(s => 
+        s.subject.includes("Cost") || s.subject.includes("Auditing") || s.subject.includes("FM")
+      );
+    }
+    return subjectMasteryData;
+  }, [analyticsData?.subjectMasteryData, userProfile?.ca_group]);
+
   const stats = analyticsData
     ? [
         { icon: Clock,      label: "Total Study Hours (This Week)", value: `${analyticsData.weeklyHours}h`,    sub: "vs 18h last week",           color: "bg-indigo-500" },
         { icon: TrendingUp, label: "Average Daily Hours",            value: `${analyticsData.avgDailyHours}h`, sub: "Goal: 6h/day",               color: "bg-purple-500" },
         { icon: Award,      label: "Exams Taken",                    value: analyticsData.examsTaken,          sub: `${analyticsData.passRate}% pass rate`, color: "bg-emerald-500" },
-        { icon: Flame,      label: "Current Streak",                 value: `${analyticsData.streak} days`,   sub: "Personal best: 42d",         color: "bg-orange-500" },
+        { icon: Flame,      label: "Current Streak",                 value: `${analyticsData.streak} days`,   sub: "Verified IST daily check-in", color: "bg-orange-500" },
       ]
     : [
         { icon: Clock,      label: "Total Study Hours (This Week)", value: "23h",      sub: "vs 18h last week",   color: "bg-indigo-500" },
         { icon: TrendingUp, label: "Average Daily Hours",            value: "3.3h",    sub: "Goal: 6h/day",       color: "bg-purple-500" },
         { icon: Award,      label: "Exams Taken",                    value: "41",      sub: "78% pass rate",      color: "bg-emerald-500" },
-        { icon: Flame,      label: "Current Streak",                 value: "14 days", sub: "Personal best: 42d", color: "bg-orange-500" },
+        { icon: Flame,      label: "Current Streak",                 value: "14 days", sub: "Verified IST daily check-in", color: "bg-orange-500" },
       ];
+
+  const groupLabel = userProfile?.ca_group || analyticsData?.group || "Both Groups";
 
   return (
     <AnimatePresence>
-      <div className="min-h-screen bg-background text-white p-6 md:p-10">
+      <div className="min-h-screen bg-background text-white p-4 sm:p-6 md:p-10 space-y-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mb-8"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl bg-indigo-500/20">
-              <BarChart3 className="w-6 h-6 text-indigo-400" />
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl bg-indigo-500/20">
+                <BarChart3 className="w-6 h-6 text-indigo-400" />
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                Study Analytics
+              </h1>
             </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              Study Analytics
-            </h1>
+            <p className="text-slate-400 text-xs sm:text-sm max-w-2xl">
+              Track your performance and mastery across {groupLabel} subjects for CA {userProfile?.ca_stage ? userProfile.ca_stage.toUpperCase() : 'INTERMEDIATE'}.
+            </p>
           </div>
-          <p className="text-slate-400 ml-14">
-            Track your progress, study habits, and exam performance across all CA Intermediate subjects.
-          </p>
+
+          <div className="px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-bold self-start sm:self-auto">
+            Filtered: {groupLabel}
+          </div>
         </motion.div>
 
         {loading ? (
@@ -324,10 +357,10 @@ export default function Analytics() {
               >
                 <div className="flex items-center gap-2 mb-5">
                   <Brain className="w-5 h-5 text-purple-400" />
-                  <h2 className="text-lg font-semibold text-white">Subject Mastery</h2>
+                  <h2 className="text-lg font-semibold text-white">Subject Mastery ({groupLabel})</h2>
                 </div>
                 <ResponsiveContainer width="100%" height={240}>
-                  <RadarChart data={subjectMasteryData} margin={{ top: 4, right: 24, bottom: 4, left: 24 }}>
+                  <RadarChart data={displayedMasteryData} margin={{ top: 4, right: 24, bottom: 4, left: 24 }}>
                     <PolarGrid stroke="#1e293b" />
                     <PolarAngleAxis dataKey="subject" tick={{ fill: "#94a3b8", fontSize: 10 }} />
                     <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "#475569", fontSize: 9 }} />
@@ -352,12 +385,12 @@ export default function Analytics() {
             >
               <div className="flex items-center gap-2 mb-5">
                 <BarChart3 className="w-5 h-5 text-emerald-400" />
-                <h2 className="text-lg font-semibold text-white">Subject Breakdown</h2>
+                <h2 className="text-lg font-semibold text-white">Subject Breakdown ({groupLabel})</h2>
               </div>
               <div className="space-y-3">
-                {subjectMasteryData.map((s) => (
+                {displayedMasteryData.map((s) => (
                   <div key={s.subject} className="flex items-center gap-3">
-                    <span className="text-sm text-slate-300 w-40 shrink-0">{s.subject}</span>
+                    <span className="text-sm text-slate-300 w-48 shrink-0">{s.subject}</span>
                     <div className="flex-1 bg-slate-800 rounded-full h-2.5 overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
@@ -366,7 +399,7 @@ export default function Analytics() {
                         className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500"
                       />
                     </div>
-                    <span className="text-sm font-semibold text-indigo-300 w-10 text-right">
+                    <span className="text-sm font-semibold text-indigo-300 w-12 text-right">
                       {s.score}%
                     </span>
                   </div>

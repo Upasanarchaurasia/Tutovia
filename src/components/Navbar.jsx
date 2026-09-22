@@ -143,9 +143,9 @@ export function Navbar({ onOpenTutor }) {
             </div>
 
             {/* Streak Counter */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
-              <Flame className="w-4 h-4 text-amber-500 animate-bounce" />
-              <span className="hidden sm:inline">{streak} Day Streak</span>
+            <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
+              <Flame className="w-4 h-4 text-amber-500 animate-bounce shrink-0" />
+              <span className="font-bold">{streak} <span className="hidden sm:inline">Day Streak</span><span className="sm:hidden">d</span></span>
             </div>
 
                         {/* Theme Toggle */}
