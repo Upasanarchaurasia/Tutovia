@@ -31,7 +31,8 @@ export default function User() {
   }, [isEditing, formData.attempt]);
 
   const fetchProfile = async () => {
-    const uid = user?.id || 'u1';
+    const uid = user?.id;
+    if (!uid) return;
     try {
       const res = await axios.get(`/api/profile?userId=${uid}`).catch(() => ({ data: {} }));
       setProfile(res.data);
@@ -49,7 +50,11 @@ export default function User() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    const uid = user?.id || 'u1';
+    const uid = user?.id;
+    if (!uid) {
+      setIsSaving(false);
+      return;
+    }
     try {
       const res = await axios.post(`/api/profile?userId=${uid}`, formData);
       setProfile(res.data);

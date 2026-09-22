@@ -25,7 +25,16 @@ import { ToastProvider } from './context/ToastContext.jsx';
 
 export default function App() {
   const [isTutorOpen, setIsTutorOpen] = useState(false);
-  const { user, needsOnboarding } = useAuth();
+  const { user, needsOnboarding, loading } = useAuth();
+
+  // If auth state is still initializing from storage, show a minimal loading spinner to avoid route bouncing
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   // If user is NOT logged in, show the public marketing site or login page
   if (!user) {

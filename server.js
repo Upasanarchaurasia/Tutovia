@@ -14,7 +14,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://tivosvngnljlpfufulgj.supabase.co';
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_GDz5UGZNZzh3PIye3ceEvg_EvuQ6VwY';
@@ -55,11 +56,13 @@ const requireAuth = async (req, res, next) => {
 
   // Resilient fallback for mobile / local session
   if (xUserId) {
-    req.user = { id: xUserId, name: 'Student' };
+    const userMatch = usersDB.find(u => u.id === xUserId);
+    req.user = { id: xUserId, name: userMatch?.name || 'Student' };
     return next();
   }
 
-  req.user = { id: 'u1', name: 'Upasana' };
+  const guestIp = (req.ip || 'anon').replace(/[^a-zA-Z0-9]/g, '_');
+  req.user = { id: `guest_${guestIp}`, name: 'Guest' };
   next();
 };
 
@@ -500,20 +503,35 @@ app.post('/api/waitlist', (req, res) => {
 
 // CA Profile API
 app.get('/api/profile', (req, res) => {
-  const userId = req.query.userId || (req.user ? req.user.id : 'u1');
-  const prof = userProfileDB[userId] || {
+  const userId = req.query.userId || req.user?.id;
+  if (!userId || userId.startsWith('guest_')) {
+    return res.json({
+      id: userId || 'guest',
+      name: "Student",
+      ca_stage: "intermediate",
+      ca_group: "Both Groups",
+      attempt: "September 2026",
+      target_score: "60%"
+    });
+  }
+  if (userProfileDB[userId]) {
+    return res.json({ id: userId, ...userProfileDB[userId] });
+  }
+  const userObj = usersDB.find(u => u.id === userId);
+  const defaultProf = {
     id: userId,
-    name: "Upasana",
+    name: userObj?.name || (req.user?.name && !req.user.name.startsWith('Guest') ? req.user.name : "CA Aspirant"),
     ca_stage: "intermediate",
     ca_group: "Both Groups",
-    attempt: "May 2027",
+    attempt: "September 2026",
     target_score: "60%"
   };
-  res.json(prof);
+  res.json(defaultProf);
 });
 
 app.post('/api/profile', (req, res) => {
-  const userId = req.body.userId || req.query.userId || (req.user ? req.user.id : 'u1');
+  const userId = req.body.userId || req.query.userId || req.user?.id;
+  if (!userId) return res.status(400).json({ error: "userId required" });
   if (!userProfileDB[userId]) {
     userProfileDB[userId] = {};
   }
@@ -547,9 +565,9 @@ app.get('/api/materials', (req, res) => {
 // CA Subjects API
 app.get('/api/subjects', (req, res) => {
   const { group, userId } = req.query;
-  const uid = req.query.userId || (req.user ? req.user.id : 'u1');
-  const userAttempts = attemptsDB.filter(a => a.user_id === uid);
-  const userProfile = userProfileDB[uid] || {};
+  const uid = userId || req.user?.id;
+  const userAttempts = (uid && !uid.startsWith('guest_')) ? attemptsDB.filter(a => a.user_id === uid) : [];
+  const userProfile = (uid && userProfileDB[uid]) ? userProfileDB[uid] : {};
   
   // Strict filter: either pass in the group query param, or fallback to what's in profile
   const targetGroup = group || userProfile.ca_group || "Both Groups";
@@ -618,8 +636,9 @@ app.get('/api/subjects/:id', (req, res) => {
 
 // Progress & Daily Study Hours
 app.get('/api/progress', (req, res) => {
-  const uid = req.query.userId || req.body?.userId || (req.user ? req.user.id : 'u1');
-  const userAttempts = attemptsDB.filter(a => a.user_id === uid);
+  const uid = req.query.userId || req.body?.userId || req.user?.id;
+  const isGuest = !uid || uid.startsWith('guest_');
+  const userAttempts = isGuest ? [] : attemptsDB.filter(a => a.user_id === uid);
   const total_exams = userAttempts.length;
   const avg_score = total_exams > 0 
     ? Math.round(userAttempts.reduce((acc, curr) => acc + curr.score_pct, 0) / total_exams)
@@ -640,10 +659,10 @@ app.get('/api/progress', (req, res) => {
     exam: att.exam_title
   }));
 
-  if (!userProgressDB[uid]) {
+  if (uid && !userProgressDB[uid]) {
     userProgressDB[uid] = { total_study_minutes: 0, completed_pomodoros: 0, completed_exams: 0, current_streak: 1, last_active_date: getTodayIST() };
   }
-  const prog = userProgressDB[uid];
+  const prog = (uid && userProgressDB[uid]) ? userProgressDB[uid] : { total_study_minutes: 0, completed_pomodoros: 0, completed_exams: 0, current_streak: 1 };
   const study_hours_today = (prog.total_study_minutes / 60).toFixed(2);
   
   // Verify streak freshness based on calendar days in IST
@@ -683,7 +702,10 @@ app.get('/api/progress', (req, res) => {
 
 // Daily Check-In Endpoint to maintain and increment streak on presence
 app.post('/api/progress/check-in', (req, res) => {
-  const uid = req.body?.userId || req.query?.userId || (req.user ? req.user.id : 'u1');
+  const uid = req.body?.userId || req.query?.userId || req.user?.id;
+  if (!uid || uid.startsWith('guest_')) {
+    return res.json({ success: true, current_streak: 1, incremented: false, today: getTodayIST() });
+  }
   const streakInfo = updateStreakForUser(uid);
   res.json({
     success: true,
@@ -695,7 +717,7 @@ app.post('/api/progress/check-in', (req, res) => {
 
 app.post('/api/progress/study-hours', (req, res) => {
   const { minutesAdded, isPomodoro, activityType, userId } = req.body;
-  const uid = userId || (req.user ? req.user.id : 'u1');
+  const uid = userId || req.query?.userId || req.user?.id || 'guest';
   if (!userProgressDB[uid]) {
     userProgressDB[uid] = { total_study_minutes: 0, completed_pomodoros: 0, completed_exams: 0, current_streak: 1 };
   }
@@ -704,7 +726,9 @@ app.post('/api/progress/study-hours', (req, res) => {
   if (isPomodoro) userProgressDB[uid].completed_pomodoros += 1;
 
   // Update real consecutive day streak
-  updateStreakForUser(uid);
+  if (!uid.startsWith('guest_')) {
+    updateStreakForUser(uid);
+  }
 
   // Auto-strike off matching schedule activity item upon real-time session completion!
   const userSched = getUserSchedule(uid);
@@ -723,13 +747,15 @@ app.post('/api/progress/study-hours', (req, res) => {
 });
 
 app.post('/api/progress/pomodoro', (req, res) => {
-  const uid = req.body?.userId || req.query?.userId || (req.user ? req.user.id : 'u1');
+  const uid = req.body?.userId || req.query?.userId || req.user?.id || 'guest';
   if (!userProgressDB[uid]) {
     userProgressDB[uid] = { total_study_minutes: 0, completed_pomodoros: 0, completed_exams: 0, current_streak: 1 };
   }
   userProgressDB[uid].total_study_minutes += 25;
   userProgressDB[uid].completed_pomodoros = (userProgressDB[uid].completed_pomodoros || 0) + 1;
-  updateStreakForUser(uid);
+  if (!uid.startsWith('guest_')) {
+    updateStreakForUser(uid);
+  }
 
   const userSched = getUserSchedule(uid);
   const pendingItem = userSched.find(s => !s.done && (s.type === 'study' || s.type === 'exam'));
@@ -748,60 +774,87 @@ app.post('/api/progress/pomodoro', (req, res) => {
 
 // Personal AI Study Coach Analytics API (Filtered strictly by selected CA Group)
 app.get('/api/analytics', (req, res) => {
-  const uid = req.query.userId || (req.user ? req.user.id : 'u1');
-  const userProfile = userProfileDB[uid] || {};
+  const uid = req.query.userId || req.user?.id;
+  const userProfile = (uid && userProfileDB[uid]) ? userProfileDB[uid] : {};
   const targetGroup = req.query.group || userProfile.ca_group || "Both Groups";
-  const userAttempts = attemptsDB.filter(a => a.user_id === uid);
-  const prog = userProgressDB[uid] || { total_study_minutes: 0, current_streak: 1 };
+  const userAttempts = (uid && !uid.startsWith('guest_')) ? attemptsDB.filter(a => a.user_id === uid) : [];
+  const prog = (uid && userProgressDB[uid]) ? userProgressDB[uid] : { total_study_minutes: 0, current_streak: 1 };
 
-  // Calculate Subject Mastery filtered strictly by Group
-  const ALL_MASTERY_BASE = [
-    { subject: "Adv. Accounting", score: 72, group: "Group 1", id: "advanced-accounting" },
-    { subject: "Corporate Laws",  score: 65, group: "Group 1", id: "corporate-laws" },
-    { subject: "Taxation",        score: 68, group: "Group 1", id: "taxation" },
-    { subject: "Cost Accounting", score: 74, group: "Group 2", id: "cost-management" },
-    { subject: "Auditing",        score: 62, group: "Group 2", id: "auditing-ethics" },
-    { subject: "FM & SM",         score: 70, group: "Group 2", id: "fm-sm" }
+  // CA Subject Base
+  const ALL_SUBJECTS = [
+    { subject: "Adv. Accounting", group: "Group 1", id: "advanced-accounting" },
+    { subject: "Corporate Laws",  group: "Group 1", id: "corporate-laws" },
+    { subject: "Taxation",        group: "Group 1", id: "taxation" },
+    { subject: "Cost Accounting", group: "Group 2", id: "cost-management" },
+    { subject: "Auditing",        group: "Group 2", id: "auditing-ethics" },
+    { subject: "FM & SM",         group: "Group 2", id: "fm-sm" }
   ];
 
-  let filteredMastery = ALL_MASTERY_BASE;
+  let filteredSubjects = ALL_SUBJECTS;
   if (targetGroup === "Group 1") {
-    filteredMastery = ALL_MASTERY_BASE.filter(m => m.group === "Group 1");
+    filteredSubjects = ALL_SUBJECTS.filter(m => m.group === "Group 1");
   } else if (targetGroup === "Group 2") {
-    filteredMastery = ALL_MASTERY_BASE.filter(m => m.group === "Group 2");
+    filteredSubjects = ALL_SUBJECTS.filter(m => m.group === "Group 2");
   }
 
-  // Update mastery from actual user exam attempts if available
-  const subjectMasteryData = filteredMastery.map(item => {
+  // Update mastery strictly from actual user exam attempts (0 if unassessed)
+  const subjectMasteryData = filteredSubjects.map(item => {
     const relevantAttempts = userAttempts.filter(att => 
       att.exam_id?.includes(item.id) || 
       att.exam_title?.toLowerCase().includes(item.subject.toLowerCase())
     );
     if (relevantAttempts.length > 0) {
       const avg = Math.round(relevantAttempts.reduce((acc, curr) => acc + curr.score_pct, 0) / relevantAttempts.length);
-      return { subject: item.subject, score: avg, group: item.group };
+      return { subject: item.subject, score: avg, group: item.group, attemptsCount: relevantAttempts.length };
     }
-    return { subject: item.subject, score: item.score, group: item.group };
+    return { subject: item.subject, score: 0, group: item.group, attemptsCount: 0 };
   });
 
-  const weeklyHours = (prog.total_study_minutes ? (prog.total_study_minutes / 60) : 18.5).toFixed(1);
+  const weeklyHours = ((prog.total_study_minutes || 0) / 60).toFixed(1);
   const avgDailyHours = (parseFloat(weeklyHours) / 7).toFixed(1);
-  const examsTaken = userAttempts.length > 0 ? userAttempts.length : 12;
+  const examsTaken = userAttempts.length;
   const passRate = userAttempts.length > 0 
     ? Math.round((userAttempts.filter(a => a.score_pct >= 40).length / userAttempts.length) * 100)
-    : 78;
+    : 0;
+
+  // Real 84-day activity array for study heatmap (0 hours for past days without logs)
+  const days = 84;
+  const now = new Date();
+  const dailyActivity = Array.from({ length: days }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - (days - 1 - i));
+    const dStr = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    const isToday = i === days - 1;
+    return {
+      date: dStr,
+      hours: isToday ? Math.round(((prog.total_study_minutes || 0) / 60) * 10) / 10 : 0
+    };
+  });
+
+  // Calculate actual chronological accuracy trend from real attempts
+  let accuracyTrend = [];
+  if (userAttempts.length > 0) {
+    accuracyTrend = userAttempts.slice(-8).map((att, idx) => ({
+      month: `Q${idx + 1}`,
+      label: `Quiz #${idx + 1}`,
+      accuracy: att.score_pct,
+      title: att.exam_title
+    }));
+  }
 
   if (userAttempts.length === 0) {
     return res.json({
-      readinessScore: 68,
+      readinessScore: 0,
       weaknesses: [],
-      nextAction: `Revise ${subjectMasteryData[0]?.subject || 'Core Subjects'} to prepare for upcoming Mock Exams.`,
+      nextAction: "Take your first mock exam to discover your baseline readiness score.",
       weeklyHours,
       avgDailyHours,
-      examsTaken,
-      passRate,
+      examsTaken: 0,
+      passRate: 0,
       streak: prog.current_streak || 1,
-      subjectMasteryData
+      subjectMasteryData,
+      dailyActivity,
+      accuracyTrend: []
     });
   }
 
@@ -841,7 +894,7 @@ app.get('/api/analytics', (req, res) => {
   const practiceBump = Math.min(15, uniqueExamsCount * 2);
   let readinessScore = Math.round(avgScore + practiceBump);
   if (readinessScore > 98) readinessScore = 98;
-  if (readinessScore < 20) readinessScore = 20;
+  if (readinessScore < 10) readinessScore = 10;
 
   let nextAction = "Take a full subject Mock Exam to update your readiness score.";
   if (weaknesses.length > 0) {
@@ -859,14 +912,16 @@ app.get('/api/analytics', (req, res) => {
     examsTaken,
     passRate,
     streak: prog.current_streak || 1,
-    subjectMasteryData
+    subjectMasteryData,
+    dailyActivity,
+    accuracyTrend
   });
 });
 
 // Exams API
 app.get('/api/exams', (req, res) => {
-  const uid = req.user ? req.user.id : 'u1';
-  const userProfile = userProfileDB[uid] || {};
+  const uid = req.query.userId || req.user?.id;
+  const userProfile = (uid && userProfileDB[uid]) ? userProfileDB[uid] : {};
   const targetGroup = userProfile.ca_group || "Both Groups";
 
   const list = examsDB.map(exam => {
@@ -886,10 +941,10 @@ app.get('/api/exams', (req, res) => {
 
 // Flashcards API
 app.get('/api/flashcards', (req, res) => {
-  const uid = req.user ? req.user.id : 'u1';
-  const userProfile = userProfileDB[uid] || {};
+  const uid = req.query.userId || req.user?.id;
+  const userProfile = (uid && userProfileDB[uid]) ? userProfileDB[uid] : {};
   const targetGroup = userProfile.ca_group || "Both Groups";
-  const userProgress = flashcardProgressDB[uid] || {};
+  const userProgress = (uid && flashcardProgressDB[uid]) ? flashcardProgressDB[uid] : {};
 
   // Combine built-in flashcards with user-imported ones
   const allFlashcards = [
@@ -1004,10 +1059,11 @@ app.post('/api/exams/submit', (req, res) => {
   const total = exam.questions.length;
   const score_pct = Math.round((correctCount / total) * 100);
 
+  const effectiveUserId = req.body.userId || req.query.userId || req.user?.id || 'guest';
   const attempt = {
     id: 'att-' + Date.now(),
-    user_id: req.user ? req.user.id : 'u1',
-    user: req.body.userName || "demo-student",
+    user_id: effectiveUserId,
+    user: req.body.userName || (req.user?.name && !req.user.name.startsWith('Guest') ? req.user.name : "Student"),
     exam_id,
     exam_title: exam.title,
     score_pct,
@@ -1023,13 +1079,15 @@ app.post('/api/exams/submit', (req, res) => {
   attemptsDB.unshift(attempt);
 
   // Auto-accumulate 15 minutes of study time on exam completion & auto-strike exam schedule item
-  const uid = req.body?.userId || req.query?.userId || attempt.user_id || 'u1';
+  const uid = effectiveUserId;
   if (!userProgressDB[uid]) {
     userProgressDB[uid] = { total_study_minutes: 0, completed_pomodoros: 0, completed_exams: 0, current_streak: 1 };
   }
   userProgressDB[uid].total_study_minutes += 15;
   userProgressDB[uid].completed_exams = (userProgressDB[uid].completed_exams || 0) + 1;
-  updateStreakForUser(uid);
+  if (!uid.startsWith('guest_')) {
+    updateStreakForUser(uid);
+  }
 
   const userSched = getUserSchedule(uid);
   const examScheduleItem = userSched.find(s => !s.done && (s.type === 'exam' || s.type === 'study'));
@@ -1046,7 +1104,7 @@ app.post('/api/exams/submit', (req, res) => {
 
 // Timetable Schedule API with 12-Hour Format & Auto-Overdue Reminders
 app.get('/api/schedule', (req, res) => {
-  const uid = req.query.userId || (req.user ? req.user.id : 'u1');
+  const uid = req.query.userId || req.user?.id || 'guest';
   const now = new Date();
   const currentTotalMins = now.getHours() * 60 + now.getMinutes();
 
@@ -1113,8 +1171,8 @@ app.post('/api/schedule/custom', (req, res) => {
 });
 
 app.post('/api/schedule/ai-generate', (req, res) => {
-  const userId = req.user ? req.user.id : 'u1';
-  const profile = userProfileDB[userId] || { ca_group: "Both Groups" };
+  const userId = req.body?.userId || req.query?.userId || req.user?.id || 'guest';
+  const profile = (userId && userProfileDB[userId]) ? userProfileDB[userId] : { ca_group: "Both Groups" };
   const ca_group = profile.ca_group;
 
   let availableSubjects = caSubjectsDB;
@@ -1328,20 +1386,28 @@ app.post('/api/schedule/ai-generate', (req, res) => {
 });
 
 // Mood API
-app.get('/api/mood', (req, res) => res.json(moodDB));
+app.get('/api/mood', (req, res) => {
+  const uid = req.query.userId || req.user?.id;
+  if (!uid || uid.startsWith('guest_')) return res.json([]);
+  const userMoods = moodDB.filter(m => m.userId === uid);
+  res.json(userMoods);
+});
 
 app.post('/api/mood', (req, res) => {
-  const { mood, rating, note } = req.body;
+  const { mood, rating, note, userId } = req.body;
+  const uid = userId || req.query.userId || req.user?.id;
   const time12Str = get12HourInfo().formattedTime12;
   const newEntry = {
     id: 'm-' + Date.now(),
+    userId: uid,
     mood: mood || "Focused",
     rating: rating || 5,
     note: note || "",
     date: `Today, ${time12Str}`
   };
   moodDB.unshift(newEntry);
-  res.json(moodDB);
+  const userMoods = (uid && !uid.startsWith('guest_')) ? moodDB.filter(m => m.userId === uid) : [newEntry];
+  res.json(userMoods);
 });
 
 // Community Doubts API
@@ -1375,7 +1441,7 @@ app.post('/api/doubts/:id/replies', (req, res) => {
 
 // Centralized Resilient Groq AI completions with automatic model fallback
 async function callGroqChat({ messages, temperature = 0.5, max_tokens = 1024, response_format = null }) {
-  const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+  const models = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'qwen/qwen3.8-27b'];
   let lastError = null;
 
   for (const model of models) {
@@ -1680,33 +1746,22 @@ app.post('/api/sleep', (req, res) => {
 
 // Leaderboard API
 app.get('/api/leaderboard', (req, res) => {
-  // Generate dummy leaderboard combining userProgressDB stats
-  const leaderboard = Object.keys(userProgressDB).map((uid, index) => {
-    const userProf = userProfileDB[uid] || { name: `Student ${index + 1}`, avatar: '' };
-    return {
-      userId: uid,
-      name: userProf.name || `Student ${index + 1}`,
-      avatar: userProf.avatar,
-      total_study_minutes: userProgressDB[uid].total_study_minutes || 0,
-      completed_exams: userProgressDB[uid].completed_exams || 0,
-      current_streak: userProgressDB[uid].current_streak || 0
-    };
-  });
-
-  // Add some dummy competitors if less than 5
-  if (leaderboard.length < 5) {
-    const dummyNames = ['Rahul S.', 'Priya M.', 'Aditya K.', 'Sneha R.'];
-    dummyNames.forEach((name, i) => {
-      leaderboard.push({
-        userId: `dummy${i}`,
-        name,
-        avatar: '',
-        total_study_minutes: Math.floor(Math.random() * 500) + 100,
-        completed_exams: Math.floor(Math.random() * 10) + 1,
-        current_streak: Math.floor(Math.random() * 15) + 1
-      });
-    });
-  }
+  // Aggregate real users from userProgressDB
+  const leaderboard = Object.keys(userProgressDB)
+    .filter(uid => !uid.startsWith('guest_') && !uid.startsWith('dummy'))
+    .map((uid, index) => {
+      const userProf = userProfileDB[uid] || {};
+      const userObj = usersDB.find(u => u.id === uid);
+      return {
+        userId: uid,
+        name: userProf.name || userObj?.name || `Student ${index + 1}`,
+        avatar: userProf.avatar || '',
+        total_study_minutes: userProgressDB[uid].total_study_minutes || 0,
+        completed_exams: userProgressDB[uid].completed_exams || 0,
+        current_streak: userProgressDB[uid].current_streak || 0
+      };
+    })
+    .filter(entry => entry.total_study_minutes > 0 || entry.completed_exams > 0);
 
   leaderboard.sort((a, b) => b.total_study_minutes - a.total_study_minutes);
 
@@ -1716,7 +1771,8 @@ app.get('/api/leaderboard', (req, res) => {
 // Progress Reset API
 app.post('/api/progress/reset', (req, res) => {
   const { type, userId } = req.body;
-  const uid = req.user ? req.user.id : 'u1';
+  const uid = userId || req.query?.userId || req.user?.id;
+  if (!uid || uid.startsWith('guest_')) return res.status(400).json({ error: "Invalid user." });
   
   if (type === 'exams') {
     // Clear exam attempts for user
@@ -1833,24 +1889,26 @@ Each object should have the exact following structure:
 
 // Notes API
 app.get('/api/notes', (req, res) => {
-  const userId = req.user ? req.user.id : 'u1';
+  const userId = req.query.userId || req.user?.id;
   const subjectId = req.query.subjectId;
-  const userNotes = notesDB[userId] || {};
+  const userNotes = (userId && notesDB[userId]) ? notesDB[userId] : {};
   res.json({ notes: userNotes[subjectId] || '' });
 });
 
 app.post('/api/notes', (req, res) => {
-  const userId = req.user ? req.user.id : 'u1';
-  const subjectId = req.query.subjectId;
+  const userId = req.body?.userId || req.user?.id;
+  const subjectId = req.query.subjectId || req.body?.subjectId;
+  if (!userId || !subjectId) return res.json({ success: false });
   if (!notesDB[userId]) notesDB[userId] = {};
   notesDB[userId][subjectId] = req.body.notes || '';
   res.json({ success: true });
 });
 
 app.post('/api/progress/goal', (req, res) => {
-  const userId = req.user ? req.user.id : 'u1';
+  const userId = req.body?.userId || req.user?.id;
+  if (!userId) return res.json({ success: false });
   if (!userProgressDB[userId]) {
-    userProgressDB[userId] = { total_study_minutes: 0, completed_pomodoros: 0, completed_exams: 0, current_streak: 3 };
+    userProgressDB[userId] = { total_study_minutes: 0, completed_pomodoros: 0, completed_exams: 0, current_streak: 1 };
   }
   userProgressDB[userId].daily_goal_minutes = req.body.daily_goal_minutes;
   res.json({ success: true });

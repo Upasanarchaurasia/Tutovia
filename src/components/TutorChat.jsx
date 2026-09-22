@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, Sparkles, RefreshCw, BookOpen, Lightbulb, CheckCircle2, Mic, MicOff, Image as ImageIcon } from 'lucide-react';
+import { Bot, X, Send, Sparkles, RefreshCw, BookOpen, Lightbulb, CheckCircle2, Mic, MicOff, Image as ImageIcon, Brain } from 'lucide-react';
 import axios from '../api.js';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../context/AuthContext.jsx';

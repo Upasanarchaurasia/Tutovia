@@ -38,11 +38,11 @@ export default function Flashcards() {
 
   const fetchData = async () => {
     setLoading(true);
-    const uid = user?.id || 'u1';
+    const uid = user?.id || '';
     try {
       const [fcRes, subRes] = await Promise.all([
-        axios.get(`/api/flashcards?userId=${uid}`).catch(() => ({ data: [] })),
-        axios.get(`/api/subjects?userId=${uid}`).catch(() => ({ data: [] }))
+        axios.get(`/api/flashcards${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: [] })),
+        axios.get(`/api/subjects${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: [] }))
       ]);
       setFlashcards(Array.isArray(fcRes.data) ? fcRes.data : []);
       setAvailableSubjects(Array.isArray(subRes.data) ? subRes.data : []);
@@ -54,9 +54,9 @@ export default function Flashcards() {
   };
 
   const fetchFlashcards = async () => {
-    const uid = user?.id || 'u1';
+    const uid = user?.id || '';
     try {
-      const res = await axios.get(`/api/flashcards?userId=${uid}`).catch(() => ({ data: [] }));
+      const res = await axios.get(`/api/flashcards${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: [] }));
       setFlashcards(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error(error);

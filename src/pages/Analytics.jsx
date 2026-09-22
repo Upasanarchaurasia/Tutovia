@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Flame, TrendingUp, Award, Clock, BarChart3, Brain } from "lucide-react";
+import { Flame, TrendingUp, Award, Clock, BarChart3, Brain, Play } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   ResponsiveContainer,
   LineChart,
@@ -18,56 +19,10 @@ import {
 import axios from '../api.js';
 import { useAuth } from "../context/AuthContext.jsx";
 
-// --- Mock Data ---
-
-function generateHeatmapData() {
-  const days = 84;
-  const today = new Date();
-  return Array.from({ length: days }, (_, i) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (days - 1 - i));
-    const rand = Math.random();
-    const hours =
-      rand < 0.25
-        ? 0
-        : rand < 0.55
-        ? Math.random() * 2 + 0.5
-        : rand < 0.8
-        ? Math.random() * 2 + 3
-        : Math.random() * 3 + 5;
-    return {
-      date: date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      hours: Math.round(hours * 10) / 10,
-    };
-  });
-}
-
-const heatmapData = generateHeatmapData();
-
-const accuracyData = [
-  { month: "Feb", accuracy: 48 },
-  { month: "Mar", accuracy: 54 },
-  { month: "Apr", accuracy: 51 },
-  { month: "May", accuracy: 63 },
-  { month: "Jun", accuracy: 70 },
-  { month: "Jul", accuracy: 67 },
-  { month: "Aug", accuracy: 75 },
-  { month: "Sep", accuracy: 79 },
-];
-
-const subjectMasteryData = [
-  { subject: "Adv. Accounting", score: 72 },
-  { subject: "Corporate Laws", score: 58 },
-  { subject: "Taxation", score: 65 },
-  { subject: "Cost Accounting", score: 79 },
-  { subject: "Auditing", score: 54 },
-  { subject: "FM & SM", score: 61 },
-];
-
 // --- Helpers ---
 
 function heatColor(hours) {
-  if (hours === 0) return "bg-slate-800";
+  if (!hours || hours === 0) return "bg-slate-800";
   if (hours <= 2) return "bg-indigo-900";
   if (hours <= 4) return "bg-indigo-700";
   return "bg-indigo-500";
@@ -107,18 +62,33 @@ function HeatmapTooltip({ data }) {
   return (
     <div className="bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-xs shadow-xl pointer-events-none">
       <p className="text-slate-300 font-medium">{data.date}</p>
-      <p className="text-indigo-400">{data.hours} hrs studied</p>
+      <p className="text-indigo-400">{data.hours || 0} hrs studied</p>
     </div>
   );
 }
 
-function Heatmap() {
+function Heatmap({ dailyData }) {
   const [hovered, setHovered] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
+  // Generate 84 days baseline if dailyData is empty
+  const activeDays = useMemo(() => {
+    if (dailyData && dailyData.length >= 84) return dailyData;
+    const days = 84;
+    const today = new Date();
+    return Array.from({ length: days }, (_, i) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (days - 1 - i));
+      return {
+        date: date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+        hours: 0,
+      };
+    });
+  }, [dailyData]);
+
   const weeks = [];
   for (let w = 0; w < 12; w++) {
-    weeks.push(heatmapData.slice(w * 7, w * 7 + 7));
+    weeks.push(activeDays.slice(w * 7, w * 7 + 7));
   }
 
   return (
@@ -130,7 +100,7 @@ function Heatmap() {
               <div
                 key={di}
                 className={`w-4 h-4 rounded-sm cursor-pointer transition-all duration-150 ${heatColor(
-                  day.hours
+                  day?.hours || 0
                 )} hover:ring-2 hover:ring-indigo-400`}
                 onMouseEnter={(e) => {
                   setHovered(day);
@@ -152,12 +122,12 @@ function Heatmap() {
         </div>
       )}
       <div className="flex items-center gap-2 mt-4 text-xs text-slate-500">
-        <span>Less</span>
+        <span>0h (Unstudied)</span>
         <div className="w-3 h-3 rounded-sm bg-slate-800" />
         <div className="w-3 h-3 rounded-sm bg-indigo-900" />
         <div className="w-3 h-3 rounded-sm bg-indigo-700" />
         <div className="w-3 h-3 rounded-sm bg-indigo-500" />
-        <span>More</span>
+        <span>4h+ (High focus)</span>
       </div>
     </div>
   );
@@ -197,7 +167,11 @@ export default function Analytics() {
 
   useEffect(() => {
     const fetchAnalytics = async () => {
-      const uid = user?.id || 'u1';
+      const uid = user?.id;
+      if (!uid) {
+        setLoading(false);
+        return;
+      }
       try {
         const [res, profRes] = await Promise.all([
           axios.get(`/api/analytics?userId=${uid}`).catch(() => null),
@@ -210,7 +184,7 @@ export default function Analytics() {
           setUserProfile(profRes.data);
         }
       } catch {
-        // fall back to mock
+        // Safe empty error catch
       } finally {
         setLoading(false);
       }
@@ -223,31 +197,39 @@ export default function Analytics() {
       return analyticsData.subjectMasteryData;
     }
     const grp = userProfile?.ca_group || "Both Groups";
-    if (grp === "Group 1") {
-      return subjectMasteryData.filter(s => 
-        s.subject.includes("Accounting") || s.subject.includes("Laws") || s.subject.includes("Taxation")
-      );
-    }
-    if (grp === "Group 2") {
-      return subjectMasteryData.filter(s => 
-        s.subject.includes("Cost") || s.subject.includes("Auditing") || s.subject.includes("FM")
-      );
-    }
-    return subjectMasteryData;
+    const defaultList = [
+      { subject: "Adv. Accounting", score: 0, group: "Group 1" },
+      { subject: "Corporate Laws", score: 0, group: "Group 1" },
+      { subject: "Taxation", score: 0, group: "Group 1" },
+      { subject: "Cost Accounting", score: 0, group: "Group 2" },
+      { subject: "Auditing", score: 0, group: "Group 2" },
+      { subject: "FM & SM", score: 0, group: "Group 2" },
+    ];
+    if (grp === "Group 1") return defaultList.filter(s => s.group === "Group 1");
+    if (grp === "Group 2") return defaultList.filter(s => s.group === "Group 2");
+    return defaultList;
   }, [analyticsData?.subjectMasteryData, userProfile?.ca_group]);
+
+  const hasMasteryData = useMemo(() => {
+    return displayedMasteryData.some(s => s.score > 0);
+  }, [displayedMasteryData]);
+
+  const accuracyData = useMemo(() => {
+    return analyticsData?.accuracyTrend || [];
+  }, [analyticsData?.accuracyTrend]);
 
   const stats = analyticsData
     ? [
-        { icon: Clock,      label: "Total Study Hours (This Week)", value: `${analyticsData.weeklyHours}h`,    sub: "vs 18h last week",           color: "bg-indigo-500" },
-        { icon: TrendingUp, label: "Average Daily Hours",            value: `${analyticsData.avgDailyHours}h`, sub: "Goal: 6h/day",               color: "bg-purple-500" },
-        { icon: Award,      label: "Exams Taken",                    value: analyticsData.examsTaken,          sub: `${analyticsData.passRate}% pass rate`, color: "bg-emerald-500" },
-        { icon: Flame,      label: "Current Streak",                 value: `${analyticsData.streak} days`,   sub: "Verified IST daily check-in", color: "bg-orange-500" },
+        { icon: Clock,      label: "Total Study Hours (This Week)", value: `${analyticsData.weeklyHours || '0.0'}h`, sub: "Goal: 20h/week", color: "bg-indigo-500" },
+        { icon: TrendingUp, label: "Average Daily Hours",            value: `${analyticsData.avgDailyHours || '0.0'}h`, sub: "Goal: 3.0h/day", color: "bg-purple-500" },
+        { icon: Award,      label: "Exams Taken",                    value: analyticsData.examsTaken || 0, sub: `${analyticsData.passRate || 0}% pass rate`, color: "bg-emerald-500" },
+        { icon: Flame,      label: "Current Streak",                 value: `${analyticsData.streak || 1} day${analyticsData.streak > 1 ? 's' : ''}`, sub: "Verified IST daily check-in", color: "bg-orange-500" },
       ]
     : [
-        { icon: Clock,      label: "Total Study Hours (This Week)", value: "23h",      sub: "vs 18h last week",   color: "bg-indigo-500" },
-        { icon: TrendingUp, label: "Average Daily Hours",            value: "3.3h",    sub: "Goal: 6h/day",       color: "bg-purple-500" },
-        { icon: Award,      label: "Exams Taken",                    value: "41",      sub: "78% pass rate",      color: "bg-emerald-500" },
-        { icon: Flame,      label: "Current Streak",                 value: "14 days", sub: "Verified IST daily check-in", color: "bg-orange-500" },
+        { icon: Clock,      label: "Total Study Hours (This Week)", value: "0.0h", sub: "Goal: 20h/week", color: "bg-indigo-500" },
+        { icon: TrendingUp, label: "Average Daily Hours",            value: "0.0h", sub: "Goal: 3.0h/day", color: "bg-purple-500" },
+        { icon: Award,      label: "Exams Taken",                    value: "0", sub: "0% pass rate", color: "bg-emerald-500" },
+        { icon: Flame,      label: "Current Streak",                 value: "1 day", sub: "Verified IST daily check-in", color: "bg-orange-500" },
       ];
 
   const groupLabel = userProfile?.ca_group || analyticsData?.group || "Both Groups";
@@ -311,7 +293,7 @@ export default function Analytics() {
                 <span className="text-xs text-slate-500 ml-auto">Last 12 weeks</span>
               </div>
               <div className="overflow-x-auto pb-2">
-                <Heatmap />
+                <Heatmap dailyData={analyticsData?.dailyActivity} />
               </div>
             </motion.div>
 
@@ -326,28 +308,46 @@ export default function Analytics() {
                   <TrendingUp className="w-5 h-5 text-indigo-400" />
                   <h2 className="text-lg font-semibold text-white">Exam Accuracy Trend</h2>
                 </div>
-                <ResponsiveContainer width="100%" height={240}>
-                  <LineChart data={accuracyData} margin={{ top: 4, right: 16, left: -16, bottom: 4 }}>
-                    <defs>
-                      <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#6366f1" />
-                        <stop offset="100%" stopColor="#a855f7" />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <YAxis domain={[40, 100]} tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomLineTooltip />} />
-                    <Line
-                      type="monotone"
-                      dataKey="accuracy"
-                      stroke="url(#lineGrad)"
-                      strokeWidth={3}
-                      dot={{ fill: "#6366f1", r: 4, strokeWidth: 0 }}
-                      activeDot={{ r: 6, fill: "#a855f7" }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {accuracyData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <LineChart data={accuracyData} margin={{ top: 4, right: 16, left: -16, bottom: 4 }}>
+                      <defs>
+                        <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#6366f1" />
+                          <stop offset="100%" stopColor="#a855f7" />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                      <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <Tooltip content={<CustomLineTooltip />} />
+                      <Line
+                        type="monotone"
+                        dataKey="accuracy"
+                        stroke="url(#lineGrad)"
+                        strokeWidth={3}
+                        dot={{ fill: "#6366f1", r: 4, strokeWidth: 0 }}
+                        activeDot={{ r: 6, fill: "#a855f7" }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-60 flex flex-col items-center justify-center text-center p-6 space-y-3">
+                    <TrendingUp className="w-8 h-8 text-slate-600" />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-300">No Exam Accuracy Trend Yet</p>
+                      <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                        Complete chapter quizzes or full mock exams to record your score trend.
+                      </p>
+                    </div>
+                    <Link
+                      to="/exams"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition-all"
+                    >
+                      <Play className="w-3.5 h-3.5" /> Start First Mock
+                    </Link>
+                  </div>
+                )}
               </motion.div>
 
               {/* Radar Chart */}
@@ -359,22 +359,40 @@ export default function Analytics() {
                   <Brain className="w-5 h-5 text-purple-400" />
                   <h2 className="text-lg font-semibold text-white">Subject Mastery ({groupLabel})</h2>
                 </div>
-                <ResponsiveContainer width="100%" height={240}>
-                  <RadarChart data={displayedMasteryData} margin={{ top: 4, right: 24, bottom: 4, left: 24 }}>
-                    <PolarGrid stroke="#1e293b" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: "#94a3b8", fontSize: 10 }} />
-                    <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "#475569", fontSize: 9 }} />
-                    <Radar
-                      name="Score"
-                      dataKey="score"
-                      stroke="#a855f7"
-                      fill="#a855f7"
-                      fillOpacity={0.25}
-                      strokeWidth={2}
-                    />
-                    <Tooltip content={<CustomRadarTooltip />} />
-                  </RadarChart>
-                </ResponsiveContainer>
+                {hasMasteryData ? (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <RadarChart data={displayedMasteryData} margin={{ top: 4, right: 24, bottom: 4, left: 24 }}>
+                      <PolarGrid stroke="#1e293b" />
+                      <PolarAngleAxis dataKey="subject" tick={{ fill: "#94a3b8", fontSize: 10 }} />
+                      <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "#475569", fontSize: 9 }} />
+                      <Radar
+                        name="Score"
+                        dataKey="score"
+                        stroke="#a855f7"
+                        fill="#a855f7"
+                        fillOpacity={0.25}
+                        strokeWidth={2}
+                      />
+                      <Tooltip content={<CustomRadarTooltip />} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-60 flex flex-col items-center justify-center text-center p-6 space-y-3">
+                    <Brain className="w-8 h-8 text-slate-600" />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-300">Subject Mastery Not Evaluated</p>
+                      <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                        Take tests in your {groupLabel} subjects to calculate your syllabus readiness breakdown.
+                      </p>
+                    </div>
+                    <Link
+                      to="/exams"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold transition-all"
+                    >
+                      <Play className="w-3.5 h-3.5" /> Practice Subjects
+                    </Link>
+                  </div>
+                )}
               </motion.div>
             </div>
 
@@ -399,8 +417,8 @@ export default function Analytics() {
                         className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500"
                       />
                     </div>
-                    <span className="text-sm font-semibold text-indigo-300 w-12 text-right">
-                      {s.score}%
+                    <span className="text-sm font-semibold text-indigo-300 w-16 text-right">
+                      {s.score > 0 ? `${s.score}%` : 'Not assessed'}
                     </span>
                   </div>
                 ))}

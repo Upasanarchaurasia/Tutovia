@@ -39,11 +39,11 @@ export default function Exams() {
 
   const fetchExamsData = () => {
     setLoading(true);
-    const uid = user?.id || 'u1';
+    const uid = user?.id || '';
     Promise.all([
-      axios.get(`/api/exams?userId=${uid}`).catch(() => ({ data: [] })),
-      axios.get(`/api/progress?userId=${uid}`).catch(() => ({ data: { attempts: [] } })),
-      axios.get(`/api/profile?userId=${uid}`).catch(() => ({ data: { ca_group: 'Both Groups' } }))
+      axios.get(`/api/exams${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: [] })),
+      axios.get(`/api/progress${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: { attempts: [] } })),
+      axios.get(`/api/profile${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: { ca_group: 'Both Groups' } }))
     ])
     .then(([examsRes, progRes, profileRes]) => {
       const examsData = Array.isArray(examsRes.data) ? examsRes.data : [];

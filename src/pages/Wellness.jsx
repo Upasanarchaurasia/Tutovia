@@ -43,7 +43,8 @@ export default function Wellness() {
 
   // Fetch Settings & Sleep Data
   useEffect(() => {
-    const uid = user?.id || 'u1';
+    const uid = user?.id;
+    if (!uid) return;
     axios.get(`/api/settings?userId=${uid}`).then(res => {
       if (res?.data) {
         setSettings(res.data);
@@ -58,7 +59,8 @@ export default function Wellness() {
   }, [user?.id]);
 
   const saveSettings = async () => {
-    const uid = user?.id || 'u1';
+    const uid = user?.id;
+    if (!uid) return;
     try {
       const res = await axios.post('/api/settings', { userId: uid, settings: settingsForm });
       setSettings(res.data);
@@ -73,7 +75,8 @@ export default function Wellness() {
 
   const saveSleep = async (e) => {
     e.preventDefault();
-    const uid = user?.id || 'u1';
+    const uid = user?.id;
+    if (!uid) return;
     try {
       const res = await axios.post('/api/sleep', {
         userId: uid,
@@ -227,6 +230,9 @@ export default function Wellness() {
         </div>
       </div>
 
+      {/* Persistent Audio Engine - Kept mounted to prevent YouTube iframe DOM node removal errors */}
+      <YoutubeAudio videoId={youtubeTracks[musicMode]} playing={isPlayingMusic && activeTab === 'pomodoro'} volume={volume} />
+
       {activeTab === 'counselor' ? (
         <WellnessCounselor />
       ) : activeTab === 'sleep' ? (
@@ -266,7 +272,6 @@ export default function Wellness() {
         </div>
       ) : (
         <>
-          <YoutubeAudio videoId={youtubeTracks[musicMode]} playing={isPlayingMusic} volume={volume} />
           {/* Aesthetic Soothing Music Player Bar */}
           <div className="glass-panel p-5 rounded-3xl border border-indigo-500/30 flex flex-col md:flex-row items-center justify-between gap-4 bg-gradient-to-r from-indigo-950/40 via-surface-card to-purple-950/40 shadow-xl">
             <div className="flex items-center gap-3">

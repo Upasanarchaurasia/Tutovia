@@ -661,7 +661,8 @@ export default function PYQ() {
 
   // Sync with user's selected stage and group from profile
   useEffect(() => {
-    const uid = user?.id || 'u1';
+    const uid = user?.id;
+    if (!uid) return;
     axios.get(`/api/profile?userId=${uid}`)
       .then(res => {
         if (res?.data) {

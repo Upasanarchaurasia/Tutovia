@@ -50,21 +50,26 @@ export function Navbar({ onOpenTutor }) {
   const [streak, setStreak] = useState(0);
 
   const getInitials = (name) => {
-    if (!name) return 'U';
-    const names = name.split(' ');
+    if (!name) return 'S';
+    const names = name.trim().split(' ');
     if (names.length >= 2) return (names[0][0] + names[1][0]).toUpperCase();
     return names[0][0].toUpperCase();
   };
 
   useEffect(() => {
-    const uid = user?.id || 'u1';
+    const uid = user?.id;
     axios.get('/api/notifications').then(res => setNotifications(Array.isArray(res.data) ? res.data : [])).catch(() => {});
-    axios.get(`/api/progress?userId=${uid}`).then(res => {
-      if (res?.data) {
-        setStudyHours(res.data.study_hours_today || '0.00');
-        setStreak(res.data.current_streak || 0);
-      }
-    }).catch(() => {});
+    if (uid) {
+      axios.get(`/api/progress?userId=${uid}`).then(res => {
+        if (res?.data) {
+          setStudyHours(res.data.study_hours_today || '0.00');
+          setStreak(res.data.current_streak || 0);
+        }
+      }).catch(() => {});
+    } else {
+      setStudyHours('0.00');
+      setStreak(0);
+    }
   }, [location.pathname, user?.id]);
 
   const navItems = [

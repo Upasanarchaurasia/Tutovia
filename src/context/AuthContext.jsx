@@ -81,13 +81,14 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const loadUserProfile = async (userId) => {
+    if (!userId) return;
     try {
-      // 0. Immediate local cache check - never block the user
-      const cachedProfileStr = localStorage.getItem('tutovia_profile');
+      // 0. Immediate local cache check strictly for THIS user ID
+      const cachedProfileStr = localStorage.getItem(`tutovia_profile_${userId}`) || localStorage.getItem('tutovia_profile');
       if (cachedProfileStr) {
         try {
           const cachedProfile = JSON.parse(cachedProfileStr);
-          if (cachedProfile && (cachedProfile.ca_group || cachedProfile.ca_stage)) {
+          if (cachedProfile && cachedProfile.id === userId && (cachedProfile.ca_group || cachedProfile.ca_stage)) {
             setProfile(cachedProfile);
             setNeedsOnboarding(false);
             return;
@@ -95,7 +96,7 @@ export const AuthProvider = ({ children }) => {
         } catch {}
       }
 
-      if (localStorage.getItem('tutovia_onboarded') === 'true') {
+      if (localStorage.getItem(`tutovia_onboarded_${userId}`) === 'true') {
         setNeedsOnboarding(false);
         return;
       }
@@ -112,8 +113,8 @@ export const AuthProvider = ({ children }) => {
 
       if (sbProfile && (sbProfile.ca_group || sbProfile.ca_stage)) {
         setProfile(sbProfile);
-        localStorage.setItem('tutovia_profile', JSON.stringify(sbProfile));
-        localStorage.setItem('tutovia_onboarded', 'true');
+        localStorage.setItem(`tutovia_profile_${userId}`, JSON.stringify(sbProfile));
+        localStorage.setItem(`tutovia_onboarded_${userId}`, 'true');
         setNeedsOnboarding(false);
         return;
       }
@@ -124,17 +125,16 @@ export const AuthProvider = ({ children }) => {
         new Promise((_, reject) => setTimeout(() => reject('timeout'), 2500))
       ]).catch(() => null);
 
-      if (res?.data && (res.data.ca_group || res.data.ca_stage)) {
+      if (res?.data && (res.data.ca_group || res.data.ca_stage) && res.data.is_onboarded) {
         setProfile(res.data);
-        localStorage.setItem('tutovia_profile', JSON.stringify(res.data));
-        localStorage.setItem('tutovia_onboarded', 'true');
+        localStorage.setItem(`tutovia_profile_${userId}`, JSON.stringify(res.data));
+        localStorage.setItem(`tutovia_onboarded_${userId}`, 'true');
         setNeedsOnboarding(false);
       } else {
-        // User exists but has not completed stream/target setup
+        // Brand new user: trigger onboarding modal so they configure their own stage, group, and attempt
         setNeedsOnboarding(true);
       }
     } catch {
-      // Default fallback - never block the user from their dashboard
       setNeedsOnboarding(false);
     }
   };
@@ -152,6 +152,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signUpWithSupabase = async (name, email, password) => {
+    // Clear any previous user state from storage
+    localStorage.removeItem('tutovia_user');
+    localStorage.removeItem('tutovia_profile');
+    localStorage.removeItem('tutovia_onboarded');
+    sessionStorage.removeItem('tutovia_user');
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -168,12 +174,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const completeOnboarding = async (onboardingData) => {
+    const currentUid = user?.id || 'student_' + Date.now();
     const updated = {
-      id: user?.id || 'u1',
+      id: currentUid,
       email: user?.email || 'student@tutovia.com',
       name: user?.name || 'CA Aspirant',
       ca_stage: 'intermediate',
       ca_group: 'Both Groups',
+      is_onboarded: true,
       ...onboardingData,
       updated_at: new Date().toISOString()
     };
@@ -181,6 +189,8 @@ export const AuthProvider = ({ children }) => {
     // 1. INSTANT LOCAL PERSISTENCE — Immediately closes modal and unblocks UI
     setProfile(updated);
     setNeedsOnboarding(false);
+    localStorage.setItem(`tutovia_profile_${currentUid}`, JSON.stringify(updated));
+    localStorage.setItem(`tutovia_onboarded_${currentUid}`, 'true');
     localStorage.setItem('tutovia_profile', JSON.stringify(updated));
     localStorage.setItem('tutovia_onboarded', 'true');
 
@@ -195,11 +205,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    const currentUid = user?.id;
     await supabase.auth.signOut().catch(() => {});
     setUser(null);
     setProfile(null);
     setNeedsOnboarding(false);
     localStorage.removeItem('tutovia_user');
+    localStorage.removeItem('tutovia_profile');
+    localStorage.removeItem('tutovia_onboarded');
+    if (currentUid) {
+      localStorage.removeItem(`tutovia_profile_${currentUid}`);
+      localStorage.removeItem(`tutovia_onboarded_${currentUid}`);
+    }
     sessionStorage.removeItem('tutovia_user');
   };
 

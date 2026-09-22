@@ -17,23 +17,27 @@ export default function Subject() {
   const [activeTab, setActiveTab] = useState('overview');
   const [completedChapters, setCompletedChapters] = useState([]);
   const [notes, setNotes] = useState('');
+  const { user, profile } = useAuth();
   const [savingNotes, setSavingNotes] = useState(false);
   
+  const userStorageKey = `tutovia_completed_chapters_${user?.id || 'guest'}_${id}`;
+
   useEffect(() => {
-    const saved = localStorage.getItem('tutovia_completed_chapters_' + id);
+    const saved = localStorage.getItem(userStorageKey);
     if (saved) {
       try { setCompletedChapters(JSON.parse(saved)); } catch (e) {}
+    } else {
+      setCompletedChapters([]);
     }
-  }, [id]);
+  }, [id, user?.id, userStorageKey]);
 
   const toggleChapter = (no) => {
     setCompletedChapters(prev => {
       const newList = prev.includes(no) ? prev.filter(c => c !== no) : [...prev, no];
-      localStorage.setItem('tutovia_completed_chapters_' + id, JSON.stringify(newList));
+      localStorage.setItem(userStorageKey, JSON.stringify(newList));
       return newList;
     });
   };
-  const { user, profile } = useAuth();
 
   useEffect(() => {
     fetchSubject();
@@ -41,14 +45,14 @@ export default function Subject() {
 
   const fetchSubject = async () => {
     setLoading(true);
-    const uid = user?.id || 'u1';
+    const uid = user?.id || '';
     const attempt = profile?.attempt || user?.attempt || 'September 2026';
     try {
       const [resSub, resChap, resMat, resNotes] = await Promise.all([
-        axios.get(`/api/subjects/${id}?userId=${uid}`).catch(() => ({ data: null })),
+        axios.get(`/api/subjects/${id}${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: null })),
         axios.get(`/api/chapters?subjectId=${id}`).catch(() => ({ data: [] })),
         axios.get(`/api/materials?subjectId=${id}&attempt=${encodeURIComponent(attempt)}`).catch(() => ({ data: [] })),
-        axios.get(`/api/notes?userId=${uid}&subjectId=${id}`).catch(() => ({ data: { notes: '' } }))
+        axios.get(`/api/notes?subjectId=${id}${uid ? `&userId=${uid}` : ''}`).catch(() => ({ data: { notes: '' } }))
       ]);
       if (resSub?.data) setSubject(resSub.data);
       if (resChap?.data) setChapters(resChap.data);
@@ -63,7 +67,11 @@ export default function Subject() {
 
   const saveNotes = async () => {
     setSavingNotes(true);
-    const uid = user?.id || 'u1';
+    const uid = user?.id;
+    if (!uid) {
+      setSavingNotes(false);
+      return;
+    }
     try {
       await axios.post(`/api/notes?userId=${uid}&subjectId=${id}`, { notes });
     } catch (err) {

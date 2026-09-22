@@ -157,8 +157,12 @@ export default function Dashboard({ onOpenTutor }) {
   }, [user?.id]);
 
   const fetchDashboardData = async () => {
+    const uid = user?.id;
+    if (!uid) {
+      setLoading(false);
+      return;
+    }
     setIsRefreshing(true);
-    const uid = user?.id || 'u1';
     try {
       const profRes = await axios.get(`/api/profile?userId=${uid}`).catch(() => ({ data: {} }));
       if (profRes?.data) setProfile(profRes.data);
@@ -592,13 +596,16 @@ export default function Dashboard({ onOpenTutor }) {
           <div>
             <span className="text-xs text-slate-400 font-medium">Exam Readiness Score</span>
             <div className="flex items-baseline gap-2">
-              {analytics?.readinessScore !== null ? (
+              {analytics?.readinessScore > 0 ? (
                 <>
-                  <span className="text-2xl font-bold text-white">{analytics?.readinessScore}%</span>
+                  <span className="text-2xl font-bold text-white">{analytics.readinessScore}%</span>
                   <span className="text-[10px] text-amber-400">Calculated</span>
                 </>
               ) : (
-                <span className="text-sm font-medium text-slate-400">Calculating...</span>
+                <>
+                  <span className="text-2xl font-bold text-slate-400">0%</span>
+                  <Link to="/exams" className="text-[10px] text-amber-400 hover:underline">Take 1st Mock</Link>
+                </>
               )}
             </div>
           </div>
