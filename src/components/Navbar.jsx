@@ -19,8 +19,13 @@ import {
   BookMarked,
   Search,
   Cloud,
-  RefreshCw
+  RefreshCw,
+  Shield
 } from 'lucide-react';
+
+// Owner account IDs — admin portal only shows for these accounts
+const ADMIN_USER_IDS = ['u1'];
+const ADMIN_EMAILS = ['chaurasiaupasana70@gmail.com'];
 import axios from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -30,6 +35,12 @@ export function Navbar({ onOpenTutor }) {
   const { user, syncStatus, triggerSync } = useAuth();
   const { addToast } = useToast();
   const [notifications, setNotifications] = useState([]);
+
+  // Only show admin portal for the owner account (Upasana / u1)
+  const isAdmin = user && (
+    ADMIN_USER_IDS.includes(user.id) ||
+    ADMIN_EMAILS.includes((user.email || '').toLowerCase())
+  );
   const [showNotifs, setShowNotifs] = useState(false);
   const [theme, setTheme] = useState('dark');
 
@@ -246,6 +257,22 @@ export function Navbar({ onOpenTutor }) {
               <Bot className="w-4 h-4 text-indigo-200" />
               <span>Ask AI Tutor</span>
             </button>
+
+            {/* Admin Portal Button — only visible to owner account (Upasana / u1) */}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl font-medium text-sm transition-all hover:scale-105 active:scale-95 border ${
+                  location.pathname === '/admin'
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-md'
+                    : 'bg-surface-card border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300'
+                }`}
+                title="Admin Portal — Owner Only"
+              >
+                <Shield className="w-4 h-4" />
+                <span>Admin</span>
+              </Link>
+            )}
 
             {/* User Profile Link */}
             <Link 

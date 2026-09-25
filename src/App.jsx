@@ -19,6 +19,7 @@ import NotFound from './pages/NotFound.jsx';
 import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
 import TermsOfService from './pages/TermsOfService.jsx';
 import Contact from './pages/Contact.jsx';
+import AdminPanel from './pages/AdminPanel.jsx';
 import OnboardingModal from './components/OnboardingModal.jsx';
 import CloudSyncModal from './components/CloudSyncModal.jsx';
 import { useAuth } from './context/AuthContext.jsx';
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/admin" element={<AdminPanel />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
@@ -82,6 +84,7 @@ export default function App() {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/admin" element={<AdminPanel />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>

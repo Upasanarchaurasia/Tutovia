@@ -15,13 +15,21 @@ import {
   ChevronRight,
   ShieldCheck,
   Brain,
-  Sparkles
+  Sparkles,
+  Shield
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function BottomNav({ onOpenTutor }) {
   const location = useLocation();
+  const { user } = useAuth();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  const isOwner = user && (
+    user.id === 'u1' ||
+    (user.email && user.email.toLowerCase() === 'chaurasiaupasana70@gmail.com')
+  );
 
   const mainTabs = [
     { path: '/', label: 'Home', icon: LayoutDashboard },
@@ -31,6 +39,13 @@ export default function BottomNav({ onOpenTutor }) {
   ];
 
   const moreItems = [
+    ...(isOwner ? [{
+      path: '/admin',
+      label: 'Website Admin Portal',
+      desc: 'Platform stats, user management & question bank',
+      icon: Shield,
+      color: 'text-amber-400 bg-amber-500/10'
+    }] : []),
     { path: '/analytics', label: 'Study Analytics & Mastery', desc: 'Track your weekly hours & radar accuracy', icon: BarChart3, color: 'text-indigo-400 bg-indigo-500/10' },
     { path: '/wellness', label: 'Mindful Wellness & Breaks', desc: 'Breathing timer, posture & hydration resets', icon: HeartPulse, color: 'text-rose-400 bg-rose-500/10' },
     { path: '/news', label: 'ICAI News & Exam Alerts', desc: 'Official notifications & exam date updates', icon: Newspaper, color: 'text-amber-400 bg-amber-500/10' },

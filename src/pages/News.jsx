@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Newspaper, ExternalLink, Lightbulb, Sparkles, Bookmark, AlertCircle } from 'lucide-react';
+import { Newspaper, ExternalLink, Lightbulb, Sparkles, Bookmark, AlertCircle, FileText, Download, CheckCircle2 } from 'lucide-react';
 import axios from '../api.js';
 
 export default function News() {
@@ -38,15 +38,17 @@ export default function News() {
   }, []);
 
   const categories = [
-    'All', 'ICAI Updates', 'Exam Updates', 'Advanced Accounting', 
+    'All', 'Official Circulars (PDF)', 'ICAI Updates', 'Exam Updates', 'Advanced Accounting', 
     'Corporate & Other Laws', 'Taxation', 'Cost & Management Accounting', 
     'Auditing & Ethics', 'FM & SM', 'Finance & Economy'
   ];
 
-  const icaiUpdates = newsList.filter(item => item.source && item.source.toLowerCase().includes('icai'));
+  const icaiUpdates = newsList.filter(item => item.source && (item.source.toLowerCase().includes('icai') || item.category === 'Exam Updates'));
 
   let filteredNews = newsList;
-  if (selectedCategory === 'ICAI Updates') {
+  if (selectedCategory === 'Official Circulars (PDF)') {
+    filteredNews = newsList.filter(item => Boolean(item.pdfUrl));
+  } else if (selectedCategory === 'ICAI Updates') {
     filteredNews = icaiUpdates;
   } else if (selectedCategory !== 'All') {
     filteredNews = newsList.filter(item => item.category === selectedCategory);
@@ -82,9 +84,9 @@ export default function News() {
             <Newspaper className="w-3.5 h-3.5 text-indigo-400" />
             <span>Curated Academic & Industry Intelligence</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Related News & Practical Applicability</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Official Updates, Circulars & Practical Applicability</h1>
           <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-            Bridge the gap between theoretical exam concepts and real-world finance markets. Every news item includes a direct breakdown of how it applies to your corporate finance & accounting syllabus!
+            Direct access to official ICAI circulars, CBDT notifications, MCA rules, and GST Council decisions in original PDF format, paired with syllabus exam breakdowns!
           </p>
         </div>
       </div>
@@ -93,20 +95,55 @@ export default function News() {
       {icaiUpdates.length > 0 && selectedCategory === 'All' && (
         <div className="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/30">
           <h3 className="text-rose-400 font-bold mb-3 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" /> 🔴 Latest ICAI Updates
+            <AlertCircle className="w-5 h-5" /> 🔴 Latest ICAI Official Announcements & Circulars
           </h3>
           <div className="space-y-3">
             {icaiUpdates.slice(0, 2).map(update => (
-              <div key={update.id} className="p-4 rounded-xl bg-surface-card border border-rose-500/20 flex flex-col sm:flex-row gap-4 justify-between">
-                <div>
-                  <h4 className="font-bold text-white text-sm mb-1">{update.headline || update.title}</h4>
+              <div key={update.id} className="p-4 rounded-xl bg-surface-card border border-rose-500/20 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      OFFICIAL NOTICE
+                    </span>
+                    {update.pdfUrl && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        <FileText className="w-2.5 h-2.5" /> PDF Attached
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="font-bold text-white text-sm">
+                    <a 
+                      href={update.pdfUrl || update.originalUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="hover:text-rose-400 hover:underline transition-colors"
+                    >
+                      {update.headline || update.title}
+                    </a>
+                  </h4>
                   <p className="text-xs text-slate-400">{update.summary}</p>
                 </div>
-                {update.originalUrl && (
-                  <a href={update.originalUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 h-fit rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/30 hover:bg-rose-500/30 transition-all">
-                    Read Announcement <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
+                <div className="shrink-0 flex items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
+                  {update.pdfUrl ? (
+                    <a 
+                      href={update.pdfUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-600/30 transition-all"
+                    >
+                      <FileText className="w-3.5 h-3.5" /> Open Circular PDF <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : update.originalUrl && (
+                    <a 
+                      href={update.originalUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/30 hover:bg-rose-500/30 transition-all"
+                    >
+                      Read Notice <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -125,7 +162,7 @@ export default function News() {
                 : 'bg-surface-card border-surface-border text-slate-400 hover:text-slate-200'
             }`}
           >
-            {cat}
+            {cat === 'Official Circulars (PDF)' ? '📄 Official Circulars (PDF)' : cat}
           </button>
         ))}
       </div>
@@ -149,16 +186,36 @@ export default function News() {
                 <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">
                   Relevant to: {article.category}
                 </span>
+                {article.pdfUrl && (
+                  <span className="text-xs font-bold px-2 py-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1.5 animate-pulse">
+                    <FileText className="w-3.5 h-3.5 text-rose-400" /> Official Circular PDF Available
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-3 text-xs text-slate-400 mt-3 sm:mt-0">
                 <span className="font-semibold text-slate-300">Source: {article.source}</span>
                 <span>•</span>
-                <span>{article.date ? new Date(article.date).toLocaleDateString() : 'Recent'}</span>
+                <span>{article.date ? (isNaN(Date.parse(article.date)) ? article.date : new Date(article.date).toLocaleDateString()) : 'Recent'}</span>
               </div>
             </div>
 
             <div>
-              <h2 className="text-xl font-bold text-white mb-2 leading-snug">{renderBold(article.headline || article.title)}</h2>
+              <h2 className="text-xl font-bold text-white mb-2 leading-snug">
+                {article.pdfUrl ? (
+                  <a 
+                    href={article.pdfUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="hover:text-rose-400 transition-colors inline-flex items-baseline gap-1.5"
+                    title="Click to open official PDF circular"
+                  >
+                    {renderBold(article.headline || article.title)}
+                    <ExternalLink className="w-4 h-4 text-rose-400 inline shrink-0" />
+                  </a>
+                ) : (
+                  renderBold(article.headline || article.title)
+                )}
+              </h2>
               <p className="text-sm text-slate-300 leading-relaxed">{renderBold(article.summary)}</p>
             </div>
 
@@ -166,7 +223,7 @@ export default function News() {
             <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-surface-card to-purple-500/10 border border-indigo-500/30 space-y-2">
               <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
                 <Lightbulb className="w-4 h-4 text-indigo-400" />
-                <span>Why this matters to you</span>
+                <span>Why this matters to you (CA Exam Applicability)</span>
               </div>
               <p className="text-xs text-slate-200 leading-relaxed font-medium">
                 {renderBold(article.whyItMatters || article.applicability)}
@@ -175,15 +232,36 @@ export default function News() {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              {article.originalUrl && (
-                <a href={article.originalUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-card hover:bg-slate-800 text-slate-300 text-xs font-bold border border-surface-border transition-all">
-                  Read Original <ExternalLink className="w-3 h-3" />
+              {article.pdfUrl && (
+                <a 
+                  href={article.pdfUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold shadow-lg shadow-rose-600/25 transition-all"
+                >
+                  <FileText className="w-4 h-4" /> View Official Circular (PDF) <ExternalLink className="w-3 h-3" />
                 </a>
               )}
-              <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-card hover:bg-slate-800 text-slate-300 text-xs font-bold border border-surface-border transition-all">
+              {article.originalUrl && (
+                <a 
+                  href={article.originalUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-card hover:bg-slate-800 text-slate-300 text-xs font-bold border border-surface-border transition-all"
+                >
+                  Source Web Page <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+              <button 
+                onClick={() => alert("Article saved to your Tutovia reading list!")}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-card hover:bg-slate-800 text-slate-300 text-xs font-bold border border-surface-border transition-all"
+              >
                 <Bookmark className="w-3 h-3" /> Save
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-bold border border-indigo-500/30 transition-all sm:ml-auto">
+              <button 
+                onClick={() => window.location.href = `/tutor?prompt=${encodeURIComponent(`Explain the CA exam relevance of: ${article.headline || article.title}`)}`}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-bold border border-indigo-500/30 transition-all sm:ml-auto"
+              >
                 <Sparkles className="w-3 h-3" /> ✨ Ask Tutovia AI
               </button>
             </div>
@@ -195,3 +273,4 @@ export default function News() {
     </div>
   );
 }
+

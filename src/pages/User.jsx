@@ -220,9 +220,23 @@ export default function User() {
                 </div>
               </div>
 
+              {/* Owner-Exclusive Admin Portal Link */}
+              {(user?.id === 'u1' || (user?.email && user.email.toLowerCase() === 'chaurasiaupasana70@gmail.com')) && (
+                <button 
+                  onClick={() => navigate('/admin')}
+                  className="w-full mt-4 flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-all font-semibold text-xs group"
+                >
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                    <span>Website Admin Portal</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              )}
+
               <button 
                 onClick={() => { logout(); navigate('/'); }}
-                className="w-full mt-6 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 transition-colors font-medium text-sm"
+                className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 transition-colors font-medium text-sm"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Sign Out</span>

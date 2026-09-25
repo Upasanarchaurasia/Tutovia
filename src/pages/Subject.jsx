@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   ArrowLeft, BookOpen, PenTool, Clock, Award, 
-  FileText, BrainCircuit, Activity, ChevronRight, Play, AlertCircle, Bookmark, ExternalLink, CheckCircle2
+  FileText, BrainCircuit, Activity, ChevronRight, Play, AlertCircle, Bookmark, 
+  ExternalLink, CheckCircle2, Copy, Check, Sparkles, ChevronDown, ChevronUp,
+  X, Info, Calculator, Volume2, ShieldAlert, Layers, CornerDownRight
 } from 'lucide-react';
 import axios from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { SYLLABUS_BY_STAGE } from '../data/syllabusData.js';
 import { syncCompletedChapters } from '../services/syncService.js';
+import { getChapterSpecificData, CHAPTER_DETAILS } from '../data/chapterDetailsData.js';
 
 export default function Subject() {
   const { id } = useParams();
@@ -20,6 +23,16 @@ export default function Subject() {
   const [notes, setNotes] = useState('');
   const { user, profile } = useAuth();
   const [savingNotes, setSavingNotes] = useState(false);
+  
+  // States for Unified Revision Notes & Formulas
+  const [selectedRevisionChapter, setSelectedRevisionChapter] = useState('all');
+  const [revisionSubTab, setRevisionSubTab] = useState('snapshots'); // 'snapshots' | 'notebook'
+  const [copiedFormula, setCopiedFormula] = useState(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // States for Interactive Mindmap Drill-down
+  const [selectedMindmapNode, setSelectedMindmapNode] = useState(null);
+  const [mindmapFilterChapter, setMindmapFilterChapter] = useState('all');
   
   const userStorageKey = `tutovia_completed_chapters_${user?.id || 'guest'}_${id}`;
 
@@ -80,6 +93,7 @@ export default function Subject() {
 
   const saveNotes = async () => {
     setSavingNotes(true);
+    setSaveSuccess(false);
     const uid = user?.id;
     if (!uid) {
       setSavingNotes(false);
@@ -87,11 +101,27 @@ export default function Subject() {
     }
     try {
       await axios.post(`/api/notes?userId=${uid}&subjectId=${id}`, { notes });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err) {
       console.error(err);
     } finally {
       setSavingNotes(false);
     }
+  };
+
+  const handleCopyFormula = (formulaObj) => {
+    const textToCopy = `${formulaObj.name}\nFormula: ${formulaObj.formula}\nNote: ${formulaObj.explanation || ''}`;
+    navigator.clipboard?.writeText(textToCopy);
+    setCopiedFormula(formulaObj.name);
+    setTimeout(() => setCopiedFormula(null), 2000);
+  };
+
+  const handleAppendToNotes = (text) => {
+    const updatedNotes = notes ? `${notes}\n\n${text}` : text;
+    setNotes(updatedNotes);
+    setRevisionSubTab('notebook');
+    alert('Added to your Personal Notes!');
   };
 
   if (loading) {
@@ -125,8 +155,7 @@ export default function Subject() {
     { id: 'materials', label: 'Official Study Material', icon: Bookmark },
     { id: 'chapters', label: 'Chapters & Topics', icon: BookOpen },
     { id: 'practice', label: 'Practice & Mock Tests', icon: PenTool },
-    { id: 'revision', label: 'Revision & Notes', icon: FileText },
-    { id: 'snapshots', label: 'Chapter Snapshots', icon: FileText },
+    { id: 'revision', label: 'Revision Notes', icon: FileText },
     { id: 'mindmap', label: 'Mind Map', icon: BrainCircuit }
   ];
 
@@ -483,91 +512,634 @@ export default function Subject() {
             )}
           </div>
         )}
-        {activeTab === 'snapshots' && (
-          <div className="glass-panel p-6 rounded-3xl border border-surface-border space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-border pb-6">
-              <div>
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-emerald-400" /> Chapter Snapshots
-                </h3>
-                <p className="text-sm text-slate-400 mt-1">Quick revision notes with audio dictation.</p>
-              </div>
-            </div>
+        {/* UNIFIED REVISION & NOTES TAB */}
+        {(activeTab === 'revision' || activeTab === 'snapshots') && (
+          <div className="space-y-6">
+            {/* Header & Sub-Tab Switcher */}
+            <div className="glass-panel p-6 rounded-3xl border border-surface-border">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-surface-border">
+                <div>
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-indigo-400" /> Revision Notes & Formulas
+                  </h3>
+                  <p className="text-sm text-slate-400 mt-1">
+                    Elaborated chapter snapshots, statutory provisions, formula cheat-sheets, and your synchronized study notebook.
+                  </p>
+                </div>
 
-            {chapters.length > 0 ? (
-              <div className="space-y-6">
-                {chapters.map((chap, idx) => {
-                  const summaryText = `Chapter ${chap.number}: ${chap.title}. This chapter covers key concepts which are highly tested. Remember to focus on the exceptions and statutory limits.`;
-                  return (
-                    <div key={idx} className="p-6 rounded-2xl bg-surface-card border border-surface-border space-y-4 relative overflow-hidden">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <div className="text-xs font-bold text-emerald-400 mb-1">CHAPTER {chap.number}</div>
-                          <h4 className="text-lg font-bold text-white mb-2">{chap.title}</h4>
-                        </div>
-                        <button 
-                          onClick={() => handlePlayAudio(summaryText)}
-                          className="p-3 rounded-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors flex-shrink-0"
-                          title="Listen to Summary"
-                        >
-                          <Play className="w-5 h-5 ml-0.5" />
-                        </button>
-                      </div>
-                      <div className="prose prose-invert prose-sm max-w-none text-slate-300">
-                        <ul className="space-y-2 list-disc pl-4">
-                          <li>Focus on Section provisions and time limits.</li>
-                          <li>Review the latest amendments for this topic.</li>
-                          <li>Key definition: Refers to the central concept outlined by ICAI guidelines.</li>
-                        </ul>
-                      </div>
-                    </div>
-                  );
-                })}
+                {/* Sub-tab Pill Switcher */}
+                <div className="flex items-center p-1 rounded-2xl bg-surface/80 border border-surface-border">
+                  <button
+                    onClick={() => setRevisionSubTab('snapshots')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                      revisionSubTab === 'snapshots'
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" /> Chapter Snapshots & Formulas
+                  </button>
+                  <button
+                    onClick={() => setRevisionSubTab('notebook')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                      revisionSubTab === 'notebook'
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <PenTool className="w-3.5 h-3.5" /> My Personal Notebook
+                  </button>
+                </div>
               </div>
-            ) : (
-              <p className="text-sm text-slate-400">No snapshots available.</p>
-            )}
+
+              {/* Sub-tab 1: Chapter Snapshots & Formulas */}
+              {revisionSubTab === 'snapshots' && (
+                <div className="pt-6 space-y-6">
+                  {/* Chapter Selector Filter */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                    <button
+                      onClick={() => setSelectedRevisionChapter('all')}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
+                        selectedRevisionChapter === 'all'
+                          ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                          : 'bg-surface-card border-surface-border text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      All Chapters ({chapters.length || 3})
+                    </button>
+                    {(chapters.length > 0 ? chapters : (CHAPTER_DETAILS[id]?.chapters || [])).map((chap, idx) => (
+                      <button
+                        key={chap.id || idx}
+                        onClick={() => setSelectedRevisionChapter(String(chap.number || idx + 1))}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
+                          selectedRevisionChapter === String(chap.number || idx + 1)
+                            ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                            : 'bg-surface-card border-surface-border text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Ch {chap.number || idx + 1}: {chap.title?.length > 25 ? chap.title.substring(0, 25) + '...' : chap.title}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Chapter Cards List */}
+                  <div className="space-y-6">
+                    {(chapters.length > 0 ? chapters : (CHAPTER_DETAILS[id]?.chapters || []))
+                      .filter(chap => selectedRevisionChapter === 'all' || selectedRevisionChapter === String(chap.number))
+                      .map((chap, idx) => {
+                        const chapData = getChapterSpecificData(id, chap.number || idx + 1, chap.title);
+                        return (
+                          <div 
+                            key={chap.id || idx}
+                            className="p-6 rounded-3xl bg-surface-card border border-surface-border hover:border-indigo-500/30 transition-all space-y-5"
+                          >
+                            {/* Chapter Header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-surface-border">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wider">
+                                    {chap.module || chapData.module || 'Core Module'}
+                                  </span>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    Weightage: {chapData.marks || '15-20'} Marks
+                                  </span>
+                                </div>
+                                <h4 className="text-lg font-bold text-white">
+                                  Chapter {chap.number || idx + 1}: {chap.title || chapData.title}
+                                </h4>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  onClick={() => handlePlayAudio(chapData.audioSummary)}
+                                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-bold transition-all"
+                                  title="Listen to comprehensive audio summary"
+                                >
+                                  <Volume2 className="w-4 h-4 text-emerald-400" /> Listen Audio Summary
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setActiveTab('mindmap');
+                                    setSelectedMindmapNode({
+                                      title: chap.title || chapData.title,
+                                      subtitle: `Chapter ${chap.number || idx + 1} • ${chap.module || chapData.module}`,
+                                      marks: chapData.marks,
+                                      summary: chapData.audioSummary,
+                                      provisions: chapData.importantPoints,
+                                      formulas: chapData.formulas,
+                                      traps: chapData.icaiTraps,
+                                      chapterUrl: chap.url
+                                    });
+                                  }}
+                                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 border border-purple-500/30 text-xs font-bold transition-all"
+                                  title="Explore in interactive mind map"
+                                >
+                                  <BrainCircuit className="w-4 h-4 text-purple-400" /> Mind Map
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Section 1: Key Conceptual Points & Statutory Provisions */}
+                            <div className="space-y-3">
+                              <h5 className="text-xs font-extrabold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Key Conceptual Points & Statutory Provisions
+                              </h5>
+                              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                {chapData.importantPoints?.map((point, pIdx) => (
+                                  <li 
+                                    key={pIdx} 
+                                    className="p-3 rounded-xl bg-surface/50 border border-surface-border text-xs text-slate-300 leading-relaxed flex items-start gap-2"
+                                  >
+                                    <span className="text-emerald-400 font-bold shrink-0 mt-0.5">•</span>
+                                    <span>{point}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            {/* Section 2: Formulas & Calculation Cheat Sheet */}
+                            {chapData.formulas && chapData.formulas.length > 0 && (
+                              <div className="space-y-3">
+                                <h5 className="text-xs font-extrabold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                                  <Calculator className="w-3.5 h-3.5" /> Essential Formulas & Computational Cheat Sheet
+                                </h5>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {chapData.formulas.map((f, fIdx) => (
+                                    <div 
+                                      key={fIdx} 
+                                      className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 space-y-2 relative group"
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-xs font-bold text-white">{f.name}</span>
+                                        <button
+                                          onClick={() => handleCopyFormula(f)}
+                                          className="p-1.5 rounded-lg bg-surface hover:bg-slate-700 text-slate-300 hover:text-white transition-all text-[10px] font-bold flex items-center gap-1"
+                                          title="Copy formula to clipboard"
+                                        >
+                                          {copiedFormula === f.name ? (
+                                            <>
+                                              <Check className="w-3 h-3 text-emerald-400" /> Copied!
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Copy className="w-3 h-3" /> Copy
+                                            </>
+                                          )}
+                                        </button>
+                                      </div>
+                                      <div className="p-2.5 rounded-xl bg-surface/80 border border-surface-border font-mono text-xs text-indigo-300 overflow-x-auto">
+                                        {f.formula}
+                                      </div>
+                                      {f.explanation && (
+                                        <p className="text-[11px] text-slate-400 leading-normal">
+                                          {f.explanation}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Section 3: ICAI Exam Traps & Examiner Pitfalls */}
+                            {chapData.icaiTraps && chapData.icaiTraps.length > 0 && (
+                              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2">
+                                <h5 className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                                  <ShieldAlert className="w-4 h-4 text-amber-400" /> ICAI Exam Traps & Pitfall Warnings
+                                </h5>
+                                <ul className="space-y-1.5">
+                                  {chapData.icaiTraps.map((trap, tIdx) => (
+                                    <li key={tIdx} className="text-xs text-slate-300 flex items-start gap-2">
+                                      <span className="text-amber-400 font-bold shrink-0">⚠️</span>
+                                      <span>{trap}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Bottom Actions */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleAppendToNotes(`### Chapter ${chap.number || idx + 1}: ${chap.title || chapData.title}\n\n**Key Points:**\n${chapData.importantPoints?.map(p => `- ${p}`).join('\n')}\n\n**Formulas:**\n${chapData.formulas?.map(f => `${f.name}: ${f.formula}`).join('\n')}`)}
+                                  className="px-3.5 py-2 rounded-xl bg-surface hover:bg-slate-800 text-slate-300 text-xs font-bold border border-surface-border transition-all flex items-center gap-1.5"
+                                >
+                                  <Copy className="w-3.5 h-3.5" /> Append Points to My Notes
+                                </button>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {chap.url && (
+                                  <a
+                                    href={chap.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-all flex items-center gap-1.5"
+                                  >
+                                    <FileText className="w-3.5 h-3.5" /> Read Chapter PDF <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                )}
+                                <Link
+                                  to={`/exams?examId=mock-${subject?.id}-${chap.id || idx + 1}`}
+                                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5"
+                                >
+                                  Take Chapter Quiz <Play className="w-3 h-3 fill-current" />
+                                </Link>
+                              </div>
+                            </div>
+
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-tab 2: My Personal Notebook */}
+              {revisionSubTab === 'notebook' && (
+                <div className="pt-6 space-y-4">
+                  {/* Quick Insert Symbols Toolbar */}
+                  <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl bg-surface/60 border border-surface-border">
+                    <span className="text-xs font-bold text-slate-400 mr-2 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Quick Inserts:
+                    </span>
+                    <button
+                      onClick={() => handleAppendToNotes('\n## Key Formula:\n- **Concept**: \n- **Equation**: \n- **Parameters**: \n')}
+                      className="px-2.5 py-1 rounded-lg bg-surface-card hover:bg-indigo-600/20 hover:text-indigo-300 text-slate-300 text-xs font-bold border border-surface-border transition-all"
+                    >
+                      + Formula Block
+                    </button>
+                    <button
+                      onClick={() => handleAppendToNotes('\n### Statutory Provision / Section:\n- **Section**: \n- **Applicability**: \n- **Condition**: \n')}
+                      className="px-2.5 py-1 rounded-lg bg-surface-card hover:bg-indigo-600/20 hover:text-indigo-300 text-slate-300 text-xs font-bold border border-surface-border transition-all"
+                    >
+                      + Section Note
+                    </button>
+                    {['₹', 'P/V Ratio', 'WACC', 'BEP', 'AS 10', 'Sec 135', 'SA 200', 'ITC'].map(sym => (
+                      <button
+                        key={sym}
+                        onClick={() => handleAppendToNotes(` ${sym} `)}
+                        className="px-2.5 py-1 rounded-lg bg-surface-card hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-surface-border transition-all"
+                      >
+                        {sym}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Notes Textarea */}
+                  <div className="relative">
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Write your personal revision notes, mnemonics, formula reminders, and tricky adjustments here. Automatically saved and synced across web and mobile!"
+                      className="w-full h-[450px] bg-surface/50 border border-surface-border rounded-2xl p-5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 leading-relaxed font-sans text-sm resize-y"
+                    ></textarea>
+                  </div>
+
+                  {/* Footer with Character count and Save Button */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                    <div className="flex items-center gap-3 text-xs text-slate-400">
+                      <span>{notes.length} characters</span>
+                      <span>•</span>
+                      <span>{notes.trim() ? notes.trim().split(/\s+/).length : 0} words</span>
+                      {saveSuccess && (
+                        <span className="text-emerald-400 font-bold flex items-center gap-1 animate-pulse">
+                          <CheckCircle2 className="w-4 h-4" /> Notes Saved & Synced to Cloud!
+                        </span>
+                      )}
+                    </div>
+
+                    <button 
+                      onClick={saveNotes}
+                      disabled={savingNotes}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-lg shadow-indigo-600/20"
+                    >
+                      {savingNotes ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <PenTool className="w-4 h-4" />
+                      )}
+                      {savingNotes ? 'Saving to Cloud...' : 'Save & Sync Notes'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* MIND MAP TAB */}
+        {/* INTERACTIVE MIND MAP TAB WITH DETAILED DRILL-DOWN */}
         {activeTab === 'mindmap' && (
-          <div className="glass-panel p-6 rounded-3xl border border-surface-border h-[600px] flex flex-col relative overflow-hidden">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
-              <BrainCircuit className="w-5 h-5 text-purple-400" /> Interactive Mind Map
-            </h3>
-            <p className="text-sm text-slate-400 mb-6">Visual structure of {subject.title}</p>
-            
-            <div className="flex-1 relative border border-surface-border rounded-2xl bg-surface/50 overflow-hidden flex items-center justify-center">
-              <svg width="100%" height="100%" className="absolute inset-0 pointer-events-none">
-                <path d="M 50% 20% L 30% 50%" stroke="rgba(167, 139, 250, 0.2)" strokeWidth="2" fill="none" />
-                <path d="M 50% 20% L 70% 50%" stroke="rgba(167, 139, 250, 0.2)" strokeWidth="2" fill="none" />
-                <path d="M 30% 50% L 15% 80%" stroke="rgba(167, 139, 250, 0.2)" strokeWidth="2" fill="none" />
-                <path d="M 30% 50% L 45% 80%" stroke="rgba(167, 139, 250, 0.2)" strokeWidth="2" fill="none" />
-                <path d="M 70% 50% L 85% 80%" stroke="rgba(167, 139, 250, 0.2)" strokeWidth="2" fill="none" />
-              </svg>
-              
-              <div className="absolute top-[15%] left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl bg-purple-500/20 border border-purple-500/40 text-purple-100 font-bold shadow-[0_0_20px_rgba(168,85,247,0.2)]">
-                {subject.title}
+          <div className="space-y-6">
+            <div className="glass-panel p-6 rounded-3xl border border-surface-border space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-surface-border">
+                <div>
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <BrainCircuit className="w-5 h-5 text-purple-400" /> Interactive Visual Mind Map
+                  </h3>
+                  <p className="text-sm text-slate-400 mt-1">
+                    Click on ANY node to open a comprehensive drill-down overview with statutory provisions, formulas, and exam guidance!
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400">Focus:</span>
+                  <select
+                    value={mindmapFilterChapter}
+                    onChange={(e) => setMindmapFilterChapter(e.target.value)}
+                    className="bg-surface-card border border-surface-border rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50"
+                  >
+                    <option value="all">Full Subject Blueprint</option>
+                    {(chapters.length > 0 ? chapters : (CHAPTER_DETAILS[id]?.chapters || [])).map((c, i) => (
+                      <option key={c.id || i} value={String(c.number || i + 1)}>
+                        Ch {c.number || i + 1}: {c.title?.length > 25 ? c.title.substring(0, 25) + '...' : c.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              
-              <div className="absolute top-[45%] left-[30%] -translate-x-1/2 px-4 py-2 rounded-xl bg-surface-card border border-surface-border text-slate-200 text-sm font-semibold hover:border-purple-500/50 cursor-pointer transition-colors">
-                {chapters[0]?.title || 'Module 1'}
-              </div>
-              <div className="absolute top-[45%] left-[70%] -translate-x-1/2 px-4 py-2 rounded-xl bg-surface-card border border-surface-border text-slate-200 text-sm font-semibold hover:border-purple-500/50 cursor-pointer transition-colors">
-                {chapters[1]?.title || 'Module 2'}
-              </div>
-              
-              <div className="absolute top-[75%] left-[15%] -translate-x-1/2 px-3 py-1.5 rounded-lg bg-surface border border-surface-border text-slate-400 text-xs hover:text-white cursor-pointer transition-colors">
-                Concepts
-              </div>
-              <div className="absolute top-[75%] left-[45%] -translate-x-1/2 px-3 py-1.5 rounded-lg bg-surface border border-surface-border text-slate-400 text-xs hover:text-white cursor-pointer transition-colors">
-                Provisions
-              </div>
-              <div className="absolute top-[75%] left-[85%] -translate-x-1/2 px-3 py-1.5 rounded-lg bg-surface border border-surface-border text-slate-400 text-xs hover:text-white cursor-pointer transition-colors">
-                Amendments
+
+              {/* Mind Map Canvas / Interactive Tree */}
+              <div className="relative border border-surface-border rounded-3xl bg-surface/40 p-6 md:p-10 overflow-x-auto min-h-[520px] flex flex-col items-center justify-center">
+                {/* Visual Decorative SVG Lines */}
+                <div className="w-full max-w-4xl space-y-10">
+                  {/* ROOT NODE: Subject */}
+                  <div className="flex justify-center">
+                    <button
+                      onClick={() => {
+                        const firstChap = (chapters.length > 0 ? chapters[0] : CHAPTER_DETAILS[id]?.chapters?.[0]);
+                        const firstData = getChapterSpecificData(id, 1, firstChap?.title);
+                        setSelectedMindmapNode({
+                          title: subject.title,
+                          subtitle: `${subject.code || 'CA Intermediate'} • Complete Course Blueprint`,
+                          marks: '100 Marks Total',
+                          summary: `${subject.title} is a core CA paper comprising ${chapters.length || 6} major chapters across statutory framework, practical problem solving, and ICAI case studies.`,
+                          provisions: [
+                            'Structured under ICAI New Scheme of Education and Training.',
+                            'Exams consist of 30% compulsory case-scenario based MCQs and 70% descriptive questions.',
+                            'Requires thorough conceptual command over statutory limits, formulas, and presentation standards.'
+                          ],
+                          formulas: firstData.formulas || [],
+                          traps: [
+                            'Allocate 1.8 minutes per mark in exam (180 minutes for 100 marks).',
+                            'Always cite applicable Section numbers and Accounting Standards in initial paragraphs.'
+                          ]
+                        });
+                      }}
+                      className="px-6 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-base md:text-lg shadow-[0_0_30px_rgba(168,85,247,0.3)] border border-purple-400/30 flex items-center gap-3 transition-all hover:scale-105"
+                    >
+                      <BrainCircuit className="w-6 h-6 text-purple-200" />
+                      <span>{subject.title}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white">Click to Explore</span>
+                    </button>
+                  </div>
+
+                  {/* Connective Line Down */}
+                  <div className="flex justify-center">
+                    <div className="w-0.5 h-8 bg-gradient-to-b from-purple-500 to-indigo-500"></div>
+                  </div>
+
+                  {/* LEVEL 2: Modules & Chapters Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {(chapters.length > 0 ? chapters.slice(0, 3) : (CHAPTER_DETAILS[id]?.chapters || []).slice(0, 3)).map((chap, idx) => {
+                      const chapData = getChapterSpecificData(id, chap.number || idx + 1, chap.title);
+                      return (
+                        <div 
+                          key={chap.id || idx}
+                          className="flex flex-col items-center space-y-4"
+                        >
+                          {/* Module / Chapter Box */}
+                          <button
+                            onClick={() => setSelectedMindmapNode({
+                              title: `Chapter ${chap.number || idx + 1}: ${chap.title || chapData.title}`,
+                              subtitle: `${chap.module || chapData.module} • Weightage: ${chapData.marks || '15-20'} Marks`,
+                              marks: chapData.marks,
+                              summary: chapData.audioSummary,
+                              provisions: chapData.importantPoints,
+                              formulas: chapData.formulas,
+                              traps: chapData.icaiTraps,
+                              chapterUrl: chap.url
+                            })}
+                            className="w-full p-4 rounded-2xl bg-surface-card hover:bg-surface border border-purple-500/30 hover:border-purple-400 text-left transition-all hover:scale-[1.02] shadow-lg group relative overflow-hidden"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
+                                {chap.module || chapData.module || `Module ${idx + 1}`}
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                                {chapData.marks || '15-20'} Marks
+                              </span>
+                            </div>
+                            <h4 className="font-bold text-white text-sm group-hover:text-purple-300 transition-colors">
+                              {chap.title || chapData.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                              {chapData.importantPoints?.[0] || 'Click to view specific legal provisions and calculation models.'}
+                            </p>
+                            <div className="mt-3 flex items-center justify-between text-[11px] text-purple-400 font-bold">
+                              <span>Drill Down Overview →</span>
+                              <span className="text-slate-500">{chapData.formulas?.length || 2} Formulas</span>
+                            </div>
+                          </button>
+
+                          {/* Sub-concept Leaf Nodes */}
+                          <div className="w-full space-y-2 pl-3 border-l-2 border-purple-500/20">
+                            {chapData.mindmapTree?.children?.[0]?.subtopics?.slice(0, 2).map((subtopic, sIdx) => (
+                              <button
+                                key={sIdx}
+                                onClick={() => setSelectedMindmapNode({
+                                  title: subtopic,
+                                  subtitle: `Concept under Chapter ${chap.number || idx + 1}: ${chap.title || chapData.title}`,
+                                  marks: 'Tested in 4-6 Mark Case Questions',
+                                  summary: `Specific core concept testing application of provisions under ${chap.title || chapData.title}. Remember to review statutory exemptions and computational adjustments.`,
+                                  provisions: [
+                                    chapData.importantPoints?.[sIdx] || `Mandatory legal provisions governing ${subtopic}.`,
+                                    'Ensure all requisite disclosures and conditions are explicitly cited in your answers.'
+                                  ],
+                                  formulas: chapData.formulas || [],
+                                  traps: chapData.icaiTraps || [],
+                                  chapterUrl: chap.url
+                                })}
+                                className="w-full p-2.5 rounded-xl bg-surface/80 hover:bg-purple-950/30 border border-surface-border hover:border-purple-500/40 text-left text-xs text-slate-300 hover:text-white transition-all flex items-center justify-between group"
+                              >
+                                <span className="flex items-center gap-1.5 font-medium">
+                                  <CornerDownRight className="w-3 h-3 text-purple-400 shrink-0" />
+                                  <span className="truncate">{subtopic}</span>
+                                </span>
+                                <span className="text-[10px] text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                  Inspect →
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* MINDMAP DRILL-DOWN DETAILED MODAL */}
+            {selectedMindmapNode && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+                <div className="w-full max-w-3xl max-h-[90vh] bg-surface-card border border-purple-500/30 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                  {/* Modal Header */}
+                  <div className="p-6 bg-gradient-to-r from-purple-900/30 via-surface to-indigo-900/30 border-b border-surface-border flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase tracking-wider">
+                          MIND MAP DRILL-DOWN
+                        </span>
+                        {selectedMindmapNode.marks && (
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            {selectedMindmapNode.marks}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-xl font-extrabold text-white">
+                        {selectedMindmapNode.title}
+                      </h3>
+                      {selectedMindmapNode.subtitle && (
+                        <p className="text-xs text-purple-300/80 mt-0.5">
+                          {selectedMindmapNode.subtitle}
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedMindmapNode(null)}
+                      className="p-2 rounded-xl bg-surface hover:bg-slate-800 text-slate-400 hover:text-white transition-all shrink-0"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Modal Body (Scrollable) */}
+                  <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-200">
+                    {/* 1. Overview */}
+                    <div className="p-4 rounded-2xl bg-surface/60 border border-surface-border space-y-2">
+                      <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Info className="w-4 h-4" /> Concept Breakdown & Practical Overview
+                      </h4>
+                      <p className="text-sm text-slate-300 leading-relaxed">
+                        {selectedMindmapNode.summary}
+                      </p>
+                    </div>
+
+                    {/* 2. Key Statutory Provisions */}
+                    {selectedMindmapNode.provisions && selectedMindmapNode.provisions.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" /> Statutory Provisions & Rules
+                        </h4>
+                        <ul className="space-y-2">
+                          {selectedMindmapNode.provisions.map((prov, prIdx) => (
+                            <li 
+                              key={prIdx}
+                              className="p-3 rounded-xl bg-surface/40 border border-surface-border text-xs text-slate-300 flex items-start gap-2.5 leading-relaxed"
+                            >
+                              <span className="text-emerald-400 font-bold shrink-0 mt-0.5">•</span>
+                              <span>{prov}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* 3. Formulas & Calculations */}
+                    {selectedMindmapNode.formulas && selectedMindmapNode.formulas.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Calculator className="w-4 h-4" /> Formulas & Quantitative Methods
+                        </h4>
+                        <div className="space-y-2.5">
+                          {selectedMindmapNode.formulas.map((f, fIdx) => (
+                            <div key={fIdx} className="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/20 space-y-1.5">
+                              <div className="flex items-center justify-between text-xs font-bold text-white">
+                                <span>{f.name}</span>
+                                <button
+                                  onClick={() => handleCopyFormula(f)}
+                                  className="text-[10px] text-indigo-300 hover:text-white flex items-center gap-1"
+                                >
+                                  {copiedFormula === f.name ? 'Copied!' : 'Copy Formula'}
+                                </button>
+                              </div>
+                              <div className="p-2 rounded-lg bg-surface font-mono text-xs text-indigo-300">
+                                {f.formula}
+                              </div>
+                              {f.explanation && (
+                                <p className="text-[11px] text-slate-400">{f.explanation}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 4. ICAI Exam Traps */}
+                    {selectedMindmapNode.traps && selectedMindmapNode.traps.length > 0 && (
+                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                        <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                          <ShieldAlert className="w-4 h-4 text-amber-400" /> ICAI Exam Traps & Pitfalls
+                        </h4>
+                        <ul className="space-y-1.5">
+                          {selectedMindmapNode.traps.map((tr, tIdx) => (
+                            <li key={tIdx} className="text-xs text-slate-300 flex items-start gap-2">
+                              <span className="text-amber-400 shrink-0">⚠️</span>
+                              <span>{tr}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Modal Footer Actions */}
+                  <div className="p-4 sm:p-6 bg-surface/80 border-t border-surface-border flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handlePlayAudio(selectedMindmapNode.summary)}
+                        className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-bold transition-all flex items-center gap-1.5"
+                      >
+                        <Volume2 className="w-4 h-4 text-emerald-400" /> Listen Audio
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleAppendToNotes(`### ${selectedMindmapNode.title}\n\n${selectedMindmapNode.summary}\n\n**Key Provisions:**\n${selectedMindmapNode.provisions?.map(p => `- ${p}`).join('\n') || ''}`);
+                          setSelectedMindmapNode(null);
+                          setActiveTab('revision');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-surface hover:bg-slate-700 text-slate-300 text-xs font-bold border border-surface-border transition-all flex items-center gap-1.5"
+                      >
+                        <Copy className="w-3.5 h-3.5" /> Save to Revision Notes
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {selectedMindmapNode.chapterUrl && (
+                        <a
+                          href={selectedMindmapNode.chapterUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-4 py-2 rounded-xl bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 border border-indigo-500/30 text-xs font-bold transition-all flex items-center gap-1.5"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> Read PDF <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => setSelectedMindmapNode(null)}
+                        className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md shadow-purple-600/20"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -591,31 +1163,6 @@ export default function Subject() {
                 Take Mock Test
               </Link>
             </div>
-          </div>
-        )}
-
-        {/* REVISION TAB */}
-        {activeTab === 'revision' && (
-          <div className="glass-panel p-6 rounded-3xl border border-surface-border">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <FileText className="w-5 h-5 text-indigo-400" /> My Study Notes
-              </h3>
-              <button 
-                onClick={saveNotes}
-                disabled={savingNotes}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all disabled:opacity-50"
-              >
-                {savingNotes ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <PenTool className="w-4 h-4" />}
-                {savingNotes ? 'Saving...' : 'Save Notes'}
-              </button>
-            </div>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Write your mnemonics, formulas, and key summaries here..."
-              className="w-full h-96 bg-surface/50 border border-surface-border rounded-xl p-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 resize-y"
-            ></textarea>
           </div>
         )}
 
