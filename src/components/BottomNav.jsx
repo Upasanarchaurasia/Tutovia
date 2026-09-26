@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Brain,
   Sparkles,
-  Shield
+  Shield,
+  BookOpen
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -33,6 +34,7 @@ export default function BottomNav({ onOpenTutor }) {
 
   const mainTabs = [
     { path: '/', label: 'Home', icon: LayoutDashboard },
+    { path: '/syllabus', label: 'Syllabus', icon: BookOpen },
     { path: '/exams', label: 'Exams', icon: GraduationCap },
     { path: '/pyq', label: 'PYQ Bank', icon: BookMarked },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },

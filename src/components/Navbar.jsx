@@ -20,7 +20,8 @@ import {
   Search,
   Cloud,
   RefreshCw,
-  Shield
+  Shield,
+  BookOpen
 } from 'lucide-react';
 
 // Owner account IDs — admin portal only shows for these accounts
@@ -73,22 +74,29 @@ export function Navbar({ onOpenTutor }) {
 
   useEffect(() => {
     const uid = user?.id;
-    axios.get('/api/notifications').then(res => setNotifications(Array.isArray(res.data) ? res.data : [])).catch(() => {});
-    if (uid) {
-      axios.get(`/api/progress?userId=${uid}`).then(res => {
-        if (res?.data) {
-          setStudyHours(res.data.study_hours_today || '0.00');
-          setStreak(res.data.current_streak || 0);
-        }
-      }).catch(() => {});
-    } else {
-      setStudyHours('0.00');
-      setStreak(0);
-    }
-  }, [location.pathname, user?.id]);
+    const fetchNavData = () => {
+      axios.get('/api/notifications').then(res => setNotifications(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+      if (uid) {
+        axios.get(`/api/progress?userId=${uid}`).then(res => {
+          if (res?.data) {
+            setStudyHours(res.data.study_hours_today || '0.00');
+            setStreak(res.data.current_streak || 0);
+          }
+        }).catch(() => {});
+      } else {
+        setStudyHours('0.00');
+        setStreak(0);
+      }
+    };
+
+    fetchNavData();
+    const interval = setInterval(fetchNavData, 60000); // lightweight 60s background sync
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/syllabus', label: 'Syllabus', icon: BookOpen },
     { path: '/exams', label: 'Exams & Quizzes', icon: GraduationCap },
     { path: '/flashcards', label: 'Flashcards', icon: Layers },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },

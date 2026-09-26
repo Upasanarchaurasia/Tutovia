@@ -24,8 +24,9 @@ export default function Flashcards() {
   const [newTip, setNewTip] = useState('');
 
   // Filters
+  const [groupFilter, setGroupFilter] = useState('all'); // all, 'Group 1', 'Group 2'
   const [subjectFilter, setSubjectFilter] = useState('all');
-  const [progressFilter, setProgressFilter] = useState('all'); // all, pending, reviewed
+  const [progressFilter, setProgressFilter] = useState('all'); // all, pending, reviewed, due, again, hard, good, mastered
 
   useEffect(() => {
     fetchData();
@@ -34,7 +35,7 @@ export default function Flashcards() {
   useEffect(() => {
     setCurrentIndex(0);
     setIsFlipped(false);
-  }, [subjectFilter, progressFilter]);
+  }, [subjectFilter, progressFilter, groupFilter]);
 
   const getStorageKey = () => `tutovia_fc_progress_${user?.id || 'guest'}`;
 
@@ -85,9 +86,25 @@ export default function Flashcards() {
     }
   };
 
+  const stats = useMemo(() => {
+    const total = flashcards.length;
+    const mastered = flashcards.filter(fc => fc.status === 'mastered').length;
+    const good = flashcards.filter(fc => fc.status === 'good').length;
+    const hard = flashcards.filter(fc => fc.status === 'hard').length;
+    const again = flashcards.filter(fc => fc.status === 'again' || fc.status === 'learning').length;
+    const reviewed = flashcards.filter(fc => fc.status && fc.status !== 'pending').length;
+    const now = new Date();
+    const due = flashcards.filter(fc => fc.status && fc.status !== 'pending' && fc.next_review_date && new Date(fc.next_review_date) <= now).length;
+    return { total, mastered, good, hard, again, reviewed, due };
+  }, [flashcards]);
+
   const filteredCards = useMemo(() => {
     let result = flashcards;
     
+    if (groupFilter !== 'all') {
+      result = result.filter(fc => fc.group === groupFilter || fc.isCustom);
+    }
+
     if (subjectFilter !== 'all') {
       result = result.filter(fc => fc.subject_id === subjectFilter);
     }
@@ -106,7 +123,7 @@ export default function Flashcards() {
         return true;
       });
     } else if (progressFilter === 'again') {
-      result = result.filter(fc => fc.status === 'again');
+      result = result.filter(fc => fc.status === 'again' || fc.status === 'learning');
     } else if (progressFilter === 'hard') {
       result = result.filter(fc => fc.status === 'hard');
     } else if (progressFilter === 'good') {
@@ -116,7 +133,7 @@ export default function Flashcards() {
     }
 
     return result;
-  }, [flashcards, subjectFilter, progressFilter]);
+  }, [flashcards, groupFilter, subjectFilter, progressFilter]);
 
   const safeIndex = filteredCards.length > 0 ? Math.min(currentIndex, filteredCards.length - 1) : 0;
 
@@ -323,19 +340,92 @@ export default function Flashcards() {
   return (
     <div className="space-y-6">
       
-      {/* Filters Row */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-card border border-surface-border p-4 rounded-2xl">
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+      {/* 1. Header & Summary Stats */}
+      <div className="glass-panel p-6 rounded-3xl border border-indigo-500/20 shadow-xl bg-gradient-to-r from-indigo-950/20 via-surface-card to-background">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-semibold mb-2">
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              <span>CA Intermediate Active Recall & Spaced Repetition</span>
+            </div>
+            <h1 className="text-2xl font-black text-white tracking-tight">CA Flashcards Deck</h1>
+            <p className="text-slate-400 text-xs mt-0.5">Retain critical section numbers, accounting standards (AS/Ind AS), formulas, and audit definitions.</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchData()}
+              title="Recollect and re-sync flashcards with server"
+              className="px-3.5 py-2 rounded-xl bg-surface-card hover:bg-slate-800 text-slate-300 hover:text-white border border-surface-border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Sync Deck</span>
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Custom Card</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4-Stat Metric Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-surface-border">
+          <div className="p-3 bg-surface-card/60 rounded-xl border border-surface-border">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Total Cards</span>
+            <div className="text-xl font-black text-white">{stats.total}</div>
+          </div>
+          <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block mb-1">Mastered</span>
+            <div className="text-xl font-black text-emerald-300">{stats.mastered}</div>
+          </div>
+          <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block mb-1">Needs Review</span>
+            <div className="text-xl font-black text-amber-300">{stats.again + stats.hard}</div>
+          </div>
+          <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 block mb-1">Due for Review</span>
+            <div className="text-xl font-black text-purple-300">{stats.due}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Group Selector & Filters Row */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-surface-card border border-surface-border p-4 rounded-2xl shadow-sm">
+        {/* Group Tabs */}
+        <div className="flex items-center gap-1 p-1 bg-background/60 border border-surface-border rounded-xl">
+          {[
+            { id: 'all', label: `All Groups (${stats.total})` },
+            { id: 'Group 1', label: 'Group 1' },
+            { id: 'Group 2', label: 'Group 2' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setGroupFilter(tab.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                groupFilter === tab.id
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Subject & Progress Dropdowns */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <select 
             value={subjectFilter}
             onChange={(e) => setSubjectFilter(e.target.value)}
-            className="bg-surface border border-surface-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="bg-surface border border-surface-border rounded-xl px-3 py-2 text-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="all">All Subjects</option>
             {availableSubjects.map(sub => (
               <option key={sub.id} value={sub.id}>{sub.title}</option>
             ))}
-            {/* Always include custom imported cards option if any exist */}
             {flashcards.some(fc => fc.isCustom) && (
               <option value="general">Custom Imported</option>
             )}
@@ -344,21 +434,21 @@ export default function Flashcards() {
           <select 
             value={progressFilter}
             onChange={(e) => setProgressFilter(e.target.value)}
-            className="bg-surface border border-surface-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="bg-surface border border-surface-border rounded-xl px-3 py-2 text-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
-            <option value="all">All Progress</option>
-            <option value="pending">Pending Only ({flashcards.length - flippedCount})</option>
-            <option value="reviewed">Reviewed Only ({flippedCount})</option>
-            <option value="due">Due for Review</option>
-            <option value="again">Needs Review ({againCount})</option>
-            <option value="hard">Hard Cards ({hardCount})</option>
-            <option value="good">Good Memory ({goodCount})</option>
-            <option value="mastered">Mastered Only ({masteredCount})</option>
+            <option value="all">All Statuses ({filteredCards.length})</option>
+            <option value="pending">Pending Only ({stats.total - stats.reviewed})</option>
+            <option value="reviewed">Reviewed Only ({stats.reviewed})</option>
+            <option value="due">Due for Review ({stats.due})</option>
+            <option value="again">Needs Review / Again ({stats.again})</option>
+            <option value="hard">Hard Cards ({stats.hard})</option>
+            <option value="good">Good Memory ({stats.good})</option>
+            <option value="mastered">Mastered ({stats.mastered})</option>
           </select>
-        </div>
-        
-        <div className="text-slate-400 text-sm font-medium">
-          Showing {filteredCards.length} Cards
+
+          <div className="text-slate-400 text-xs font-medium ml-auto">
+            Showing <strong className="text-white">{filteredCards.length}</strong> Cards
+          </div>
         </div>
       </div>
 

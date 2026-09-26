@@ -22,6 +22,11 @@ import { supabase } from '../supabaseClient.js';
 import { SYLLABUS_BY_STAGE } from '../data/syllabusData.js';
 
 let initialNotificationsShown = false;
+let dashboardMemoryCache = {
+  data: null,
+  timestamp: 0,
+  userId: null
+};
 
 // --- Subject Card Component ---
 const colorMap = {
@@ -160,42 +165,83 @@ export default function Dashboard({ onOpenTutor }) {
     fetchDashboardData();
   }, [user?.id]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (forceRefresh = false) => {
     const uid = user?.id;
     if (!uid) {
       setLoading(false);
       return;
     }
+
+    const now = Date.now();
+    // 1. Instant Cache Hit (0ms)
+    if (!forceRefresh && dashboardMemoryCache.data && dashboardMemoryCache.userId === uid && (now - dashboardMemoryCache.timestamp < 120000)) {
+      const c = dashboardMemoryCache.data;
+      if (c.profile) setProfile(c.profile);
+      if (c.progress) setProgress(c.progress);
+      if (c.schedule) setSchedule(c.schedule);
+      if (c.moods) setMoods(c.moods);
+      if (c.subjects) setSubjects(c.subjects);
+      if (c.analytics) setAnalytics(c.analytics);
+      setLoading(false);
+      return;
+    }
+
+    // If stale cache exists, render it immediately while revalidating
+    if (dashboardMemoryCache.data && dashboardMemoryCache.userId === uid) {
+      const c = dashboardMemoryCache.data;
+      if (c.profile) setProfile(c.profile);
+      if (c.progress) setProgress(c.progress);
+      if (c.schedule) setSchedule(c.schedule);
+      if (c.moods) setMoods(c.moods);
+      if (c.subjects) setSubjects(c.subjects);
+      if (c.analytics) setAnalytics(c.analytics);
+      setLoading(false);
+    }
+
     setIsRefreshing(true);
     try {
-      const profRes = await axios.get(`/api/profile?userId=${uid}`).catch(() => ({ data: {} }));
-      if (profRes?.data) setProfile(profRes.data);
-      
-      const [progRes, schedRes, moodRes, subRes, analyticsRes] = await Promise.all([
-        axios.post('/api/progress/check-in', { userId: uid }).catch(() => null),
-        axios.get(`/api/progress?userId=${uid}`).catch(() => ({ data: null })),
-        axios.get(`/api/schedule?userId=${uid}`).catch(() => ({ data: [] })),
-        axios.get(`/api/mood?userId=${uid}`).catch(() => ({ data: [] })),
-        axios.get(`/api/subjects?userId=${uid}`).catch(() => ({ data: [] })),
-        axios.get(`/api/analytics?userId=${uid}`).catch(() => ({ data: null }))
-      ]).then(([, p, s, m, sub, a]) => [p, s, m, sub, a]);
-      
-      if (progRes?.data) setProgress(progRes.data);
-      if (schedRes?.data) setSchedule(Array.isArray(schedRes.data) ? schedRes.data : []);
-      if (moodRes?.data) setMoods(Array.isArray(moodRes.data) ? moodRes.data : []);
-      if (subRes?.data) setSubjects(Array.isArray(subRes.data) ? subRes.data : []);
-      if (analyticsRes?.data) setAnalytics(analyticsRes.data);
+      // 1-Roundtrip Bundled Dashboard Request
+      const bundleRes = await axios.get(`/api/dashboard/bundle?userId=${uid}`).catch(() => null);
+      if (bundleRes?.data) {
+        const d = bundleRes.data;
+        if (d.profile) setProfile(d.profile);
+        if (d.progress) setProgress(d.progress);
+        if (d.schedule) setSchedule(d.schedule);
+        if (d.moods) setMoods(d.moods);
+        if (d.subjects) setSubjects(d.subjects);
+        if (d.analytics) setAnalytics(d.analytics);
 
-      // Show Mood Check-in if not logged today
-      const today = new Date().toDateString();
-      const hasLoggedMoodToday = moodRes.data.some(m => m.date && m.date.includes('Today'));
-      if (!hasLoggedMoodToday) {
-        setTimeout(() => setShowMoodCheckIn(true), 2000);
+        dashboardMemoryCache = {
+          data: d,
+          timestamp: Date.now(),
+          userId: uid
+        };
+
+        const today = new Date().toDateString();
+        const hasLoggedMoodToday = (d.moods || []).some(m => m.date && m.date.includes('Today'));
+        if (!hasLoggedMoodToday) {
+          setTimeout(() => setShowMoodCheckIn(true), 2000);
+        }
+      } else {
+        // Fallback to individual requests if bundle fails
+        const [profRes, progRes, schedRes, moodRes, subRes, analyticsRes] = await Promise.all([
+          axios.get(`/api/profile?userId=${uid}`).catch(() => ({ data: {} })),
+          axios.get(`/api/progress?userId=${uid}`).catch(() => ({ data: null })),
+          axios.get(`/api/schedule?userId=${uid}`).catch(() => ({ data: [] })),
+          axios.get(`/api/mood?userId=${uid}`).catch(() => ({ data: [] })),
+          axios.get(`/api/subjects?userId=${uid}`).catch(() => ({ data: [] })),
+          axios.get(`/api/analytics?userId=${uid}`).catch(() => ({ data: null }))
+        ]);
+        if (profRes?.data) setProfile(profRes.data);
+        if (progRes?.data) setProgress(progRes.data);
+        if (schedRes?.data) setSchedule(Array.isArray(schedRes.data) ? schedRes.data : []);
+        if (moodRes?.data) setMoods(Array.isArray(moodRes.data) ? moodRes.data : []);
+        if (subRes?.data) setSubjects(Array.isArray(subRes.data) ? subRes.data : []);
+        if (analyticsRes?.data) setAnalytics(analyticsRes.data);
       }
 
       if (!initialNotificationsShown) {
         initialNotificationsShown = true;
-        
         const affirmations = [
           "Believe you can and you're halfway there.",
           "Success is the sum of small efforts repeated daily.",
@@ -204,17 +250,9 @@ export default function Dashboard({ onOpenTutor }) {
           "Focus on the step in front of you, not the whole staircase."
         ];
         const randomAffirmation = affirmations[Math.floor(Math.random() * affirmations.length)];
-        
         setTimeout(() => {
           addToast(`Daily Affirmation: ${randomAffirmation}`, 'motivation', 8000);
         }, 500);
-        
-        const pendingCount = schedRes.data.filter(s => !s.done).length;
-        if (pendingCount > 0) {
-          setTimeout(() => {
-            addToast(`You have ${pendingCount} pending session${pendingCount > 1 ? 's' : ''} for today. Let's get to work!`, 'info', 10000);
-          }, 1500);
-        }
       }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -681,27 +719,32 @@ export default function Dashboard({ onOpenTutor }) {
         </div>
       </div>
 
-      {/* My Syllabus Quick View */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-surface-border mt-6">
-        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-indigo-400" />
-          My Official Syllabus
-        </h2>
-        <div className="space-y-3">
-          {SYLLABUS_BY_STAGE[profile?.ca_stage || 'intermediate']?.papers.length > 0 ? (
-            SYLLABUS_BY_STAGE[profile?.ca_stage || 'intermediate'].papers.map(paper => (
-              <a key={paper.id} href={paper.officialPdfUrl} target="_blank" rel="noopener noreferrer" className={`p-4 rounded-2xl bg-surface-card border hover:border-${paper.color}-500/50 transition-colors flex items-center justify-between group`}>
-                <div>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider text-${paper.color}-400 mb-1 block`}>{paper.code}</span>
-                  <h4 className="text-white font-bold group-hover:text-indigo-300 transition-colors">{paper.shortTitle}</h4>
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors" />
-              </a>
-            ))
-          ) : (
-            <p className="text-slate-400 text-sm">No official syllabus papers found for this stage.</p>
-          )}
+      {/* Dedicated Syllabus Hub Link Card */}
+      <div className="glass-panel p-6 rounded-3xl border border-indigo-500/20 bg-gradient-to-r from-indigo-950/20 via-surface-card to-background flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-6 shadow-lg">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shrink-0">
+            <BookOpen className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
+                Dedicated Section
+              </span>
+              <span className="text-[10px] font-bold text-slate-400">
+                • ICAI Official 2026/27 Curriculum
+              </span>
+            </div>
+            <h4 className="font-bold text-white text-base">ICAI Official Syllabus Hub</h4>
+            <p className="text-slate-400 text-xs mt-0.5">Explore chapter checklists, marks weightage, module PDFs, and revision statuses under the dedicated Syllabus section.</p>
+          </div>
         </div>
+        <Link 
+          to="/syllabus"
+          className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-static-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2 shrink-0 hover:scale-105"
+        >
+          <span>Open Syllabus</span>
+          <ArrowRight className="w-4 h-4" />
+        </Link>
       </div>
 
       {/* ICAI Passing & Aggregate Simulator */}

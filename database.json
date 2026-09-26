@@ -173,7 +173,56 @@
   ],
   "moodDB": [],
   "doubtsDB": [],
-  "newsDB": [],
+  "newsDB": [
+    {
+      "id": "1",
+      "importance": "🔵 GENERAL FINANCE",
+      "headline": "ICAI - The Institute of Chartered Accountants of India - ICAI",
+      "summary": "ICAI - The Institute of Chartered Accountants of India  ICAI",
+      "category": "Finance & Economy",
+      "source": "ICAI",
+      "date": "2012-03-11 09:22:46",
+      "originalUrl": "https://news.google.com/rss/articles/CBMiOEFVX3lxTFBhcG16akZfV20tZGNnR1NidjVfM1h4WEJjcW83ZUJHaEltZVUtYk1pdmctNUJPTVZt?oc=5",
+      "pdfUrl": "https://resource.cdn.icai.org/exam_schedule_inter_final.pdf",
+      "whyItMatters": "Keeps you updated on the governing body of CA in India."
+    },
+    {
+      "id": "2",
+      "importance": "🔵 GENERAL FINANCE",
+      "headline": "ICAI Placement Directorate - ICAI",
+      "summary": "ICAI Placement Directorate  ICAI",
+      "category": "Finance & Economy",
+      "source": "ICAI",
+      "date": "2026-03-08 02:54:43",
+      "originalUrl": "https://news.google.com/rss/articles/CBMiR0FVX3lxTFAydHk0QzJhS2J1aVhVUjh5ZjBDX015YlcxbmFfQ1VycF9DQmdUdHZ3WUREX0pHX3hfZ3pIVXhEZHF5V2NPdTJJ?oc=5",
+      "pdfUrl": "https://resource.cdn.icai.org/exam_schedule_inter_final.pdf",
+      "whyItMatters": "Shows potential career paths and placement trends for CA graduates."
+    },
+    {
+      "id": "3",
+      "importance": "🔴 MUST KNOW",
+      "headline": "94359exam-aps6372-stu-iff-jan2027.pdf - resource.cdn.icai.org - ICAI",
+      "summary": "94359exam-aps6372-stu-iff-jan2027.pdf - resource.cdn.icai.org  ICAI",
+      "category": "Exam Updates",
+      "source": "ICAI",
+      "date": "2026-09-26 12:00:43",
+      "originalUrl": "https://news.google.com/rss/articles/CBMidkFVX3lxTE1QVmItQzJKNkRHM1JCU0JtMGRSWGtBNUFnaEU4cnlxMDBYV0N3cVJPaktQclhQcWcxb2ZLMzk2Z3ltckdBU1l4WmNhLVc5dEN3SHZNVTZtcHZ1dmthajAwS0VnSUVuSVNKSzZZN1Ruc2RBV093dlE?oc=5",
+      "pdfUrl": "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf",
+      "whyItMatters": "Contains the latest exam paper – essential for exam preparation."
+    },
+    {
+      "id": "4",
+      "importance": "🔵 GENERAL FINANCE",
+      "headline": "Home | Income Tax Department - incometax.gov.in",
+      "summary": "Home | Income Tax Department  incometax.gov.in",
+      "category": "Taxation",
+      "source": "Tax & GST",
+      "date": "2021-06-07 15:20:33",
+      "originalUrl": "https://news.google.com/rss/articles/CBMiU0FVX3lxTE9iamtGVFRLVVFwUEtOekRfcThXQXl0S0R3a1Z0bVFIVXhxblVMbVlIUEg3SThJRDFVeGNlYVVGOU9yc19vUWpLdkxEMXRYMXF3Snpj?oc=5",
+      "pdfUrl": "https://incometaxindia.gov.in/communications/circular/circular-04-2024.pdf",
+      "whyItMatters": "Provides official updates on income tax rules and procedures."
+    }
+  ],
   "notificationsDB": [],
   "usersDB": [
     {

@@ -6,7 +6,13 @@ import { createClient } from '@supabase/supabase-js';
 import { icaiMaterialsDB, chaptersDB } from './icaiData.js';
 import { examsDB } from './examsData.js';
 import { flashcardsDB } from './flashcardsData.js';
+import { group2Flashcards } from './group2Flashcards.js';
 import { SYLLABUS_BY_STAGE } from './src/data/syllabusData.js';
+
+const combinedFlashcardsDB = [
+  ...flashcardsDB,
+  ...group2Flashcards
+];
 
 dotenv.config();
 
@@ -105,6 +111,7 @@ let usersDB = [
   { id: 'u2', email: 'student2@icai.org', name: 'Student Two', password: 'password' }
 ];
 let notesDB = {};
+let syllabusProgressDB = {};
 
 let userProfileDB = {
   'u1': {
@@ -127,6 +134,7 @@ if (fs.existsSync(DB_FILE)) {
     if (data.attemptsDB) attemptsDB = data.attemptsDB;
     if (data.flashcardProgressDB) flashcardProgressDB = data.flashcardProgressDB;
     if (data.importedFlashcards) importedFlashcards = data.importedFlashcards;
+    if (data.syllabusProgressDB) syllabusProgressDB = data.syllabusProgressDB;
     if (data.userScheduleDB) { userScheduleDB = data.userScheduleDB; } else if (data.scheduleDB) { userScheduleDB = { 'u1': data.scheduleDB }; }
     if (data.moodDB) moodDB = data.moodDB;
     if (data.doubtsDB) doubtsDB = data.doubtsDB;
@@ -136,6 +144,15 @@ if (fs.existsSync(DB_FILE)) {
     if (data.userProfileDB) userProfileDB = data.userProfileDB;
     if (data.waitlistDB) waitlistDB = data.waitlistDB;
     if (data.supportMessagesDB) supportMessagesDB = data.supportMessagesDB;
+
+    // Harmonize Upasana's flashcard progress across both IDs (u1 and Supabase UUID)
+    const upasanaUuid = 'c6338d8a-33ec-4ab0-a748-2436cb6b87a5';
+    const u1Prog = flashcardProgressDB['u1'] || {};
+    const uuidProg = flashcardProgressDB[upasanaUuid] || {};
+    const mergedProg = { ...u1Prog, ...uuidProg };
+    flashcardProgressDB['u1'] = mergedProg;
+    flashcardProgressDB[upasanaUuid] = mergedProg;
+
     console.log('[DB] Loaded database from disk.');
   } catch (err) {
     console.error('[DB] Failed to load database.json:', err);
@@ -146,7 +163,7 @@ if (fs.existsSync(DB_FILE)) {
 setInterval(() => {
   const snapshot = {
     userProgressDB, sleepDB, userSettingsDB, attemptsDB, flashcardProgressDB,
-    importedFlashcards, scheduleDB, moodDB, doubtsDB, newsDB, notificationsDB, usersDB, userProfileDB, waitlistDB, notesDB, supportMessagesDB
+    importedFlashcards, scheduleDB, moodDB, doubtsDB, newsDB, notificationsDB, usersDB, userProfileDB, waitlistDB, notesDB, supportMessagesDB, syllabusProgressDB
   };
   fs.writeFileSync(DB_FILE, JSON.stringify(snapshot, null, 2));
 }, 5000);
@@ -995,12 +1012,28 @@ app.get('/api/exams', (req, res) => {
 app.get('/api/flashcards', (req, res) => {
   const uid = req.query.userId || req.user?.id;
   const userProfile = (uid && userProfileDB[uid]) ? userProfileDB[uid] : {};
-  const targetGroup = userProfile.ca_group || "Both Groups";
-  const userProgress = (uid && flashcardProgressDB[uid]) ? flashcardProgressDB[uid] : {};
+  const requestedGroup = req.query.group;
 
-  // Combine built-in flashcards with user-imported ones
+  // Resolve user progress with full cross-account sync for Upasana
+  let userProgress = {};
+  if (uid && flashcardProgressDB[uid]) {
+    userProgress = { ...flashcardProgressDB[uid] };
+  }
+  const isUpasana = uid === 'c6338d8a-33ec-4ab0-a748-2436cb6b87a5' || 
+                    uid === 'u1' || 
+                    (userProfile.email && userProfile.email.toLowerCase().includes('upasana')) ||
+                    (userProfile.name && userProfile.name.toLowerCase().includes('upasana'));
+  if (isUpasana) {
+    userProgress = {
+      ...(flashcardProgressDB['u1'] || {}),
+      ...(flashcardProgressDB['c6338d8a-33ec-4ab0-a748-2436cb6b87a5'] || {}),
+      ...userProgress
+    };
+  }
+
+  // Combine built-in flashcards (Group 1 + Group 2) with user-imported ones
   const allFlashcards = [
-    ...flashcardsDB,
+    ...combinedFlashcardsDB,
     ...importedFlashcards.map(fc => ({ ...fc, isCustom: true }))
   ];
 
@@ -1016,13 +1049,16 @@ app.get('/api/flashcards', (req, res) => {
         nextReviewDate = progData.next_review_date;
       }
     }
-    return { ...fc, group: subject ? subject.group : "General", status, next_review_date: nextReviewDate };
+    return { ...fc, group: subject ? subject.group : (fc.group || "General"), status, next_review_date: nextReviewDate };
   });
 
   let availableFC = list;
-  // Custom imported cards (group: "General") are always shown regardless of group setting
-  if (targetGroup !== "Both Groups") {
-    availableFC = list.filter(fc => fc.group === targetGroup || fc.group === "General" || fc.isCustom);
+  // If user requested a specific group (e.g. Group 1 or Group 2), filter it
+  if (requestedGroup && requestedGroup !== 'all' && requestedGroup !== 'Both Groups') {
+    const filtered = list.filter(fc => fc.group === requestedGroup || fc.group === "General" || fc.isCustom);
+    if (filtered.length > 0) {
+      availableFC = filtered;
+    }
   }
 
   res.json(availableFC);
@@ -1082,8 +1118,169 @@ app.post('/api/flashcards/progress', (req, res) => {
   }
 
   flashcardProgressDB[uid][cardId] = data;
+
+  // Sync to both u1 and Upasana UUID if applicable
+  const isUpasana = uid === 'c6338d8a-33ec-4ab0-a748-2436cb6b87a5' || uid === 'u1';
+  if (isUpasana) {
+    if (!flashcardProgressDB['u1']) flashcardProgressDB['u1'] = {};
+    if (!flashcardProgressDB['c6338d8a-33ec-4ab0-a748-2436cb6b87a5']) flashcardProgressDB['c6338d8a-33ec-4ab0-a748-2436cb6b87a5'] = {};
+    flashcardProgressDB['u1'][cardId] = data;
+    flashcardProgressDB['c6338d8a-33ec-4ab0-a748-2436cb6b87a5'][cardId] = data;
+  }
+
   res.json({ success: true, progress: data });
 });
+
+// ============================================================
+// SYLLABUS PROGRESS API — Dedicated Tracker
+// ============================================================
+app.get('/api/syllabus/progress', (req, res) => {
+  const uid = req.query.userId || req.user?.id || 'guest';
+  const progress = syllabusProgressDB[uid] || {};
+  res.json(progress);
+});
+
+app.post('/api/syllabus/progress', (req, res) => {
+  const { userId, chapterId, status } = req.body;
+  const uid = userId || req.user?.id || 'guest';
+  if (!syllabusProgressDB[uid]) {
+    syllabusProgressDB[uid] = {};
+  }
+  syllabusProgressDB[uid][chapterId] = status; // 'not_started', 'in_progress', 'rev_1', 'rev_2', 'completed'
+  
+  if (uid === 'c6338d8a-33ec-4ab0-a748-2436cb6b87a5' || uid === 'u1') {
+    if (!syllabusProgressDB['u1']) syllabusProgressDB['u1'] = {};
+    if (!syllabusProgressDB['c6338d8a-33ec-4ab0-a748-2436cb6b87a5']) syllabusProgressDB['c6338d8a-33ec-4ab0-a748-2436cb6b87a5'] = {};
+    syllabusProgressDB['u1'][chapterId] = status;
+    syllabusProgressDB['c6338d8a-33ec-4ab0-a748-2436cb6b87a5'][chapterId] = status;
+  }
+  res.json({ success: true, progress: syllabusProgressDB[uid] });
+});
+
+// ============================================================
+// ULTRA-FAST BUNDLED DASHBOARD SUMMARY ENDPOINT
+// ============================================================
+app.get('/api/dashboard/bundle', (req, res) => {
+  const uid = req.query.userId || req.user?.id;
+  const isGuest = !uid || uid.startsWith('guest_');
+
+  // 1. Profile
+  const userObj = usersDB.find(u => u.id === uid);
+  let profile = {
+    id: uid || 'guest',
+    name: "Student",
+    ca_stage: "intermediate",
+    ca_group: "Both Groups",
+    attempt: "September 2026",
+    target_score: "60%"
+  };
+  if (uid && userProfileDB[uid]) {
+    profile = { id: uid, phone: userProfileDB[uid].phone || userObj?.phone || "", ...userProfileDB[uid] };
+  } else if (uid && !isGuest) {
+    profile = {
+      id: uid,
+      name: userObj?.name || "CA Aspirant",
+      phone: userObj?.phone || "",
+      ca_stage: "intermediate",
+      ca_group: "Both Groups",
+      attempt: "September 2026",
+      target_score: "60%"
+    };
+  }
+
+  // 2. Progress
+  const userAttempts = isGuest ? [] : attemptsDB.filter(a => a.user_id === uid);
+  const total_exams = userAttempts.length;
+  const avg_score = total_exams > 0 
+    ? Math.round(userAttempts.reduce((acc, curr) => acc + curr.score_pct, 0) / total_exams)
+    : 0;
+
+  if (uid && !userProgressDB[uid]) {
+    userProgressDB[uid] = { total_study_minutes: 0, completed_pomodoros: 0, completed_exams: 0, current_streak: 1, last_active_date: getTodayIST() };
+  }
+  const prog = (uid && userProgressDB[uid]) ? userProgressDB[uid] : { total_study_minutes: 0, completed_pomodoros: 0, completed_exams: 0, current_streak: 1 };
+  const study_hours_today = (prog.total_study_minutes / 60).toFixed(2);
+  const today = getTodayIST();
+  const yesterday = getYesterdayIST();
+  let activeStreak = prog.current_streak || 1;
+  if (prog.last_active_date && prog.last_active_date !== today && prog.last_active_date !== yesterday) {
+    activeStreak = 1;
+  }
+  const xp = prog.total_study_minutes * 10 + (prog.completed_exams * 100);
+  const level = Math.floor(Math.sqrt(xp / 100)) + 1;
+  const xpForNextLevel = Math.pow(level, 2) * 100;
+  const xpForCurrentLevel = Math.pow(level - 1, 2) * 100;
+  const levelProgress = ((xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100;
+
+  const progressData = {
+    attempts: userAttempts,
+    avg_score,
+    total_exams,
+    trend: userAttempts.slice(0, 5).reverse().map((att, idx) => ({
+      name: `#${idx + 1}`,
+      score: att.score_pct,
+      exam: att.exam_title
+    })),
+    study_hours_today,
+    total_study_minutes: prog.total_study_minutes,
+    completed_pomodoros: prog.completed_pomodoros,
+    current_streak: activeStreak,
+    last_active_date: prog.last_active_date,
+    daily_goal_minutes: prog.daily_goal_minutes || 180,
+    xp,
+    level,
+    levelProgress
+  };
+
+  // 3. Schedule
+  const schedule = getUserSchedule(uid);
+
+  // 4. Mood
+  const moods = moodDB.filter(m => m.userId === uid || (!m.userId && isGuest)).slice(-10).reverse();
+
+  // 5. Subjects
+  const targetGroup = profile.ca_group || "Both Groups";
+  let filteredSubjects = caSubjectsDB;
+  if (targetGroup !== "Both Groups") {
+    filteredSubjects = caSubjectsDB.filter(s => s.group === targetGroup);
+  }
+  const subjects = filteredSubjects.map(sub => {
+    const subAttempts = userAttempts.filter(a => a.exam_id === `ca-${sub.id}` || a.exam_id === sub.id || a.exam_id.includes(sub.id));
+    let questionsAttempted = 0;
+    let correctCount = 0;
+    subAttempts.forEach(att => {
+      questionsAttempted += att.total || 0;
+      correctCount += att.correct || 0;
+    });
+    let accuracy = null;
+    let progress = 0;
+    if (questionsAttempted > 0) {
+      accuracy = Math.round((correctCount / questionsAttempted) * 100);
+      progress = Math.min(100, Math.round(questionsAttempted / 2));
+    }
+    return { ...sub, progress, questionsAttempted, accuracy };
+  });
+
+  // 6. Analytics calculation
+  const uniqueExamsCount = new Set(userAttempts.map(a => a.exam_id)).size;
+  const practiceBump = Math.min(15, uniqueExamsCount * 2);
+  let readinessScore = userAttempts.length > 0 ? Math.round(avg_score + practiceBump) : 0;
+  if (readinessScore > 98) readinessScore = 98;
+
+  res.json({
+    profile,
+    progress: progressData,
+    schedule,
+    moods,
+    subjects,
+    analytics: {
+      readinessScore,
+      weaknesses: [],
+      nextAction: "Revise high-weightage chapters or take a standard mock exam."
+    }
+  });
+});
+
 
 app.get('/api/exams/:id', (req, res) => {
   const exam = examsDB.find(e => e.id === req.params.id);

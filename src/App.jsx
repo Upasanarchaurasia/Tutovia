@@ -21,6 +21,7 @@ import TermsOfService from './pages/TermsOfService.jsx';
 import Contact from './pages/Contact.jsx';
 import AdminPanel from './pages/AdminPanel.jsx';
 import AppExclusive from './pages/AppExclusive.jsx';
+import Syllabus from './pages/Syllabus.jsx';
 import OnboardingModal from './components/OnboardingModal.jsx';
 import CloudSyncModal from './components/CloudSyncModal.jsx';
 import { useAuth } from './context/AuthContext.jsx';
@@ -73,6 +74,7 @@ export default function App() {
         <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
           <Routes>
             <Route path="/" element={<Dashboard onOpenTutor={() => setIsTutorOpen(true)} />} />
+            <Route path="/syllabus" element={<Syllabus />} />
             <Route path="/subject/:id" element={<Subject />} />
             <Route path="/exams" element={<Exams />} />
             <Route path="/flashcards" element={<Flashcards />} />
