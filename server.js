@@ -1520,6 +1520,24 @@ app.post('/api/schedule/ai-generate', (req, res) => {
   const groupSubjectTitles = availableSubjects.map(s => s.title);
   const groupWeaknesses = weaknesses.filter(w => groupSubjectTitles.includes(w.subject));
 
+  // --- SIMULATOR SUBJECT GAP WEIGHTING ---
+  // subjectGaps comes from CaAggregateSimulator: [{paperId, paperName, currentScore, targetScore}]
+  const subjectGaps = req.body.subjectGaps || [];
+  // Build a gap score map: higher gap = more study time priority
+  const gapScoreMap = {};
+  subjectGaps.forEach(sg => {
+    const gap = Math.max(0, (sg.targetScore || 50) - (sg.currentScore || 0));
+    // Normalize paper name to match caSubjectsDB title
+    const name = (sg.paperName || '').toLowerCase();
+    availableSubjects.forEach(s => {
+      const title = s.title.toLowerCase();
+      if (title.includes(name.split(' ')[0]) || name.includes(title.split(' ')[0])) {
+        gapScoreMap[s.id] = (gapScoreMap[s.id] || 0) + gap;
+      }
+    });
+  });
+
+
   // --- SMART ALLOCATOR ALGORITHM ---
   const wakeTime = req.body.wakeTime || profile.wake_time || "07:00";
   const sleepTime = req.body.sleepTime || profile.sleep_time || "23:00";
@@ -1639,6 +1657,12 @@ app.post('/api/schedule/ai-generate', (req, res) => {
   let priorityIndex = 0;
   const getNextStudyTopic = () => {
     const prioritySubjects = [...availableSubjects].sort((a, b) => {
+      // Simulator gap takes highest priority
+      const aGap = gapScoreMap[a.id] || 0;
+      const bGap = gapScoreMap[b.id] || 0;
+      if (aGap !== bGap) return bGap - aGap; // higher gap first
+
+      // Fall back to exam weakness data
       const aWeak = groupWeaknesses.find(w => w.subject === a.title);
       const bWeak = groupWeaknesses.find(w => w.subject === b.title);
       if (aWeak && !bWeak) return -1;
@@ -1649,11 +1673,22 @@ app.post('/api/schedule/ai-generate', (req, res) => {
     const subj = prioritySubjects[priorityIndex % prioritySubjects.length];
     priorityIndex++;
     
+    // Build focus label
+    const gap = gapScoreMap[subj.id];
+    if (gap && gap > 0) {
+      const matchedGap = subjectGaps.find(sg => {
+        const name = (sg.paperName || '').toLowerCase();
+        return subj.title.toLowerCase().includes(name.split(' ')[0]) || name.includes(subj.title.toLowerCase().split(' ')[0]);
+      });
+      const currentScore = matchedGap?.currentScore ?? '?';
+      const targetScore = matchedGap?.targetScore ?? 50;
+      return { activity: subj.title, focus: `Gap Focus: ${currentScore} → ${targetScore} marks needed`, id: subj.id };
+    }
     const w = groupWeaknesses.find(w => w.subject === subj.title);
     if (w && w.topics.length > 0) {
       return { activity: subj.title, focus: `Weak Topic: ${w.topics[0]}`, id: subj.id };
     }
-    return { activity: subj.title, focus: "New Topic / Practice", id: subj.id };
+    return { activity: subj.title, focus: 'New Topic / Practice', id: subj.id };
   };
 
   for (const s of sessions) {
@@ -1692,12 +1727,24 @@ app.post('/api/schedule/ai-generate', (req, res) => {
   }));
 
   let whyThisSchedule = "We prioritized ";
-  if (groupWeaknesses.length > 0) {
+  const topGapSubject = availableSubjects
+    .filter(s => gapScoreMap[s.id] > 0)
+    .sort((a, b) => (gapScoreMap[b.id] || 0) - (gapScoreMap[a.id] || 0))[0];
+
+  if (topGapSubject) {
+    const matchedGap = subjectGaps.find(sg => {
+      const name = (sg.paperName || '').toLowerCase();
+      return topGapSubject.title.toLowerCase().includes(name.split(' ')[0]);
+    });
+    const diff = matchedGap ? (matchedGap.targetScore - matchedGap.currentScore) : gapScoreMap[topGapSubject.id];
+    whyThisSchedule += `**${topGapSubject.title}** most heavily (${diff} mark gap from your CA Simulator scores). `;
+  } else if (groupWeaknesses.length > 0) {
     whyThisSchedule += `**${groupWeaknesses[0].subject} (${groupWeaknesses[0].topics[0] || 'weak areas'})** because of your recent mock exam scores. `;
   } else {
     whyThisSchedule += `a balanced mix of your CA subjects. `;
   }
   whyThisSchedule += `We fit your ${studyHours} target study hours perfectly around your wake/sleep times and fixed commitments.`;
+
 
   scheduleDB = scheduleData;
   userProfileDB[userId].whyThisSchedule = whyThisSchedule; // Save the explanation to profile
@@ -2300,6 +2347,25 @@ app.post('/api/progress/goal', (req, res) => {
 });
 
 // ============================================================
+// REAL USER HELPERS
+// ============================================================
+
+// Test/seed user IDs that should never appear in admin views or analytics
+const TEST_USER_IDS = new Set(['u1', 'u2', 'newuser', 'u1790101325745', 'u1790438556543']);
+const TEST_EMAIL_DOMAINS = ['@example.com', '@icai.org', '@test.com'];
+
+const isRealUser = (user) => {
+  if (!user) return false;
+  const id = user.id || '';
+  const email = (user.email || '').toLowerCase();
+  if (TEST_USER_IDS.has(id)) return false;
+  if (TEST_EMAIL_DOMAINS.some(d => email.endsWith(d))) return false;
+  // Must have a real email with a recognizable domain
+  if (!email.includes('@') || email.startsWith('student_')) return false;
+  return true;
+};
+
+// ============================================================
 // ADMIN API ROUTES — Website Exclusive
 // ============================================================
 
@@ -2339,9 +2405,19 @@ app.post('/api/contact', (req, res) => {
 
 // Admin Stats
 app.get('/api/admin/stats', requireAdmin, (req, res) => {
+  // Merge usersDB + userProfileDB to get all unique real users
+  const allUserIds = new Set([
+    ...usersDB.map(u => u.id),
+    ...Object.keys(userProfileDB)
+  ]);
+  const realUserCount = [...allUserIds].filter(id => {
+    const u = userProfileDB[id] || usersDB.find(x => x.id === id) || {};
+    return isRealUser({ id, email: u.email || '' });
+  }).length;
+
   res.json({
-    totalUsers: usersDB.length,
-    totalFlashcards: flashcardsDB.length + importedFlashcards.length,
+    totalUsers: realUserCount,
+    totalFlashcards: combinedFlashcardsDB.length + importedFlashcards.length,
     totalExamQuestions: examsDB.reduce((acc, e) => acc + (e.questions?.length || 0), 0),
     totalDoubts: doubtsDB.length,
     totalAttempts: attemptsDB.length,
@@ -2349,7 +2425,7 @@ app.get('/api/admin/stats', requireAdmin, (req, res) => {
   });
 });
 
-// Admin Users
+// Admin Users — real users only
 app.get('/api/admin/users', requireAdmin, (req, res) => {
   const users = usersDB.map(u => ({ id: u.id, name: u.name, email: u.email, phone: u.phone || '', joined: u.createdAt || 'N/A' }));
   const profileUsers = Object.entries(userProfileDB).map(([id, p]) => ({
@@ -2360,7 +2436,9 @@ app.get('/api/admin/users', requireAdmin, (req, res) => {
     acc[u.id] = { ...acc[u.id], ...u, phone: u.phone || acc[u.id]?.phone || '' }; 
     return acc; 
   }, {}));
-  res.json(all);
+  // Filter to real users only
+  const realUsers = all.filter(u => isRealUser(u));
+  res.json(realUsers);
 });
 
 // Admin Support Inbox Messages

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Calculator, Award, AlertCircle, CheckCircle2, ChevronRight, 
   Sparkles, RotateCcw, TrendingUp, Star, ShieldCheck, Target, 
-  HelpCircle, BookmarkCheck
+  HelpCircle, BookmarkCheck, CalendarDays, Loader2
 } from 'lucide-react';
 
 const INTER_PAPERS = {
@@ -42,6 +43,7 @@ const STRATEGY_PRESETS = [
 ];
 
 export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
+  const navigate = useNavigate();
   const [selectedGroup, setSelectedGroup] = useState(() => {
     if (defaultGroup === 'Group 1') return 'g1';
     if (defaultGroup === 'Group 2') return 'g2';
@@ -57,6 +59,8 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
   });
 
   const [savedFeedback, setSavedFeedback] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genSuccess, setGenSuccess] = useState(false);
 
   // Active papers based on group selection
   const activePapers = selectedGroup === 'g1' 
@@ -64,6 +68,7 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
     : selectedGroup === 'g2' 
       ? INTER_PAPERS.g2 
       : [...INTER_PAPERS.g1, ...INTER_PAPERS.g2];
+
 
   const handleMarkChange = (paperId, val) => {
     const num = Math.min(100, Math.max(0, parseInt(val) || 0));
@@ -82,6 +87,43 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
 
   const handleReset = () => {
     setMarks({ p1: 50, p2: 50, p3: 50, p4: 50, p5: 50, p6: 50 });
+  };
+
+  const generateTimetable = async () => {
+    const userId = localStorage.getItem('tutovia_user_id') || 'u1';
+    // Build subjectGaps array: use simulator marks as currentScore, 50 as baseline target (50% passing)
+    const allPapers = [...INTER_PAPERS.g1, ...INTER_PAPERS.g2];
+    const subjectGaps = allPapers.map(p => ({
+      paperId: p.id,
+      paperName: p.name,
+      currentScore: marks[p.id] || 0,
+      targetScore: Math.max(50, Math.ceil((marks[p.id] || 0) < 50 ? 55 : 60), 60)
+    }));
+
+    setGenerating(true);
+    setGenSuccess(false);
+    try {
+      const res = await fetch('/api/schedule/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+        body: JSON.stringify({
+          userId,
+          studyHours: 8,
+          subjectGaps
+        })
+      });
+      if (res.ok) {
+        setGenSuccess(true);
+        setTimeout(() => {
+          setGenSuccess(false);
+          navigate('/dashboard');
+        }, 2000);
+      }
+    } catch (e) {
+      console.error('Schedule gen error', e);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   // Calculations
@@ -345,6 +387,27 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
               <span>{savedFeedback ? 'Saved to Profile! ✓' : 'Save Target Marks'}</span>
             </button>
           </div>
+
+          {/* Generate AI Timetable CTA */}
+          <button
+            onClick={generateTimetable}
+            disabled={generating}
+            className={`w-full mt-3 py-3 px-5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg ${
+              genSuccess
+                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                : generating
+                  ? 'bg-violet-500/10 border border-violet-500/20 text-violet-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-violet-600/30 to-sky-600/30 hover:from-violet-600/50 hover:to-sky-600/50 border border-violet-500/30 text-white hover:text-violet-100'
+            }`}
+          >
+            {generating ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /><span>Planning your timetable…</span></>
+            ) : genSuccess ? (
+              <><CalendarDays className="w-4 h-4" /><span>Timetable ready! Redirecting to Dashboard…</span></>
+            ) : (
+              <><CalendarDays className="w-4 h-4" /><span>Generate AI Timetable from My Scores</span></>
+            )}
+          </button>
         </div>
 
         {/* RIGHT: Real-time Verdict Card & Analytics (5 cols) */}
