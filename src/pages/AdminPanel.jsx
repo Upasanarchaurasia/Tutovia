@@ -138,6 +138,7 @@ function UsersTab() {
               <tr className="bg-white/5 text-slate-400 text-left">
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">Mobile</th>
                 <th className="px-4 py-3 font-medium">CA Stage</th>
                 <th className="px-4 py-3 font-medium">Group</th>
                 <th className="px-4 py-3 font-medium">Attempt</th>
@@ -147,11 +148,12 @@ function UsersTab() {
             </thead>
             <tbody className="divide-y divide-surface-border">
               {filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No users found.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No users found.</td></tr>
               ) : filtered.map((u, i) => (
                 <tr key={u.id || i} className="hover:bg-white/5 transition-colors">
                   <td className="px-4 py-3 text-white font-medium">{u.name || '—'}</td>
                   <td className="px-4 py-3 text-slate-400">{u.email || '—'}</td>
+                  <td className="px-4 py-3 text-indigo-300 font-mono text-xs">{u.phone || '—'}</td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-0.5 rounded-full text-xs bg-indigo-900/50 text-indigo-300 border border-indigo-700/40">
                       {u.ca_stage || '—'}

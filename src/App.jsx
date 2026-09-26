@@ -75,10 +75,10 @@ export default function App() {
             <Route path="/" element={<Dashboard onOpenTutor={() => setIsTutorOpen(true)} />} />
             <Route path="/subject/:id" element={<Subject />} />
             <Route path="/exams" element={<Exams />} />
-            <Route path="/flashcards" element={<AppExclusive />} />
-            <Route path="/wellness" element={<AppExclusive />} />
+            <Route path="/flashcards" element={<Flashcards />} />
+            <Route path="/wellness" element={<Wellness />} />
             <Route path="/news" element={<News />} />
-            <Route path="/community" element={<AppExclusive />} />
+            <Route path="/community" element={<Community />} />
             <Route path="/profile" element={<User />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/pyq" element={<PYQ />} />

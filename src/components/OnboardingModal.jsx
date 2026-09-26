@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Target, Calendar, Clock, BookOpen, Check, GraduationCap, Trophy, Laptop, ChevronRight } from 'lucide-react';
+import { Sparkles, Target, Calendar, Clock, BookOpen, Check, GraduationCap, Trophy, Laptop, ChevronRight, Phone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { CA_STAGES } from '../data/syllabusData.js';
 
@@ -31,13 +31,14 @@ export default function OnboardingModal({ isOpen, onClose }) {
   const [step, setStep] = useState(1);
   const [caStage, setCaStage] = useState('intermediate');
 
-  // Step 2 — Group / Scheme / Attempt / Score / Hours
+  // Step 2 — Group / Scheme / Attempt / Score / Hours / Mobile
   const [caGroup, setCaGroup] = useState('Both Groups');
   const [attempt, setAttempt] = useState('September 2026');
   const [targetScore, setTargetScore] = useState('60%');
   const [studyHours, setStudyHours] = useState(8);
   const [wakeTime, setWakeTime] = useState('06:30');
   const [sleepTime, setSleepTime] = useState('23:00');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [isSaving, setIsSaving] = useState(false);
 
   if (!isOpen) return null;
@@ -57,6 +58,7 @@ export default function OnboardingModal({ isOpen, onClose }) {
         daily_study_hours: parseInt(studyHours, 10) || 8,
         wake_time: wakeTime,
         sleep_time: sleepTime,
+        phone: phone.trim(),
         commitments: '09:00 - 13:00 College / Articleship'
       });
       if (onClose) onClose();
@@ -242,6 +244,20 @@ export default function OnboardingModal({ isOpen, onClose }) {
                   className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
+            </div>
+
+            {/* Mobile Number */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Phone className="w-4 h-4 text-indigo-400" /> Mobile Number (For Revision & Exam Alerts)
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+                className="w-full bg-surface-card border border-surface-border rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-500"
+              />
             </div>
 
             {/* Buttons */}

@@ -461,12 +461,15 @@ app.post('/api/auth/login', (req, res) => {
 app.post('/api/auth/register', (req, res) => {
   const { name, email, password, phone } = req.body;
   if (!name || !email || !password) {
-    return res.status(400).json({ error: "Name, email, and password are required" });
+    return res.status(400).json({ error: "Name, email, and password are required." });
   }
-  const cleanPhone = phone ? String(phone).trim() : '';
+  const cleanPhone = phone ? String(phone).replace(/[^0-9+]/g, '').trim() : '';
+  if (!cleanPhone || cleanPhone.replace(/\D/g, '').length < 10) {
+    return res.status(400).json({ error: "A valid 10-digit mobile number is required to sign up." });
+  }
   const existingUser = usersDB.find(u => u.email.toLowerCase() === email.toLowerCase());
   if (existingUser) {
-    return res.status(409).json({ error: "Email already in use" });
+    return res.status(409).json({ error: "An account with this email already exists." });
   }
   
   const newUser = {
@@ -474,7 +477,8 @@ app.post('/api/auth/register', (req, res) => {
     name,
     email,
     phone: cleanPhone,
-    password
+    password,
+    createdAt: new Date().toLocaleDateString('en-IN')
   };
   usersDB.push(newUser);
   userProfileDB[newUser.id] = { name: newUser.name, email: newUser.email, phone: cleanPhone, ca_group: "Both Groups", attempt: "September 2026" };
@@ -1025,14 +1029,20 @@ app.get('/api/flashcards', (req, res) => {
 });
 
 app.post('/api/flashcards/progress', (req, res) => {
-  const { userId, cardId, quality } = req.body;
+  const { userId, cardId, quality, status } = req.body;
   const uid = userId || 'guest';
   if (!flashcardProgressDB[uid]) {
     flashcardProgressDB[uid] = {};
   }
   
-  // SM-2 Algorithm Implementation
-  let data = flashcardProgressDB[uid][cardId] || { interval: 0, repetition: 0, easiness_factor: 2.5 };
+  // SM-2 Algorithm Implementation - Normalize data if string or object
+  let raw = flashcardProgressDB[uid][cardId];
+  let data = { interval: 0, repetition: 0, easiness_factor: 2.5, status: 'pending' };
+  if (typeof raw === 'object' && raw !== null) {
+    data = { ...data, ...raw };
+  } else if (typeof raw === 'string') {
+    data.status = raw;
+  }
   
   if (typeof quality === 'number') {
     if (quality >= 3) {
@@ -1041,15 +1051,16 @@ app.post('/api/flashcards/progress', (req, res) => {
       } else if (data.repetition === 1) {
         data.interval = 6;
       } else {
-        data.interval = Math.round(data.interval * data.easiness_factor);
+        data.interval = Math.round(data.interval * (data.easiness_factor || 2.5));
       }
-      data.repetition += 1;
+      data.repetition = (data.repetition || 0) + 1;
     } else {
       data.repetition = 0;
       data.interval = 1;
     }
 
-    data.easiness_factor = data.easiness_factor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+    const currentEF = typeof data.easiness_factor === 'number' ? data.easiness_factor : 2.5;
+    data.easiness_factor = currentEF + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
     if (data.easiness_factor < 1.3) data.easiness_factor = 1.3;
 
     const nextDate = new Date();
@@ -1066,8 +1077,8 @@ app.post('/api/flashcards/progress', (req, res) => {
     } else {
       data.status = 'again';
     }
-  } else {
-    data.status = req.body.status || 'again';
+  } else if (status) {
+    data.status = status;
   }
 
   flashcardProgressDB[uid][cardId] = data;
@@ -1546,10 +1557,49 @@ app.post('/api/doubts/:id/replies', (req, res) => {
   res.json(doubt);
 });
 
+// Clean & sanitize messages for LLM chat completions:
+// 1. Keep system prompt at index 0.
+// 2. Strip leading assistant turns (APIs require conversation to start with user).
+// 3. Merge consecutive turns of identical role to enforce strict alternation.
+function formatChatMessages(systemPrompt, incomingMessages, botRoles = ['bot', 'assistant', 'counselor']) {
+  const formatted = [{ role: 'system', content: systemPrompt }];
+  const cleaned = [];
+
+  if (Array.isArray(incomingMessages)) {
+    for (const m of incomingMessages) {
+      const text = (m.text || m.content || '').trim() || (m.image ? '[User attached a problem document image]' : '');
+      if (!text) continue;
+      const isBot = botRoles.includes(m.sender) || botRoles.includes(m.role);
+      cleaned.push({ role: isBot ? 'assistant' : 'user', content: text });
+    }
+  }
+
+  // Strip leading assistant messages so first non-system turn is always 'user'
+  while (cleaned.length > 0 && cleaned[0].role === 'assistant') {
+    cleaned.shift();
+  }
+
+  if (cleaned.length === 0) {
+    cleaned.push({ role: 'user', content: 'Hello' });
+  }
+
+  // Merge consecutive turns with the same role
+  const alternating = [];
+  for (const msg of cleaned) {
+    if (alternating.length > 0 && alternating[alternating.length - 1].role === msg.role) {
+      alternating[alternating.length - 1].content += '\n\n' + msg.content;
+    } else {
+      alternating.push(msg);
+    }
+  }
+
+  return [...formatted, ...alternating];
+}
+
 // Centralized Resilient Groq AI completions with automatic model fallback
-async function callGroqChat({ messages, temperature = 0.5, max_tokens = 1024, response_format = null }) {
-  // qwen/qwen3.8-27b is the verified, instant, high-quality model on Groq for this account
-  const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
+async function callGroqChat({ messages, temperature = 0.5, max_tokens = 3000, response_format = null }) {
+  // qwen/qwen3.8-27b is the fast, non-reasoning, highly capable model for CA concepts
+  const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
   let lastError = null;
 
   for (const model of models) {
@@ -1794,24 +1844,12 @@ app.post('/api/tutor/chat', async (req, res) => {
       if (userContext.attempt) systemPrompt += ` Target exam attempt: ${userContext.attempt}.`;
     }
 
-    const groqMessages = [{ role: 'system', content: systemPrompt }];
-
-    if (Array.isArray(messages) && messages.length > 0) {
-      messages.forEach(m => {
-        const text = (m.text || m.content || '').trim() || (m.image ? '[User attached a problem document image]' : 'Hello');
-        groqMessages.push({
-          role: m.sender === 'bot' || m.role === 'assistant' ? 'assistant' : 'user',
-          content: text
-        });
-      });
-    } else {
-      groqMessages.push({ role: 'user', content: 'Hello' });
-    }
+    const groqMessages = formatChatMessages(systemPrompt, messages, ['bot', 'assistant']);
 
     const reply = await callGroqChat({
       messages: groqMessages,
       temperature: 0.6,
-      max_tokens: 1024
+      max_tokens: 3000
     });
 
     res.json({ reply });
@@ -1826,24 +1864,13 @@ app.post('/api/counselor/chat', async (req, res) => {
   const { messages } = req.body;
   try {
     const systemPrompt = "You are Dr. Maya, a Mindful Life & Career Counselor at Tutovia. You are an empathetic, compassionate counselor helping CA students with exam anxiety, study-life balance, motivation, and mental wellness. Answer warmly, concisely, and with encouraging, structured advice in Markdown. Avoid overwhelming the student with giant blocks of text.";
-    const groqMessages = [{ role: 'system', content: systemPrompt }];
-
-    if (Array.isArray(messages) && messages.length > 0) {
-      messages.forEach(m => {
-        const text = (m.text || m.content || '').trim() || 'Hello';
-        groqMessages.push({
-          role: m.sender === 'counselor' || m.role === 'assistant' ? 'assistant' : 'user',
-          content: text
-        });
-      });
-    } else {
-      groqMessages.push({ role: 'user', content: 'Hello' });
-    }
+    
+    const groqMessages = formatChatMessages(systemPrompt, messages, ['counselor', 'assistant']);
 
     const reply = await callGroqChat({
       messages: groqMessages,
       temperature: 0.7,
-      max_tokens: 1024
+      max_tokens: 2500
     });
 
     res.json({ reply, timestamp: new Date().toISOString() });
@@ -2108,12 +2135,15 @@ app.get('/api/admin/stats', requireAdmin, (req, res) => {
 
 // Admin Users
 app.get('/api/admin/users', requireAdmin, (req, res) => {
-  const users = usersDB.map(u => ({ id: u.id, name: u.name, email: u.email, joined: u.createdAt || 'N/A' }));
+  const users = usersDB.map(u => ({ id: u.id, name: u.name, email: u.email, phone: u.phone || '', joined: u.createdAt || 'N/A' }));
   const profileUsers = Object.entries(userProfileDB).map(([id, p]) => ({
-    id, name: p.name, email: p.email, ca_stage: p.ca_stage, ca_group: p.ca_group, attempt: p.attempt, joined: p.createdAt || 'N/A'
+    id, name: p.name, email: p.email, phone: p.phone || '', ca_stage: p.ca_stage, ca_group: p.ca_group, attempt: p.attempt, joined: p.createdAt || 'N/A'
   }));
   // Merge, prefer profileUsers
-  const all = Object.values([...users, ...profileUsers].reduce((acc, u) => { acc[u.id] = { ...acc[u.id], ...u }; return acc; }, {}));
+  const all = Object.values([...users, ...profileUsers].reduce((acc, u) => { 
+    acc[u.id] = { ...acc[u.id], ...u, phone: u.phone || acc[u.id]?.phone || '' }; 
+    return acc; 
+  }, {}));
   res.json(all);
 });
 

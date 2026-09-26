@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import axios from '../api.js';
 import { BookOpen, HelpCircle, Layers, CheckCircle2, Award, RotateCcw, ChevronLeft, ChevronRight, Upload, Loader2, Plus, X, Sparkles } from 'lucide-react';
@@ -6,7 +6,6 @@ import { BookOpen, HelpCircle, Layers, CheckCircle2, Award, RotateCcw, ChevronLe
 export default function Flashcards() {
   const { user } = useAuth();
   const [flashcards, setFlashcards] = useState([]);
-  const [filteredCards, setFilteredCards] = useState([]);
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -33,8 +32,9 @@ export default function Flashcards() {
   }, [user?.id]);
 
   useEffect(() => {
-    applyFilters();
-  }, [flashcards, subjectFilter, progressFilter]);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+  }, [subjectFilter, progressFilter]);
 
   const getStorageKey = () => `tutovia_fc_progress_${user?.id || 'guest'}`;
 
@@ -85,7 +85,7 @@ export default function Flashcards() {
     }
   };
 
-  const applyFilters = () => {
+  const filteredCards = useMemo(() => {
     let result = flashcards;
     
     if (subjectFilter !== 'all') {
@@ -93,13 +93,10 @@ export default function Flashcards() {
     }
 
     if (progressFilter === 'pending') {
-      // Only show cards that have never been reviewed
       result = result.filter(fc => fc.status === 'pending');
     } else if (progressFilter === 'reviewed') {
-      // Show all cards that have been reviewed
       result = result.filter(fc => fc.status !== 'pending');
     } else if (progressFilter === 'due') {
-      // Show cards whose spaced repetition interval is due
       const now = new Date();
       result = result.filter(fc => {
         if (fc.status === 'pending') return false;
@@ -118,27 +115,27 @@ export default function Flashcards() {
       result = result.filter(fc => fc.status === 'mastered');
     }
 
-    setFilteredCards(result);
-    setCurrentIndex(0);
-    setIsFlipped(false);
-  };
+    return result;
+  }, [flashcards, subjectFilter, progressFilter]);
+
+  const safeIndex = filteredCards.length > 0 ? Math.min(currentIndex, filteredCards.length - 1) : 0;
 
   const handleNext = () => {
-    if (currentIndex < filteredCards.length - 1) {
+    if (safeIndex < filteredCards.length - 1) {
       setIsFlipped(false);
-      setTimeout(() => setCurrentIndex(prev => prev + 1), 150);
+      setCurrentIndex(safeIndex + 1);
     }
   };
 
   const handlePrev = () => {
-    if (currentIndex > 0) {
+    if (safeIndex > 0) {
       setIsFlipped(false);
-      setTimeout(() => setCurrentIndex(prev => prev - 1), 150);
+      setCurrentIndex(safeIndex - 1);
     }
   };
 
   const submitProgress = async (quality) => {
-    const currentCard = filteredCards[currentIndex];
+    const currentCard = filteredCards[safeIndex];
     if (!currentCard) return;
 
     let optimisticStatus = 'again';
@@ -163,8 +160,18 @@ export default function Flashcards() {
       console.warn("Local storage write error:", e);
     }
 
-    // 3. Move to next card smoothly
-    handleNext();
+    // 3. Smooth flip and advance card
+    setIsFlipped(false);
+    if (progressFilter === 'all' || progressFilter === 'reviewed') {
+      if (safeIndex < filteredCards.length - 1) {
+        setCurrentIndex(safeIndex + 1);
+      }
+    } else {
+      // In dynamic filters like 'pending' or 'again', the card leaves the filter automatically.
+      if (safeIndex >= filteredCards.length - 1 && safeIndex > 0) {
+        setCurrentIndex(safeIndex - 1);
+      }
+    }
 
     // 4. Background server sync
     try {
@@ -301,7 +308,7 @@ export default function Flashcards() {
     return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div></div>;
   }
 
-  const currentCard = filteredCards[currentIndex];
+  const currentCard = filteredCards[safeIndex];
 
   // Stats
   const flippedCount = flashcards.filter(fc => fc.status !== 'pending').length;
@@ -398,7 +405,7 @@ export default function Flashcards() {
               
               <div className="flex justify-between items-center w-full mb-3 px-2">
                 <span className="bg-indigo-500/20 text-indigo-300 text-xs font-bold px-3 py-1 rounded-full border border-indigo-500/30">
-                  Card {currentIndex + 1} of {filteredCards.length}
+                  Card {safeIndex + 1} of {filteredCards.length}
                 </span>
                 {currentCard.status !== 'pending' ? (
                   <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
@@ -499,7 +506,7 @@ export default function Flashcards() {
               <div className="flex justify-between items-center mt-6 w-full">
                 <button 
                   onClick={handlePrev}
-                  disabled={currentIndex === 0}
+                  disabled={safeIndex === 0}
                   className="flex items-center gap-1 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 transition-colors"
                 >
                   <ChevronLeft className="w-5 h-5" /> Prev
@@ -514,7 +521,7 @@ export default function Flashcards() {
                 
                 <button 
                   onClick={handleNext}
-                  disabled={currentIndex === filteredCards.length - 1}
+                  disabled={safeIndex === filteredCards.length - 1}
                   className="flex items-center gap-1 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 transition-colors"
                 >
                   Next <ChevronRight className="w-5 h-5" />
