@@ -786,13 +786,17 @@ app.post('/api/progress/study-hours', (req, res) => {
 
   // Cloud Sync mirror to Supabase
   if (supabase && uid && !uid.startsWith('guest_') && !uid.startsWith('u1')) {
-    supabase.from('user_progress').upsert({
-      user_id: uid,
-      total_study_minutes: userProgressDB[uid].total_study_minutes,
-      completed_pomodoros: userProgressDB[uid].completed_pomodoros,
-      completed_exams: userProgressDB[uid].completed_exams || 0,
-      current_streak: userProgressDB[uid].current_streak || 1
-    }).catch(() => {});
+    (async () => {
+      try {
+        await supabase.from('user_progress').upsert({
+          user_id: uid,
+          total_study_minutes: userProgressDB[uid].total_study_minutes,
+          completed_pomodoros: userProgressDB[uid].completed_pomodoros,
+          completed_exams: userProgressDB[uid].completed_exams || 0,
+          current_streak: userProgressDB[uid].current_streak || 1
+        });
+      } catch (e) {}
+    })();
   }
 
   res.json({
@@ -823,13 +827,17 @@ app.post('/api/progress/pomodoro', (req, res) => {
 
   // Cloud Sync mirror to Supabase
   if (supabase && uid && !uid.startsWith('guest_') && !uid.startsWith('u1')) {
-    supabase.from('user_progress').upsert({
-      user_id: uid,
-      total_study_minutes: userProgressDB[uid].total_study_minutes,
-      completed_pomodoros: userProgressDB[uid].completed_pomodoros,
-      completed_exams: userProgressDB[uid].completed_exams || 0,
-      current_streak: userProgressDB[uid].current_streak || 1
-    }).catch(() => {});
+    (async () => {
+      try {
+        await supabase.from('user_progress').upsert({
+          user_id: uid,
+          total_study_minutes: userProgressDB[uid].total_study_minutes,
+          completed_pomodoros: userProgressDB[uid].completed_pomodoros,
+          completed_exams: userProgressDB[uid].completed_exams || 0,
+          current_streak: userProgressDB[uid].current_streak || 1
+        });
+      } catch (e) {}
+    })();
   }
 
   res.json({
@@ -1359,23 +1367,27 @@ app.post('/api/exams/submit', (req, res) => {
 
   // Cloud Sync mirror to Supabase
   if (supabase && uid && !uid.startsWith('guest_') && !uid.startsWith('u1')) {
-    supabase.from('exam_attempts').insert({
-      user_id: uid,
-      exam_id: attempt.exam_id,
-      exam_title: attempt.exam_title,
-      score: attempt.correct,
-      total_questions: attempt.total,
-      accuracy: attempt.score_pct,
-      weak_topics: attempt.weak_topics
-    }).catch(() => {});
+    (async () => {
+      try {
+        await supabase.from('exam_attempts').insert({
+          user_id: uid,
+          exam_id: attempt.exam_id,
+          exam_title: attempt.exam_title,
+          score: attempt.correct,
+          total_questions: attempt.total,
+          accuracy: attempt.score_pct,
+          weak_topics: attempt.weak_topics
+        });
 
-    supabase.from('user_progress').upsert({
-      user_id: uid,
-      total_study_minutes: userProgressDB[uid].total_study_minutes,
-      completed_pomodoros: userProgressDB[uid].completed_pomodoros || 0,
-      completed_exams: userProgressDB[uid].completed_exams,
-      current_streak: userProgressDB[uid].current_streak || 1
-    }).catch(() => {});
+        await supabase.from('user_progress').upsert({
+          user_id: uid,
+          total_study_minutes: userProgressDB[uid].total_study_minutes,
+          completed_pomodoros: userProgressDB[uid].completed_pomodoros || 0,
+          completed_exams: userProgressDB[uid].completed_exams,
+          current_streak: userProgressDB[uid].current_streak || 1
+        });
+      } catch (e) {}
+    })();
   }
 
   res.json({
@@ -1467,9 +1479,12 @@ app.post('/api/schedule/custom', async (req, res) => {
         done: !!s.done,
         link: s.link || ''
       }));
-      supabase.from('schedule').delete().eq('user_id', uid).then(() => {
-        supabase.from('schedule').insert(rows).catch(() => {});
-      }).catch(() => {});
+      (async () => {
+        try {
+          await supabase.from('schedule').delete().eq('user_id', uid);
+          await supabase.from('schedule').insert(rows);
+        } catch (e) {}
+      })();
     }
   }
   res.json(userScheduleDB[uid] || scheduleDB);
@@ -1714,11 +1729,15 @@ app.post('/api/mood', (req, res) => {
 
   // Cloud Sync mirror to Supabase
   if (supabase && uid && !uid.startsWith('guest_') && !uid.startsWith('u1')) {
-    supabase.from('mood_logs').insert({
-      user_id: uid,
-      mood: newEntry.mood,
-      note: newEntry.note || ''
-    }).catch(() => {});
+    (async () => {
+      try {
+        await supabase.from('mood_logs').insert({
+          user_id: uid,
+          mood: newEntry.mood,
+          note: newEntry.note || ''
+        });
+      } catch (e) {}
+    })();
   }
 
   const userMoods = (uid && !uid.startsWith('guest_')) ? moodDB.filter(m => m.userId === uid) : [newEntry];
