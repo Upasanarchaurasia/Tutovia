@@ -200,5 +200,6 @@
     }
   },
   "waitlistDB": [],
-  "notesDB": {}
+  "notesDB": {},
+  "supportMessagesDB": []
 }

@@ -35,7 +35,7 @@ export default function BottomNav({ onOpenTutor }) {
     { path: '/', label: 'Home', icon: LayoutDashboard },
     { path: '/exams', label: 'Exams', icon: GraduationCap },
     { path: '/pyq', label: 'PYQ Bank', icon: BookMarked },
-    { path: '/flashcards', label: 'Cards', icon: Layers },
+    { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   ];
 
   const moreItems = [
@@ -46,10 +46,7 @@ export default function BottomNav({ onOpenTutor }) {
       icon: Shield,
       color: 'text-amber-400 bg-amber-500/10'
     }] : []),
-    { path: '/analytics', label: 'Study Analytics & Mastery', desc: 'Track your weekly hours & radar accuracy', icon: BarChart3, color: 'text-indigo-400 bg-indigo-500/10' },
-    { path: '/wellness', label: 'Mindful Wellness & Breaks', desc: 'Breathing timer, posture & hydration resets', icon: HeartPulse, color: 'text-rose-400 bg-rose-500/10' },
     { path: '/news', label: 'ICAI News & Exam Alerts', desc: 'Official notifications & exam date updates', icon: Newspaper, color: 'text-amber-400 bg-amber-500/10' },
-    { path: '/community', label: 'CA Doubt Forum', desc: 'Ask questions & discuss tricky sums', icon: Users, color: 'text-emerald-400 bg-emerald-500/10' },
     { path: '/profile', label: 'Study Goals & Group Profile', desc: 'Switch Group 1, Group 2 or target dates', icon: User, color: 'text-purple-400 bg-purple-500/10' },
   ];
 

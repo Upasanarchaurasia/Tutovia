@@ -215,6 +215,10 @@ export default function User() {
                   <span className="text-slate-200 text-sm font-medium">{user?.email || 'student@icai.org'}</span>
                 </div>
                 <div className="p-3 rounded-xl bg-surface-card border border-surface-border flex items-center justify-between">
+                  <span className="text-slate-400 text-sm">Mobile</span>
+                  <span className="text-slate-200 text-sm font-medium">{profile?.phone || user?.phone || 'Not set'}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-surface-card border border-surface-border flex items-center justify-between">
                   <span className="text-slate-400 text-sm">Joined</span>
                   <span className="text-slate-200 text-sm font-medium">August 2026</span>
                 </div>
@@ -340,6 +344,20 @@ export default function User() {
                   </select>
                 ) : (
                   <div className="text-white font-medium">{profile.attempt || "Not set"}</div>
+                )}
+              </div>
+              <div className="p-4 rounded-2xl bg-surface-card border border-surface-border">
+                <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Mobile Number</label>
+                {isEditing ? (
+                  <input 
+                    type="tel"
+                    value={formData.phone || ''}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    placeholder="+91 98765 43210"
+                    className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                ) : (
+                  <div className="text-white font-medium">{profile.phone || user?.phone || "Not set"}</div>
                 )}
               </div>
               <div className="p-4 rounded-2xl bg-surface-card border border-surface-border">

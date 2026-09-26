@@ -20,6 +20,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
 import TermsOfService from './pages/TermsOfService.jsx';
 import Contact from './pages/Contact.jsx';
 import AdminPanel from './pages/AdminPanel.jsx';
+import AppExclusive from './pages/AppExclusive.jsx';
 import OnboardingModal from './components/OnboardingModal.jsx';
 import CloudSyncModal from './components/CloudSyncModal.jsx';
 import { useAuth } from './context/AuthContext.jsx';
@@ -74,10 +75,10 @@ export default function App() {
             <Route path="/" element={<Dashboard onOpenTutor={() => setIsTutorOpen(true)} />} />
             <Route path="/subject/:id" element={<Subject />} />
             <Route path="/exams" element={<Exams />} />
-            <Route path="/flashcards" element={<Flashcards />} />
-            <Route path="/wellness" element={<Wellness />} />
+            <Route path="/flashcards" element={<AppExclusive />} />
+            <Route path="/wellness" element={<AppExclusive />} />
             <Route path="/news" element={<News />} />
-            <Route path="/community" element={<Community />} />
+            <Route path="/community" element={<AppExclusive />} />
             <Route path="/profile" element={<User />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/pyq" element={<PYQ />} />

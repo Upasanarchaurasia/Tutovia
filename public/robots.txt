@@ -9,5 +9,6 @@ Disallow: /community
 Disallow: /profile
 Disallow: /analytics
 Disallow: /pyq
+Disallow: /admin
 
 Sitemap: https://tutovia.com/sitemap.xml

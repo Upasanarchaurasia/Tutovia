@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }) => {
               id: sbUser.id,
               email: sbUser.email,
               name: sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || 'CA Aspirant',
+              phone: sbUser.user_metadata?.phone || '',
               isSupabase: true
             };
             setUser(currentUser);
@@ -69,6 +70,7 @@ export const AuthProvider = ({ children }) => {
           id: sbUser.id,
           email: sbUser.email,
           name: sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || 'CA Aspirant',
+          phone: sbUser.user_metadata?.phone || '',
           isSupabase: true
         };
         setUser(formattedUser);
@@ -202,7 +204,7 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const signUpWithSupabase = async (name, email, password) => {
+  const signUpWithSupabase = async (name, email, password, phone = '') => {
     // Clear any previous user state from storage
     localStorage.removeItem('tutovia_user');
     localStorage.removeItem('tutovia_profile');
@@ -212,7 +214,7 @@ export const AuthProvider = ({ children }) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name } }
+      options: { data: { name, phone } }
     });
     if (error) throw error;
     return data;

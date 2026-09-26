@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, MessageSquare, ArrowLeft, Send, CheckCircle2, Headphones, Sparkles } from 'lucide-react';
+import { Mail, MessageSquare, ArrowLeft, Send, CheckCircle2, Headphones, Sparkles, Loader2, AlertCircle } from 'lucide-react';
+import axios from '../api.js';
 
 export default function Contact() {
   const navigate = useNavigate();
@@ -9,12 +10,23 @@ export default function Contact() {
   const [subject, setSubject] = useState('Feedback / Feature Suggestion');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name || !email || !message) return;
-    // In production, dispatch to support inbox
-    setSubmitted(true);
+    setLoading(true);
+    setError('');
+    try {
+      await axios.post('/api/contact', { name, email, subject, message });
+      setSubmitted(true);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to send message. Please try again or email us directly.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -107,11 +119,20 @@ export default function Contact() {
                 />
               </div>
 
+              {error && (
+                <div className="flex items-center gap-2 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+                  <AlertCircle size={16} className="shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full py-3.5 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-static-white text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all"
+                disabled={loading}
+                className="w-full py-3.5 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-static-white text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:cursor-not-allowed"
               >
-                <Send size={16} /> Send Message
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                <span>{loading ? 'Sending message...' : 'Send Message'}</span>
               </button>
 
               <div className="pt-4 border-t border-surface-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   BarChart3, Users, FileText, HelpCircle, Shield, LogOut,
   Trash2, Plus, Search, CheckCircle, AlertCircle, RefreshCw,
-  Newspaper, MessageSquare, BookOpen, ChevronRight, Eye, EyeOff
+  Newspaper, MessageSquare, BookOpen, ChevronRight, Eye, EyeOff,
+  Mail
 } from 'lucide-react';
 
 const ADMIN_PASSWORD = 'tutovia@admin2026';
@@ -66,12 +67,13 @@ function OverviewTab() {
       {loading ? (
         <div className="flex items-center gap-3 text-slate-400"><RefreshCw size={18} className="animate-spin" /> Loading stats…</div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatCard icon={Users} label="Total Users" value={stats?.totalUsers} color="bg-indigo-600" />
           <StatCard icon={BookOpen} label="Exam Questions" value={stats?.totalExamQuestions} color="bg-violet-600" />
           <StatCard icon={MessageSquare} label="Community Doubts" value={stats?.totalDoubts} color="bg-sky-600" />
           <StatCard icon={FileText} label="Flashcards" value={stats?.totalFlashcards} color="bg-emerald-600" />
           <StatCard icon={BarChart3} label="Exam Attempts" value={stats?.totalAttempts} color="bg-amber-600" />
+          <StatCard icon={Mail} label="Support Inbox" value={stats?.totalMessages ?? 0} color="bg-rose-600" />
         </div>
       )}
 
@@ -603,6 +605,127 @@ function QuestionBankTab() {
   );
 }
 
+// ── Support Inbox Tab ─────────────────────────────────────────────────────────
+function SupportInboxTab() {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    apiFetch('/api/admin/messages')
+      .then(d => setMessages(Array.isArray(d) ? d : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleResolve = async (id) => {
+    await apiFetch(`/api/admin/messages/${id}/resolve`, { method: 'PATCH' });
+    load();
+  };
+
+  const deleteMsg = async (id) => {
+    if (!window.confirm('Delete this message?')) return;
+    await apiFetch(`/api/admin/messages/${id}`, { method: 'DELETE' });
+    load();
+  };
+
+  const filtered = messages.filter(m =>
+    m.name?.toLowerCase().includes(search.toLowerCase()) ||
+    m.email?.toLowerCase().includes(search.toLowerCase()) ||
+    m.subject?.toLowerCase().includes(search.toLowerCase()) ||
+    m.message?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <Mail size={20} className="text-rose-400" />
+          Student Inquiries & Feedback ({messages.length})
+        </h2>
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search inquiries…"
+            className="pl-9 pr-4 py-2 rounded-xl bg-white/5 border border-surface-border text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-64"
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-3 text-slate-400 p-8">
+          <RefreshCw size={18} className="animate-spin" /> Loading inquiries…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="p-8 text-center bg-surface-card border border-surface-border rounded-2xl text-slate-400 text-sm">
+          No support inquiries received yet.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(m => (
+            <div
+              key={m.id}
+              className={`p-5 rounded-2xl border transition-all ${
+                m.status === 'Resolved'
+                  ? 'bg-surface-card/40 border-surface-border opacity-75'
+                  : 'bg-surface-card border-rose-500/30 shadow-md'
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-white text-sm">{m.name}</span>
+                  <a
+                    href={`mailto:${m.email}?subject=Re: ${encodeURIComponent(m.subject || 'Tutovia Support')}`}
+                    className="text-xs text-indigo-400 hover:underline flex items-center gap-1"
+                    title="Click to reply via email"
+                  >
+                    {m.email}
+                  </a>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                    m.status === 'Resolved'
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                  }`}>
+                    {m.status || 'New'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-slate-400">
+                  <span>{m.createdAt || m.date}</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleResolve(m.id)}
+                      className="px-2.5 py-1 rounded-lg bg-surface border border-surface-border hover:bg-emerald-500/10 text-slate-300 hover:text-emerald-400 transition-colors"
+                      title={m.status === 'Resolved' ? 'Mark as New' : 'Mark as Resolved'}
+                    >
+                      {m.status === 'Resolved' ? 'Mark New' : 'Mark Resolved'}
+                    </button>
+                    <button
+                      onClick={() => deleteMsg(m.id)}
+                      className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      title="Delete inquiry"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="text-xs font-semibold text-amber-400 mb-1.5">{m.subject}</div>
+              <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5">
+                {m.message}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Access Denied (for non-owner users trying /admin directly) ─────────────────
 function AccessDenied() {
   return (
@@ -660,6 +783,7 @@ export default function AdminPanel() {
     { key: 'users', label: 'Users', icon: Users },
     { key: 'content', label: 'Content', icon: FileText },
     { key: 'questions', label: 'Question Bank', icon: HelpCircle },
+    { key: 'inbox', label: 'Support Inbox', icon: Mail },
   ];
 
   return (
@@ -703,6 +827,7 @@ export default function AdminPanel() {
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'content' && <ContentTab />}
           {activeTab === 'questions' && <QuestionBankTab />}
+          {activeTab === 'inbox' && <SupportInboxTab />}
         </div>
       </div>
     </div>

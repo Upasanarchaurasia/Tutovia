@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, Award, Clock, AlertTriangle, CheckCircle2, Calendar, 
   Smile, ArrowRight, Play, Sparkles, Timer, Brain, BellRing, 
-  AlertCircle, BookOpen, Target, ChevronRight, X, RotateCcw
+  AlertCircle, BookOpen, Target, ChevronRight, X, RotateCcw, Moon
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import axios from '../api.js';
@@ -14,6 +14,9 @@ import TimetableGeneratorModal from '../components/TimetableGeneratorModal.jsx';
 import EditTimetableModal from '../components/EditTimetableModal.jsx';
 import BadgeGallery from '../components/BadgeGallery.jsx';
 import ExamCountdown from '../components/ExamCountdown.jsx';
+import ZenStudyRoom from '../components/ZenStudyRoom.jsx';
+import CaAggregateSimulator from '../components/CaAggregateSimulator.jsx';
+import StudyMilestoneTimeline from '../components/StudyMilestoneTimeline.jsx';
 import { exportTimetableToICS } from '../utils/calendarExport.js';
 import { supabase } from '../supabaseClient.js';
 import { SYLLABUS_BY_STAGE } from '../data/syllabusData.js';
@@ -128,8 +131,9 @@ export default function Dashboard({ onOpenTutor }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [reschedulePrompt, setReschedulePrompt] = useState(null);
 
-  // Focus Mode State
+  // Focus Mode & Zen Desk State
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [showZenRoom, setShowZenRoom] = useState(false);
 
   // 12-Hour Clock
   const [clock12Str, setClock12Str] = useState('');
@@ -448,6 +452,14 @@ export default function Dashboard({ onOpenTutor }) {
               <span>Ask AI Tutor</span>
             </button>
             <button
+              onClick={() => setShowZenRoom(true)}
+              className="px-4 py-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 text-sm font-semibold flex items-center gap-2 transition-all hover:scale-105 shadow-md shadow-sky-500/10"
+              title="Launch Distraction-Free Fullscreen Zen Study Desk"
+            >
+              <Moon className="w-4 h-4 text-sky-400" />
+              <span>Zen Study Desk</span>
+            </button>
+            <button
               onClick={() => setIsFocusMode(!isFocusMode)}
               className={`px-4 py-2.5 rounded-xl text-sm font-semibold border flex items-center gap-2 transition-all ${isFocusMode ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'bg-surface-card hover:bg-slate-800 text-slate-200 border-surface-border'}`}
             >
@@ -512,7 +524,7 @@ export default function Dashboard({ onOpenTutor }) {
 
           <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
             <Link
-              to={overdueItem.link || '/flashcards'}
+              to={overdueItem.link || '/exams'}
               className="flex-1 sm:flex-none justify-center px-4 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/30 text-xs font-bold transition-colors flex items-center gap-1.5"
             >
               <Play className="w-4 h-4" />
@@ -691,6 +703,12 @@ export default function Dashboard({ onOpenTutor }) {
           )}
         </div>
       </div>
+
+      {/* ICAI Passing & Aggregate Simulator */}
+      <CaAggregateSimulator defaultGroup={profile?.ca_group || 'Both Groups'} />
+
+      {/* 3-Phase Study Milestone Timeline */}
+      <StudyMilestoneTimeline />
 
             </>
       )}
@@ -909,6 +927,13 @@ export default function Dashboard({ onOpenTutor }) {
           </div>
         </div>
       )}
+
+      {/* Zen Distraction-Free Study Desk */}
+      <ZenStudyRoom 
+        isOpen={showZenRoom} 
+        onClose={() => setShowZenRoom(false)} 
+        defaultSubject={subjects[0]?.title || 'CA Intermediate Revision'}
+      />
     </div>
   );
 }

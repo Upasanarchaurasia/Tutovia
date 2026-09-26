@@ -35,18 +35,9 @@ function TypewriterText({ text }) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [sandboxTab, setSandboxTab] = useState('flashcard');
-  const [cardFlipped, setCardFlipped] = useState(false);
-  const [cardScheduled, setCardScheduled] = useState(false);
+  const [sandboxTab, setSandboxTab] = useState('ai');
   const [aiQuery, setAiQuery] = useState(null);
-
-  const handleCardSchedule = () => {
-    setCardScheduled(true);
-    setTimeout(() => {
-      setCardFlipped(false);
-      setCardScheduled(false);
-    }, 2000);
-  };
+  const [simMarks, setSimMarks] = useState({ p1: 68, p2: 52, p3: 45 });
 
   return (
     <div className="min-h-screen bg-background text-main flex flex-col font-sans relative overflow-x-hidden selection:bg-indigo-500 selection:text-white">
@@ -185,96 +176,49 @@ export default function LandingPage() {
             <div className="bg-surface border border-surface-border rounded-3xl overflow-hidden shadow-2xl">
               {/* Tabs */}
               <div className="flex border-b border-surface-border bg-surface-card flex-col md:flex-row">
-                <button onClick={() => setSandboxTab('flashcard')} className={`flex-1 py-4 text-sm font-bold transition-colors ${sandboxTab === 'flashcard' ? 'text-indigo-400 border-b-2 border-indigo-500 bg-surface' : 'text-slate-400 hover:text-white'}`}>
-                  <Brain size={18} className="inline mr-2 mb-0.5"/> Active Recall Simulator
+                <button onClick={() => setSandboxTab('ai')} className={`flex-1 py-4 text-sm font-bold transition-colors ${sandboxTab === 'ai' ? 'text-sky-400 border-b-2 border-sky-500 bg-surface' : 'text-slate-400 hover:text-white'}`}>
+                  <Bot size={18} className="inline mr-2 mb-0.5"/> 24/7 AI CA Mentor
                 </button>
-                <button onClick={() => setSandboxTab('ai')} className={`flex-1 py-4 text-sm font-bold transition-colors ${sandboxTab === 'ai' ? 'text-purple-400 border-b-2 border-purple-500 bg-surface' : 'text-slate-400 hover:text-white'}`}>
-                  <Bot size={18} className="inline mr-2 mb-0.5"/> 24/7 AI Mentor
+                <button onClick={() => setSandboxTab('simulator')} className={`flex-1 py-4 text-sm font-bold transition-colors ${sandboxTab === 'simulator' ? 'text-emerald-400 border-b-2 border-emerald-500 bg-surface' : 'text-slate-400 hover:text-white'}`}>
+                  <Target size={18} className="inline mr-2 mb-0.5"/> ICAI 40/50 Passing Tester
+                </button>
+                <button onClick={() => setSandboxTab('timetable')} className={`flex-1 py-4 text-sm font-bold transition-colors ${sandboxTab === 'timetable' ? 'text-indigo-400 border-b-2 border-indigo-500 bg-surface' : 'text-slate-400 hover:text-white'}`}>
+                  <Calendar size={18} className="inline mr-2 mb-0.5"/> Adaptive Timetable Engine
                 </button>
               </div>
 
               {/* Sandbox Content */}
-              <div className="p-8 md:p-12 min-h-[400px] flex flex-col items-center justify-center relative">
+              <div className="p-8 md:p-12 min-h-[420px] flex flex-col items-center justify-center relative">
                 
-                {/* Flashcard Simulator */}
-                {sandboxTab === 'flashcard' && (
-                  <div className="w-full max-w-md perspective-1000">
-                    <AnimatePresence mode="wait">
-                      {cardScheduled ? (
-                        <motion.div key="scheduled" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} 
-                          className="absolute inset-0 flex flex-col items-center justify-center text-emerald-400">
-                          <Check size={48} className="mb-4" />
-                          <div className="text-xl font-black text-white">Knowledge Locked.</div>
-                          <div className="text-sm font-medium mt-2">Next review algorithmically scheduled.</div>
-                        </motion.div>
-                      ) : (
-                        <motion.div key="card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="w-full">
-                          <div className="text-center mb-6 text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2">
-                            <Layers size={16} /> Tap to flip card
-                          </div>
-                          <div className={`relative w-full aspect-[4/3] cursor-pointer preserve-3d transition-transform duration-500 ${cardFlipped ? 'rotate-y-180' : ''}`}
-                            onClick={() => setCardFlipped(!cardFlipped)}>
-                            
-                            {/* Front */}
-                            <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-lg">
-                              <span className="text-indigo-400 text-xs font-black uppercase mb-4 tracking-widest">Question</span>
-                              <h3 className="text-2xl font-bold text-white leading-snug">What is the penalty for late filing under Section 234F?</h3>
-                            </div>
-                            
-                            {/* Back */}
-                            <div className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-lg">
-                              <span className="text-purple-400 text-xs font-black uppercase mb-4 tracking-widest">Answer</span>
-                              <h3 className="text-xl font-bold text-white leading-snug">Rs. 5,000 (if filed before Dec 31)<br/><br/>Rs. 10,000 (after Dec 31)</h3>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons (visible only when flipped) */}
-                          <div className={`mt-8 flex justify-center gap-3 transition-opacity duration-300 ${cardFlipped ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                            <button onClick={(e) => { e.stopPropagation(); handleCardSchedule(); }} className="flex-1 bg-surface-card border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 py-3 rounded-xl text-sm font-bold transition-colors">
-                              Again <span className="block text-[10px] text-rose-400/60 font-normal">in 1 day</span>
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); handleCardSchedule(); }} className="flex-1 bg-surface-card border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 py-3 rounded-xl text-sm font-bold transition-colors">
-                              Good <span className="block text-[10px] text-amber-400/60 font-normal">in 3 days</span>
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); handleCardSchedule(); }} className="flex-1 bg-surface-card border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 py-3 rounded-xl text-sm font-bold transition-colors">
-                              Easy <span className="block text-[10px] text-emerald-400/60 font-normal">in 7 days</span>
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-
-                {/* AI Mentor Simulator */}
+                {/* 1. AI Mentor Tab */}
                 {sandboxTab === 'ai' && (
                   <div className="w-full max-w-2xl flex flex-col h-full">
                     <div className="flex-1 flex flex-col gap-4 overflow-y-auto mb-6 px-2">
                       <div className="flex gap-4">
-                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-                          <Bot size={16} className="text-indigo-400" />
+                        <div className="w-8 h-8 rounded-full bg-sky-500/20 border border-sky-500/30 flex items-center justify-center shrink-0">
+                          <Bot size={16} className="text-sky-400" />
                         </div>
                         <div className="bg-surface-card border border-surface-border rounded-2xl rounded-tl-sm p-4 text-sm text-slate-300">
-                          Hi! I'm your CA Study AI. Ask me to break down complex topics, solve problems, or explain concepts like a 5-year-old.
+                          Hi! I'm your CA Study AI. Ask me to break down complex ICAI case laws, tax calculations, or accounting standards simply.
                         </div>
                       </div>
                       
                       {aiQuery && (
                         <>
                           <div className="flex gap-4 flex-row-reverse">
-                            <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
-                              <Users size={16} className="text-purple-400" />
+                            <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                              <Users size={16} className="text-indigo-400" />
                             </div>
-                            <div className="bg-purple-600 rounded-2xl rounded-tr-sm p-4 text-sm text-white font-medium">
+                            <div className="bg-indigo-600 rounded-2xl rounded-tr-sm p-4 text-sm text-white font-medium">
                               {aiQuery.q}
                             </div>
                           </div>
                           
                           <div className="flex gap-4">
-                            <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-                              <Bot size={16} className="text-indigo-400" />
+                            <div className="w-8 h-8 rounded-full bg-sky-500/20 border border-sky-500/30 flex items-center justify-center shrink-0">
+                              <Bot size={16} className="text-sky-400" />
                             </div>
-                            <div className="bg-surface-card border border-indigo-500/30 rounded-2xl rounded-tl-sm p-4 text-sm text-slate-200 leading-relaxed shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                            <div className="bg-surface-card border border-sky-500/30 rounded-2xl rounded-tl-sm p-4 text-sm text-slate-200 leading-relaxed shadow-[0_0_15px_rgba(14,165,233,0.1)]">
                               <TypewriterText text={aiQuery.a} />
                             </div>
                           </div>
@@ -285,23 +229,158 @@ export default function LandingPage() {
                     {!aiQuery && (
                       <div className="grid sm:grid-cols-2 gap-3 mt-auto">
                         {[
-                          { q: "Explain Marginal Relief simply", a: "Marginal Relief ensures that the additional income tax payable on income exceeding a surcharge threshold (like Rs. 50 Lakhs) does not exceed the actual income earned above that threshold. It's like ensuring the tax penalty isn't bigger than the bonus itself!" },
-                          { q: "Difference between AS-14 and Ind AS-103", a: "AS-14 treats Amalgamations as either 'Pooling of Interests' or 'Purchase Method'. Ind AS-103 ONLY uses the 'Acquisition Method'. Also, under Ind AS-103, Goodwill is tested for impairment annually, while AS-14 amortizes it over a period not exceeding 5 years." }
+                          { 
+                            q: "Explain Section 54 Capital Gains exemption simply", 
+                            a: "Under Section 54, if an individual/HUF sells a Long-Term residential house and invests the capital gains into 1 new house (or 2 houses if gains <= Rs. 2 Crores, once in a lifetime), the capital gains are exempt. The new house must be purchased within 1 yr before / 2 yrs after transfer, or constructed within 3 yrs!" 
+                          },
+                          { 
+                            q: "Ind AS 115: 5-step model for revenue", 
+                            a: "The 5 steps are: (1) Identify the contract with the customer, (2) Identify separate performance obligations, (3) Determine the transaction price, (4) Allocate the transaction price to obligations, and (5) Recognize revenue when (or as) the entity satisfies each performance obligation!" 
+                          },
+                          { 
+                            q: "Difference between Qualified vs Adverse Opinion (SA 705)", 
+                            a: "Qualified Opinion: Misstatements are material but NOT pervasive. Adverse Opinion: Misstatements are BOTH material AND pervasive to the financial statements, rendering them misleading overall." 
+                          },
+                          { 
+                            q: "CARO 2020: Physical inventory verification clause", 
+                            a: "Under Clause (ii)(a), the auditor must report whether physical verification of inventory was conducted by management at reasonable intervals, and whether discrepancies of 10% or more in aggregate for each class of inventory were properly dealt with in books." 
+                          }
                         ].map((q, i) => (
-                          <button key={i} onClick={() => setAiQuery(q)} className="bg-surface border border-surface-border hover:border-purple-500/50 text-left p-3 rounded-xl text-sm font-semibold text-slate-300 transition-colors flex items-center justify-between group">
+                          <button key={i} onClick={() => setAiQuery(q)} className="bg-surface border border-surface-border hover:border-sky-500/50 text-left p-3 rounded-xl text-sm font-semibold text-slate-300 transition-colors flex items-center justify-between group">
                             <span className="truncate pr-2">{q.q}</span>
-                            <Send size={14} className="text-slate-500 group-hover:text-purple-400 shrink-0" />
+                            <Send size={14} className="text-slate-500 group-hover:text-sky-400 shrink-0" />
                           </button>
                         ))}
                       </div>
                     )}
                     {aiQuery && (
                       <button onClick={() => setAiQuery(null)} className="mx-auto mt-4 text-sm text-slate-400 hover:text-white flex items-center gap-2">
-                        <RotateCcw size={14} /> Reset Demo
+                        <RotateCcw size={14} /> Try Another Question
                       </button>
                     )}
                   </div>
                 )}
+
+                {/* 2. Simulator Tab */}
+                {sandboxTab === 'simulator' && (
+                  <div className="w-full max-w-xl">
+                    <div className="text-center mb-6">
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                        Interactive ICAI 40/50 Rule Demo
+                      </span>
+                      <p className="text-xs text-slate-400 mt-2">
+                        Drag the sliders below to test individual paper pass marks (min 40) and aggregate percentage (min 50%).
+                      </p>
+                    </div>
+
+                    <div className="space-y-4 bg-surface-card p-6 rounded-2xl border border-surface-border mb-6">
+                      {[
+                        { key: 'p1', code: 'Paper 1', name: 'Advanced Accounting' },
+                        { key: 'p2', code: 'Paper 2', name: 'Corporate Laws' },
+                        { key: 'p3', code: 'Paper 3', name: 'Taxation' }
+                      ].map((p) => (
+                        <div key={p.key} className="space-y-1">
+                          <div className="flex justify-between text-xs font-semibold">
+                            <span className="text-slate-300">{p.code}: {p.name}</span>
+                            <span className={`font-mono font-bold ${simMarks[p.key] >= 60 ? 'text-amber-400' : simMarks[p.key] < 40 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {simMarks[p.key]} Marks {simMarks[p.key] >= 60 ? '⭐ Exemption' : simMarks[p.key] < 40 ? '❌ Fail (<40)' : '✓'}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={simMarks[p.key]}
+                            onChange={(e) => setSimMarks({ ...simMarks, [p.key]: parseInt(e.target.value) || 0 })}
+                            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Calculated Verdict */}
+                    {(() => {
+                      const total = simMarks.p1 + simMarks.p2 + simMarks.p3;
+                      const pct = ((total / 300) * 100).toFixed(1);
+                      const hasFail = simMarks.p1 < 40 || simMarks.p2 < 40 || simMarks.p3 < 40;
+                      const hasAgg = total >= 150;
+
+                      return (
+                        <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                          !hasFail && hasAgg
+                            ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+                            : 'bg-rose-950/20 border-rose-500/30 text-rose-300'
+                        }`}>
+                          <div>
+                            <div className="font-bold text-sm">
+                              {!hasFail && hasAgg ? 'RESULT: GROUP 1 CLEARED! 🎉' : hasFail ? 'RESULT: INDIVIDUAL PAPER SHORTFALL (<40)' : 'RESULT: AGGREGATE DEFICIT (<150)'}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-0.5">
+                              Total: <strong>{total}/300 ({pct}%)</strong> • {!hasFail && hasAgg ? 'Both 40-mark and 50% aggregate criteria met.' : hasFail ? 'Shortfall in one or more papers.' : `Needs ${150 - total} more marks to hit 50%.`}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => navigate('/login')}
+                            className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-md shrink-0 ml-3"
+                          >
+                            Full Simulator →
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* 3. Timetable Tab */}
+                {sandboxTab === 'timetable' && (
+                  <div className="w-full max-w-xl">
+                    <div className="text-center mb-6">
+                      <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+                        Smart 12-Hour Study Agenda
+                      </span>
+                      <p className="text-xs text-slate-400 mt-2">
+                        Tutovia dynamically fits 8 hours of effective revision around your coaching lectures and sleep habits.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 bg-surface-card p-4 rounded-2xl border border-surface-border">
+                      {[
+                        { time: '07:00 AM – 09:30 AM', title: 'Deep Work: Advanced Accounting (AS 28)', type: 'Study', tag: 'High Focus' },
+                        { time: '09:30 AM – 10:30 AM', title: 'Breakfast & Mindful Stretch Break', type: 'Break', tag: 'Rest' },
+                        { time: '10:30 AM – 01:30 PM', title: 'Direct Tax Laws: Capital Gains & Deductions', type: 'Study', tag: 'Core Theory' },
+                        { time: '02:00 PM – 05:00 PM', title: 'Live Coaching Lecture / Articleship Slot', type: 'Class', tag: 'Fixed Slot' },
+                        { time: '06:00 PM – 08:30 PM', title: 'Corporate Laws: Share Capital & Debentures', type: 'Study', tag: 'Active Recall' },
+                        { time: '09:00 PM – 10:00 PM', title: 'Daily Diagnostic MCQ Practice Quiz', type: 'Mock', tag: 'Diagnostic' },
+                      ].map((item, idx) => (
+                        <div key={idx} className="p-3 rounded-xl bg-surface border border-surface-border/60 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-indigo-400 font-bold">{item.time}</span>
+                            <span className="font-semibold text-slate-200">{item.title}</span>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            item.type === 'Study' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20' :
+                            item.type === 'Mock' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                            item.type === 'Class' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                            'bg-slate-800 text-slate-400'
+                          }`}>
+                            {item.tag}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={() => navigate('/login')}
+                        className="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center justify-center gap-1.5 mx-auto"
+                      >
+                        <span>Generate my personalized timetable</span>
+                        <ArrowRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
               </div>
             </div>
           </div>
@@ -311,56 +390,56 @@ export default function LandingPage() {
         <section className="py-32 px-4 relative">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-20">
-              <h2 className="text-4xl md:text-5xl font-black text-white mb-6">The 3 Proprietary Engines</h2>
-              <p className="text-xl text-slate-400 max-w-2xl mx-auto font-medium">We consolidated generic study tools into three incredibly powerful systems designed specifically to crack exams.</p>
+              <h2 className="text-4xl md:text-5xl font-black text-white mb-6">The 3 Proprietary Study Engines</h2>
+              <p className="text-xl text-slate-400 max-w-2xl mx-auto font-medium">We consolidated generic study tools into three incredibly powerful systems designed specifically to crack CA exams.</p>
             </div>
 
             <div className="grid lg:grid-cols-3 gap-8">
               {/* Engine 1 */}
               <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}
-                className="bg-surface-card border border-surface-border rounded-3xl p-8 hover:border-indigo-500/50 transition-colors relative overflow-hidden group">
+                className="bg-surface-card border border-surface-border rounded-3xl p-8 hover:border-sky-500/50 transition-colors relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-20 transition-opacity"><Brain size={120} /></div>
-                <div className="w-14 h-14 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl flex items-center justify-center mb-8">
-                  <Lock className="text-indigo-400" size={28} />
+                <div className="w-14 h-14 bg-sky-500/10 border border-sky-500/30 rounded-2xl flex items-center justify-center mb-8">
+                  <BookOpen className="text-sky-400" size={28} />
                 </div>
-                <h3 className="text-2xl font-black text-white mb-4">The Memory Lock Engine</h3>
+                <h3 className="text-2xl font-black text-white mb-4">Adaptive AI Syllabus Engine</h3>
                 <p className="text-slate-400 font-medium leading-relaxed mb-8">
-                  70% of what you read today is forgotten within 48 hours. Our SM-2 spaced-repetition algorithm calculates the precise hour before you forget a formula, serving flashcards at the scientifically optimal moment.
+                  Never wonder what chapter to revise next. Our engine maps the entire ICAI New Syllabus (Intermediate & Final), analyzes your quiz mistakes, and prioritizes high-weightage chapters automatically.
                 </p>
                 <div className="space-y-3 mt-auto border-t border-surface-border pt-6">
-                  {['SM-2 Spaced Repetition Flashcards', 'Active Recall Chapter Notes', 'Dynamic Revision Scheduler'].map((f,i)=><div key={i} className="flex items-center gap-2 text-sm font-bold text-slate-300"><Check size={16} className="text-indigo-500"/>{f}</div>)}
+                  {['Full ICAI Syllabus Breakdown', '24/7 Context-Aware AI CA Tutor', 'Official ICAI PDF Study Links'].map((f,i)=><div key={i} className="flex items-center gap-2 text-sm font-bold text-slate-300"><Check size={16} className="text-sky-400"/>{f}</div>)}
                 </div>
               </motion.div>
 
               {/* Engine 2 */}
               <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}
-                className="bg-surface-card border border-surface-border rounded-3xl p-8 hover:border-amber-500/50 transition-colors relative overflow-hidden group">
+                className="bg-surface-card border border-surface-border rounded-3xl p-8 hover:border-emerald-500/50 transition-colors relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-20 transition-opacity"><Target size={120} /></div>
-                <div className="w-14 h-14 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mb-8">
-                  <BarChart className="text-amber-400" size={28} />
+                <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center mb-8">
+                  <BarChart className="text-emerald-400" size={28} />
                 </div>
-                <h3 className="text-2xl font-black text-white mb-4">Predictive Exam Radar</h3>
+                <h3 className="text-2xl font-black text-white mb-4">Predictive Exam Radar & Simulator</h3>
                 <p className="text-slate-400 font-medium leading-relaxed mb-8">
-                  Most students fail because they revise what they already like, ignoring blind spots. Tutovia's radar provides a real-time diagnostic heatmap highlighting exact topics that will pull your marks down.
+                  Most students fail because they ignore blind spots. Tutovia provides real-time diagnostic heatmaps and the official ICAI 40/50 aggregate simulator with Set-Off rules and 60+ exemption tracking.
                 </p>
                 <div className="space-y-3 mt-auto border-t border-surface-border pt-6">
-                  {['Full-length CA Mock Exams', 'Subject Mastery Heatmaps', 'Predictive Readiness Score'].map((f,i)=><div key={i} className="flex items-center gap-2 text-sm font-bold text-slate-300"><Check size={16} className="text-amber-500"/>{f}</div>)}
+                  {['Full-length CA Mock Exams', 'ICAI 40/50 Passing Simulator', 'Subject Mastery Radar Heatmaps'].map((f,i)=><div key={i} className="flex items-center gap-2 text-sm font-bold text-slate-300"><Check size={16} className="text-emerald-400"/>{f}</div>)}
                 </div>
               </motion.div>
 
               {/* Engine 3 */}
               <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}
-                className="bg-surface-card border border-surface-border rounded-3xl p-8 hover:border-emerald-500/50 transition-colors relative overflow-hidden group">
+                className="bg-surface-card border border-surface-border rounded-3xl p-8 hover:border-indigo-500/50 transition-colors relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-20 transition-opacity"><Flame size={120} /></div>
-                <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center mb-8">
-                  <Activity className="text-emerald-400" size={28} />
+                <div className="w-14 h-14 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl flex items-center justify-center mb-8">
+                  <Clock className="text-indigo-400" size={28} />
                 </div>
-                <h3 className="text-2xl font-black text-white mb-4">Deep-Work Catalyst</h3>
+                <h3 className="text-2xl font-black text-white mb-4">Zen Study Desk & Daily Rhythm</h3>
                 <p className="text-slate-400 font-medium leading-relaxed mb-8">
-                  Eliminate procrastination. We bundle Pomodoro focus sprints with a dopamine-driven XP loop, daily streak protection, and a peer leaderboard that turns studying into a highly addictive daily habit.
+                  Eliminate distraction and screen glare. Enjoy a calming obsidian study sanctuary with synthesized noise generators (Brown noise, Rain, Alpha waves), adaptive 12-hour timetables, and calendar exports.
                 </p>
                 <div className="space-y-3 mt-auto border-t border-surface-border pt-6">
-                  {['Pomodoro Session Planner', 'XP Leveling & Badges', 'Live Peer Leaderboard'].map((f,i)=><div key={i} className="flex items-center gap-2 text-sm font-bold text-slate-300"><Check size={16} className="text-emerald-500"/>{f}</div>)}
+                  {['Distraction-Free Zen Desk', 'Adaptive 12-Hour Daily Timetable', 'RFC 5545 Calendar .ics Export'].map((f,i)=><div key={i} className="flex items-center gap-2 text-sm font-bold text-slate-300"><Check size={16} className="text-indigo-400"/>{f}</div>)}
                 </div>
               </motion.div>
             </div>

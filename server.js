@@ -29,9 +29,10 @@ const requireAuth = async (req, res, next) => {
     '/api/tutor/chat', 
     '/api/counselor/chat',
     '/api/auth/login', 
-    '/api/auth/register'
+    '/api/auth/register',
+    '/api/contact'
   ];
-  if (publicRoutes.includes(req.path) || req.method === 'OPTIONS') {
+  if (publicRoutes.includes(req.path) || req.path.startsWith('/api/admin/') || req.method === 'OPTIONS') {
     return next();
   }
 
@@ -98,6 +99,7 @@ let doubtsDB = [];
 let newsDB = [];
 let notificationsDB = [];
 let waitlistDB = [];
+let supportMessagesDB = [];
 let usersDB = [
   { id: 'u1', email: 'Chaurasiaupasana70@gmail.com', name: 'Upasana', password: 'password' },
   { id: 'u2', email: 'student2@icai.org', name: 'Student Two', password: 'password' }
@@ -133,6 +135,7 @@ if (fs.existsSync(DB_FILE)) {
     if (data.usersDB) usersDB = data.usersDB;
     if (data.userProfileDB) userProfileDB = data.userProfileDB;
     if (data.waitlistDB) waitlistDB = data.waitlistDB;
+    if (data.supportMessagesDB) supportMessagesDB = data.supportMessagesDB;
     console.log('[DB] Loaded database from disk.');
   } catch (err) {
     console.error('[DB] Failed to load database.json:', err);
@@ -143,7 +146,7 @@ if (fs.existsSync(DB_FILE)) {
 setInterval(() => {
   const snapshot = {
     userProgressDB, sleepDB, userSettingsDB, attemptsDB, flashcardProgressDB,
-    importedFlashcards, scheduleDB, moodDB, doubtsDB, newsDB, notificationsDB, usersDB, userProfileDB, waitlistDB, notesDB
+    importedFlashcards, scheduleDB, moodDB, doubtsDB, newsDB, notificationsDB, usersDB, userProfileDB, waitlistDB, notesDB, supportMessagesDB
   };
   fs.writeFileSync(DB_FILE, JSON.stringify(snapshot, null, 2));
 }, 5000);
@@ -456,10 +459,11 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/register', (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, phone } = req.body;
   if (!name || !email || !password) {
-    return res.status(400).json({ error: "All fields are required" });
+    return res.status(400).json({ error: "Name, email, and password are required" });
   }
+  const cleanPhone = phone ? String(phone).trim() : '';
   const existingUser = usersDB.find(u => u.email.toLowerCase() === email.toLowerCase());
   if (existingUser) {
     return res.status(409).json({ error: "Email already in use" });
@@ -469,12 +473,13 @@ app.post('/api/auth/register', (req, res) => {
     id: 'u' + Date.now(),
     name,
     email,
+    phone: cleanPhone,
     password
   };
   usersDB.push(newUser);
-  userProfileDB[newUser.id] = { name: newUser.name, ca_group: "Both Groups", attempt: "September 2026" };
+  userProfileDB[newUser.id] = { name: newUser.name, email: newUser.email, phone: cleanPhone, ca_group: "Both Groups", attempt: "September 2026" };
   
-  res.json({ id: newUser.id, name: newUser.name, email: newUser.email });
+  res.json({ id: newUser.id, name: newUser.name, email: newUser.email, phone: cleanPhone });
 });
 
 // Waitlist API
@@ -514,13 +519,14 @@ app.get('/api/profile', (req, res) => {
       target_score: "60%"
     });
   }
-  if (userProfileDB[userId]) {
-    return res.json({ id: userId, ...userProfileDB[userId] });
-  }
   const userObj = usersDB.find(u => u.id === userId);
+  if (userProfileDB[userId]) {
+    return res.json({ id: userId, phone: userProfileDB[userId].phone || userObj?.phone || "", ...userProfileDB[userId] });
+  }
   const defaultProf = {
     id: userId,
     name: userObj?.name || (req.user?.name && !req.user.name.startsWith('Guest') ? req.user.name : "CA Aspirant"),
+    phone: userObj?.phone || "",
     ca_stage: "intermediate",
     ca_group: "Both Groups",
     attempt: "September 2026",
@@ -538,6 +544,11 @@ app.post('/api/profile', async (req, res) => {
   const oldGroup = userProfileDB[userId]?.ca_group;
   userProfileDB[userId] = { ...userProfileDB[userId], ...req.body, id: userId };
   
+  const userObj = usersDB.find(u => u.id === userId);
+  if (userObj && req.body.phone) {
+    userObj.phone = req.body.phone;
+  }
+
   if (req.body.ca_group && req.body.ca_group !== oldGroup && typeof generateDynamicSchedule === 'function') {
     userScheduleDB[userId] = generateDynamicSchedule(req.body.ca_group);
   }
@@ -548,6 +559,7 @@ app.post('/api/profile', async (req, res) => {
       id: userId,
       name: userProfileDB[userId].name || 'CA Aspirant',
       email: userProfileDB[userId].email || '',
+      phone: userProfileDB[userId].phone || userObj?.phone || '',
       ca_stage: userProfileDB[userId].ca_stage || 'intermediate',
       ca_group: userProfileDB[userId].ca_group || 'Both Groups',
       attempt: userProfileDB[userId].attempt || 'September 2026',
@@ -1014,12 +1026,13 @@ app.get('/api/flashcards', (req, res) => {
 
 app.post('/api/flashcards/progress', (req, res) => {
   const { userId, cardId, quality } = req.body;
-  if (!flashcardProgressDB[userId]) {
-    flashcardProgressDB[userId] = {};
+  const uid = userId || 'guest';
+  if (!flashcardProgressDB[uid]) {
+    flashcardProgressDB[uid] = {};
   }
   
   // SM-2 Algorithm Implementation
-  let data = flashcardProgressDB[userId][cardId] || { interval: 0, repetition: 0, easiness_factor: 2.5 };
+  let data = flashcardProgressDB[uid][cardId] || { interval: 0, repetition: 0, easiness_factor: 2.5 };
   
   if (typeof quality === 'number') {
     if (quality >= 3) {
@@ -1043,14 +1056,21 @@ app.post('/api/flashcards/progress', (req, res) => {
     nextDate.setDate(nextDate.getDate() + data.interval);
     data.next_review_date = nextDate.toISOString();
     
-    // Legacy status support for frontend UI styling
-    data.status = quality >= 4 ? 'mastered' : (quality >= 3 ? 'review' : 'learning');
+    // Status mapping matching UI buttons: 1->again, 3->hard, 4->good, 5->mastered
+    if (quality >= 5) {
+      data.status = 'mastered';
+    } else if (quality >= 4) {
+      data.status = 'good';
+    } else if (quality >= 3) {
+      data.status = 'hard';
+    } else {
+      data.status = 'again';
+    }
   } else {
-    // Legacy support (non-SM2)
-    data.status = req.body.status;
+    data.status = req.body.status || 'again';
   }
 
-  flashcardProgressDB[userId][cardId] = data;
+  flashcardProgressDB[uid][cardId] = data;
   res.json({ success: true, progress: data });
 });
 
@@ -1528,7 +1548,8 @@ app.post('/api/doubts/:id/replies', (req, res) => {
 
 // Centralized Resilient Groq AI completions with automatic model fallback
 async function callGroqChat({ messages, temperature = 0.5, max_tokens = 1024, response_format = null }) {
-  const models = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'qwen/qwen3.8-27b'];
+  // qwen/qwen3.8-27b is the verified, instant, high-quality model on Groq for this account
+  const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
   let lastError = null;
 
   for (const model of models) {
@@ -1559,8 +1580,14 @@ async function callGroqChat({ messages, temperature = 0.5, max_tokens = 1024, re
 
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content;
-      if (content) {
-        return content;
+      if (content && typeof content === 'string' && content.trim().length > 0) {
+        return content.trim();
+      }
+      
+      // Fallback for reasoning models where completion tokens went to reasoning field
+      const reasoning = data.choices?.[0]?.message?.reasoning;
+      if (reasoning && typeof reasoning === 'string' && reasoning.trim().length > 0) {
+        return reasoning.trim();
       }
     } catch (err) {
       console.warn(`[Groq] Failed calling model ${model}:`, err.message);
@@ -2045,6 +2072,28 @@ const requireAdmin = (req, res, next) => {
   return res.status(401).json({ error: 'Unauthorized' });
 };
 
+// Public Contact / Support Form API
+app.post('/api/contact', (req, res) => {
+  const { name, email, subject, message } = req.body;
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: 'Name, email, and message are required.' });
+  }
+  const newMsg = {
+    id: 'msg-' + Date.now(),
+    name: name.trim(),
+    email: email.trim(),
+    subject: subject || 'General Support',
+    message: message.trim(),
+    status: 'New',
+    createdAt: new Date().toLocaleDateString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+  };
+  supportMessagesDB.unshift(newMsg);
+  res.json({ success: true, message: 'Message sent successfully.' });
+});
+
 // Admin Stats
 app.get('/api/admin/stats', requireAdmin, (req, res) => {
   res.json({
@@ -2052,7 +2101,8 @@ app.get('/api/admin/stats', requireAdmin, (req, res) => {
     totalFlashcards: flashcardsDB.length + importedFlashcards.length,
     totalExamQuestions: examsDB.reduce((acc, e) => acc + (e.questions?.length || 0), 0),
     totalDoubts: doubtsDB.length,
-    totalAttempts: attemptsDB.length
+    totalAttempts: attemptsDB.length,
+    totalMessages: supportMessagesDB.length
   });
 });
 
@@ -2065,6 +2115,20 @@ app.get('/api/admin/users', requireAdmin, (req, res) => {
   // Merge, prefer profileUsers
   const all = Object.values([...users, ...profileUsers].reduce((acc, u) => { acc[u.id] = { ...acc[u.id], ...u }; return acc; }, {}));
   res.json(all);
+});
+
+// Admin Support Inbox Messages
+app.get('/api/admin/messages', requireAdmin, (req, res) => res.json(supportMessagesDB));
+
+app.patch('/api/admin/messages/:id/resolve', requireAdmin, (req, res) => {
+  const msg = supportMessagesDB.find(m => m.id === req.params.id);
+  if (msg) msg.status = msg.status === 'Resolved' ? 'New' : 'Resolved';
+  res.json({ success: true, message: msg });
+});
+
+app.delete('/api/admin/messages/:id', requireAdmin, (req, res) => {
+  supportMessagesDB = supportMessagesDB.filter(m => m.id !== req.params.id);
+  res.json({ success: true });
 });
 
 // Admin News

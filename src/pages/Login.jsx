@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GraduationCap, ArrowRight, Mail, Lock, Sparkles, User as UserIcon, X, Check, KeyRound } from 'lucide-react';
+import { GraduationCap, ArrowRight, Mail, Lock, Sparkles, User as UserIcon, X, Check, KeyRound, Phone } from 'lucide-react';
 import axios from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { StoryAnimation } from '../components/StoryAnimation.jsx';
@@ -7,6 +7,7 @@ import { StoryAnimation } from '../components/StoryAnimation.jsx';
 export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
@@ -33,6 +34,12 @@ export default function Login() {
       setIsLoading(false);
       return;
     }
+    const cleanPhone = phone.replace(/[^0-9+]/g, '');
+    if (isSignUp && (!cleanPhone || cleanPhone.replace(/\D/g, '').length < 10)) {
+      setErrorMsg('Please enter a valid 10-digit mobile number.');
+      setIsLoading(false);
+      return;
+    }
     if (password.length < 6) {
       setErrorMsg('Password must be at least 6 characters.');
       setIsLoading(false);
@@ -42,7 +49,7 @@ export default function Login() {
     try {
       if (isSignUp) {
         try {
-          const data = await signUpWithSupabase(name.trim(), email.trim().toLowerCase(), password);
+          const data = await signUpWithSupabase(name.trim(), email.trim().toLowerCase(), password, cleanPhone);
           if (data?.session) {
             setSuccessMsg('Account created successfully! Welcome to Tutovia.');
           } else {
@@ -54,7 +61,8 @@ export default function Login() {
           const regRes = await axios.post('/api/auth/register', { 
             name: name.trim(), 
             email: email.trim().toLowerCase(), 
-            password 
+            password,
+            phone: cleanPhone 
           });
           if (regRes.data?.id) {
             login(regRes.data, true);
@@ -146,24 +154,45 @@ export default function Login() {
 
             <form className="space-y-5" onSubmit={handleSubmit}>
               {isSignUp && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                    Full Name
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <UserIcon className="h-5 w-5 text-slate-500" />
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <UserIcon className="h-5 w-5 text-slate-500" />
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-3 border border-surface-border rounded-xl bg-surface-card text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm"
+                        placeholder="Upasana Chaurasia"
+                      />
                     </div>
-                    <input
-                      type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-3 border border-surface-border rounded-xl bg-surface-card text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm"
-                      placeholder="Upasana Chaurasia"
-                    />
                   </div>
-                </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                      Mobile Number
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Phone className="h-5 w-5 text-slate-500" />
+                      </div>
+                      <input
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-3 border border-surface-border rounded-xl bg-surface-card text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm"
+                        placeholder="+91 98765 43210"
+                      />
+                    </div>
+                  </div>
+                </>
               )}
 
               <div>

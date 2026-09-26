@@ -36,6 +36,26 @@ export default function Flashcards() {
     applyFilters();
   }, [flashcards, subjectFilter, progressFilter]);
 
+  const getStorageKey = () => `tutovia_fc_progress_${user?.id || 'guest'}`;
+
+  const mergeLocalProgress = (cards) => {
+    try {
+      const localData = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
+      return cards.map(c => {
+        if (localData[c.id]) {
+          return {
+            ...c,
+            status: localData[c.id].status || c.status,
+            next_review_date: localData[c.id].next_review_date || c.next_review_date
+          };
+        }
+        return c;
+      });
+    } catch {
+      return cards;
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     const uid = user?.id || '';
@@ -44,7 +64,8 @@ export default function Flashcards() {
         axios.get(`/api/flashcards${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: [] })),
         axios.get(`/api/subjects${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: [] }))
       ]);
-      setFlashcards(Array.isArray(fcRes.data) ? fcRes.data : []);
+      const rawCards = Array.isArray(fcRes.data) ? fcRes.data : [];
+      setFlashcards(mergeLocalProgress(rawCards));
       setAvailableSubjects(Array.isArray(subRes.data) ? subRes.data : []);
     } catch (error) {
       console.error(error);
@@ -57,7 +78,8 @@ export default function Flashcards() {
     const uid = user?.id || '';
     try {
       const res = await axios.get(`/api/flashcards${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: [] }));
-      setFlashcards(Array.isArray(res.data) ? res.data : []);
+      const rawCards = Array.isArray(res.data) ? res.data : [];
+      setFlashcards(mergeLocalProgress(rawCards));
     } catch (error) {
       console.error(error);
     }
@@ -74,15 +96,26 @@ export default function Flashcards() {
       // Only show cards that have never been reviewed
       result = result.filter(fc => fc.status === 'pending');
     } else if (progressFilter === 'reviewed') {
-      // Show cards that are due for review based on SM-2 next_review_date
+      // Show all cards that have been reviewed
+      result = result.filter(fc => fc.status !== 'pending');
+    } else if (progressFilter === 'due') {
+      // Show cards whose spaced repetition interval is due
       const now = new Date();
       result = result.filter(fc => {
         if (fc.status === 'pending') return false;
         if (fc.next_review_date) {
           return new Date(fc.next_review_date) <= now;
         }
-        return true; // Legacy fallback
+        return true;
       });
+    } else if (progressFilter === 'again') {
+      result = result.filter(fc => fc.status === 'again');
+    } else if (progressFilter === 'hard') {
+      result = result.filter(fc => fc.status === 'hard');
+    } else if (progressFilter === 'good') {
+      result = result.filter(fc => fc.status === 'good');
+    } else if (progressFilter === 'mastered') {
+      result = result.filter(fc => fc.status === 'mastered');
     }
 
     setFilteredCards(result);
@@ -108,23 +141,49 @@ export default function Flashcards() {
     const currentCard = filteredCards[currentIndex];
     if (!currentCard) return;
 
+    let optimisticStatus = 'again';
+    if (quality >= 5) optimisticStatus = 'mastered';
+    else if (quality >= 4) optimisticStatus = 'good';
+    else if (quality >= 3) optimisticStatus = 'hard';
+
+    const optimisticNextReview = new Date(Date.now() + (quality >= 5 ? 6 : quality >= 4 ? 3 : 1) * 86400000).toISOString();
+
+    // 1. Optimistic state update in memory
+    setFlashcards(prev => prev.map(fc => 
+      fc.id === currentCard.id ? { ...fc, status: optimisticStatus, next_review_date: optimisticNextReview } : fc
+    ));
+
+    // 2. Persist locally to localStorage immediately
+    try {
+      const key = getStorageKey();
+      const localData = JSON.parse(localStorage.getItem(key) || '{}');
+      localData[currentCard.id] = { status: optimisticStatus, next_review_date: optimisticNextReview, quality };
+      localStorage.setItem(key, JSON.stringify(localData));
+    } catch (e) {
+      console.warn("Local storage write error:", e);
+    }
+
+    // 3. Move to next card smoothly
+    handleNext();
+
+    // 4. Background server sync
     try {
       const res = await axios.post('/api/flashcards/progress', {
         userId: user?.id,
         cardId: currentCard.id,
-        quality: quality // SM-2 score 0-5
+        quality: quality // SM-2 score 1-5
       });
       
-      const newStatus = res.data.progress.status;
-      const nextReview = res.data.progress.next_review_date;
+      if (res.data?.progress) {
+        const newStatus = res.data.progress.status;
+        const nextReview = res.data.progress.next_review_date;
 
-      setFlashcards(prev => prev.map(fc => 
-        fc.id === currentCard.id ? { ...fc, status: newStatus, next_review_date: nextReview } : fc
-      ));
-      
-      handleNext();
+        setFlashcards(prev => prev.map(fc => 
+          fc.id === currentCard.id ? { ...fc, status: newStatus, next_review_date: nextReview } : fc
+        ));
+      }
     } catch (error) {
-      console.error("Failed to update flashcard progress", error);
+      console.error("Failed to update flashcard progress on server", error);
     }
   };
 
@@ -250,6 +309,7 @@ export default function Flashcards() {
   const percentComplete = flashcards.length > 0 ? Math.round((flippedCount / flashcards.length) * 100) : 0;
 
   const againCount = flashcards.filter(fc => fc.status === 'again').length;
+  const hardCount = flashcards.filter(fc => fc.status === 'hard').length;
   const goodCount = flashcards.filter(fc => fc.status === 'good').length;
   const masteredCount = flashcards.filter(fc => fc.status === 'mastered').length;
 
@@ -280,8 +340,13 @@ export default function Flashcards() {
             className="bg-surface border border-surface-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="all">All Progress</option>
-            <option value="pending">Pending Only</option>
-            <option value="reviewed">Reviewed Only</option>
+            <option value="pending">Pending Only ({flashcards.length - flippedCount})</option>
+            <option value="reviewed">Reviewed Only ({flippedCount})</option>
+            <option value="due">Due for Review</option>
+            <option value="again">Needs Review ({againCount})</option>
+            <option value="hard">Hard Cards ({hardCount})</option>
+            <option value="good">Good Memory ({goodCount})</option>
+            <option value="mastered">Mastered Only ({masteredCount})</option>
           </select>
         </div>
         
@@ -335,13 +400,20 @@ export default function Flashcards() {
                 <span className="bg-indigo-500/20 text-indigo-300 text-xs font-bold px-3 py-1 rounded-full border border-indigo-500/30">
                   Card {currentIndex + 1} of {filteredCards.length}
                 </span>
-                {currentCard.status !== 'pending' && (
+                {currentCard.status !== 'pending' ? (
                   <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
                     currentCard.status === 'mastered' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
                     currentCard.status === 'good' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
-                    'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    currentCard.status === 'hard' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                    'bg-rose-500/20 text-rose-300 border-rose-500/30'
                   }`}>
-                    {currentCard.status.charAt(0).toUpperCase() + currentCard.status.slice(1)}
+                    {currentCard.status === 'mastered' ? '🌟 Mastered' :
+                     currentCard.status === 'good' ? '👍 Good' :
+                     currentCard.status === 'hard' ? '⚠️ Hard' : '🔄 Needs Review'}
+                  </span>
+                ) : (
+                  <span className="text-xs font-medium px-3 py-1 rounded-full border bg-slate-500/10 text-slate-400 border-slate-500/20">
+                    New Card
                   </span>
                 )}
               </div>
@@ -529,9 +601,13 @@ export default function Flashcards() {
             <h3 className="text-lg font-bold text-white mb-4">Review Stats</h3>
             
             <div className="grid grid-cols-1 gap-3">
-              <div className="flex justify-between items-center p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                <span className="text-amber-400 font-semibold text-sm">Needs Review (Again)</span>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                <span className="text-rose-400 font-semibold text-sm">Needs Review (Again)</span>
                 <span className="text-white font-bold text-lg">{againCount}</span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <span className="text-amber-400 font-semibold text-sm">Challenging (Hard)</span>
+                <span className="text-white font-bold text-lg">{hardCount}</span>
               </div>
               <div className="flex justify-between items-center p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                 <span className="text-blue-400 font-semibold text-sm">Good Memory (Good)</span>

@@ -89,13 +89,10 @@ export function Navbar({ onOpenTutor }) {
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/flashcards', label: 'Flashcards', icon: Layers },
     { path: '/exams', label: 'Exams & Quizzes', icon: GraduationCap },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-    { path: '/wellness', label: 'Wellness', icon: HeartPulse },
-    { path: '/news', label: 'News', icon: Newspaper },
     { path: '/pyq', label: 'PYQ Bank', icon: BookMarked },
-    { path: '/community', label: 'Doubt Forum', icon: Users },
+    { path: '/news', label: 'News', icon: Newspaper },
   ];
 
   return (
