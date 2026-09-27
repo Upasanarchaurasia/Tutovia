@@ -20,6 +20,11 @@
     --glass-card-hover: rgba(24, 38, 64, 0.9);
     --glass-border: rgba(255, 255, 255, 0.08);
     --glass-shadow: rgba(14, 165, 233, 0.12);
+
+    /* Purpose-driven semantic accents: Emerald for progress, Amber for streaks, Rose for urgency */
+    --color-progress: #10B981;
+    --color-streak: #F59E0B;
+    --color-urgency: #F43F5E;
   }
 
   .light {
@@ -38,6 +43,15 @@
     --glass-card-hover: rgba(255, 255, 255, 0.95);
     --glass-border: rgba(0, 0, 0, 0.08);
     --glass-shadow: rgba(14, 165, 233, 0.06);
+
+    --color-progress: #059669;
+    --color-streak: #D97706;
+    --color-urgency: #E11D48;
+  }
+
+  h1, h2, h3, .font-heading {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    letter-spacing: -0.025em;
   }
 
   body {

@@ -40,10 +40,34 @@ export default {
           rose: '#F43F5E',
           cyan: '#06B6D4',
           violet: '#8B5CF6'
-        }
+        },
+        // Purpose-driven semantic accents: Emerald for progress, Amber for streaks, Rose for urgency
+        progress: {
+          DEFAULT: '#10B981',
+          light: '#34D399',
+          dark: '#059669',
+          bg: 'rgba(16, 185, 129, 0.12)',
+          border: 'rgba(16, 185, 129, 0.25)',
+        },
+        streak: {
+          DEFAULT: '#F59E0B',
+          light: '#FBBF24',
+          dark: '#D97706',
+          bg: 'rgba(245, 158, 11, 0.12)',
+          border: 'rgba(245, 158, 11, 0.25)',
+        },
+        urgency: {
+          DEFAULT: '#F43F5E',
+          light: '#FB7185',
+          dark: '#E11D48',
+          bg: 'rgba(244, 63, 94, 0.12)',
+          border: 'rgba(244, 63, 94, 0.25)',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
+        heading: ['"Bricolage Grotesque"', 'sans-serif'],
+        display: ['"Bricolage Grotesque"', 'sans-serif'],
       },
       animation: {
         'pulse-subtle': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

@@ -81,7 +81,7 @@ export default function LandingPage() {
               <motion.div variants={fadeIn} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-sm font-bold mb-8 uppercase tracking-widest shadow-sm">
                 <Zap size={16} className="animate-pulse text-amber-400" /> The Algorithm Replacing 5 Study Apps
               </motion.div>
-              <motion.h1 variants={fadeIn} className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-white mb-6 leading-[1.1]">
+              <motion.h1 variants={fadeIn} className="text-5xl md:text-6xl lg:text-7xl font-heading font-black tracking-tight text-white mb-6 leading-[1.1]">
                 Your Unfair Academic Advantage.<br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-emerald-400">Powered by AI.</span>
               </motion.h1>
@@ -117,29 +117,44 @@ export default function LandingPage() {
                     </div>
                     <div>
                       <div className="font-bold text-white text-sm">Dashboard</div>
-                      <div className="text-xs text-slate-400">CA Final &bull; May 2027</div>
+                      <div className="text-xs text-slate-400">CA Intermediate &bull; Jan 2027</div>
                     </div>
                   </div>
+                  {/* Streak: Amber */}
                   <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-full">
                     <Flame size={16} className="text-amber-500 animate-pulse" />
-                    <span className="text-amber-500 font-bold text-sm">14 Days</span>
+                    <span className="text-amber-400 font-bold text-sm">14 Day Streak</span>
                   </div>
                 </div>
 
                 {/* Body Mock */}
                 <div className="space-y-4">
-                  {/* Pomodoro Mock */}
-                  <div className="bg-surface border border-surface-border rounded-2xl p-4 flex items-center justify-between">
+                  {/* Urgency / Focus Session: Rose */}
+                  <div className="bg-surface border border-rose-500/20 rounded-2xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
                         <Timer className="text-rose-400" size={20} />
                       </div>
                       <div>
-                        <div className="font-bold text-white text-sm">Deep Work Session</div>
-                        <div className="text-xs text-slate-400">Direct Tax Laws</div>
+                        <div className="font-bold text-white text-sm">Focus Session &bull; Priority</div>
+                        <div className="text-xs text-slate-400">Direct Tax Laws (TDS/TCS)</div>
                       </div>
                     </div>
                     <div className="text-xl font-black text-rose-400 font-mono tracking-wider">24:59</div>
+                  </div>
+
+                  {/* Progress Tracker: Emerald */}
+                  <div className="bg-surface border border-emerald-500/20 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span className="text-xs font-bold text-white">Daily Target Progress</span>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-400 font-mono">82% Completed</span>
+                    </div>
+                    <div className="w-full h-2 bg-surface-card rounded-full overflow-hidden border border-surface-border/50">
+                      <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full w-[82%]" />
+                    </div>
                   </div>
 
                   {/* Flashcard Alert Mock */}
@@ -148,7 +163,7 @@ export default function LandingPage() {
                     <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold mb-2 uppercase tracking-wide">
                       <Zap size={14} /> SM-2 Spaced Repetition
                     </div>
-                    <div className="font-bold text-white mb-1">Deferred Tax Assets</div>
+                    <div className="font-bold text-white mb-1">Deferred Tax Assets (AS 22)</div>
                     <div className="text-sm text-slate-300 mb-4">Memory fading. Optimal review time: Now.</div>
                     <button className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-lg w-full transition-colors shadow-lg shadow-indigo-500/25">
                       Review Flashcard
