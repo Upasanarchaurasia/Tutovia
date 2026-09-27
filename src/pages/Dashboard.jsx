@@ -10,6 +10,7 @@ import axios from '../api.js';
 import PomodoroTimer from '../components/PomodoroTimer.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 import TimetableGeneratorModal from '../components/TimetableGeneratorModal.jsx';
 import EditTimetableModal from '../components/EditTimetableModal.jsx';
 import BadgeGallery from '../components/BadgeGallery.jsx';
@@ -125,6 +126,7 @@ export default function Dashboard({ onOpenTutor }) {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const { user } = useAuth();
   const { addToast } = useToast();
+  const { currentPhaseInfo } = useTheme();
 
   // Mood State & Check-in Modal
   const [showMoodCheckIn, setShowMoodCheckIn] = useState(false);
@@ -460,11 +462,14 @@ export default function Dashboard({ onOpenTutor }) {
               <Clock className="w-3.5 h-3.5 text-indigo-400" />
               <span>Current Time: <strong>{clock12Str}</strong></span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Good evening, {user?.name || 'Scholar'} 👋
+            <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-white tracking-tight">
+              {currentPhaseInfo.greeting}, {user?.name || 'Scholar'}
             </h1>
-            <p className="text-indigo-400 font-bold text-sm mt-1 max-w-2xl leading-relaxed">
-              CA Intermediate — {profile?.ca_group || 'Not selected'}
+            <p className="text-slate-300 font-medium text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
+              {currentPhaseInfo.tagline} &bull; {currentPhaseInfo.subtext}
+            </p>
+            <p className="text-indigo-400 font-bold text-xs mt-1">
+              CA Intermediate &bull; {profile?.ca_group || 'Group 1'}
             </p>
           </div>
 

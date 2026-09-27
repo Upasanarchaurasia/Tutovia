@@ -30,11 +30,13 @@ const ADMIN_EMAILS = ['chaurasiaupasana70@gmail.com'];
 import axios from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 
 export function Navbar({ onOpenTutor }) {
   const location = useLocation();
   const { user, profile } = useAuth();
   const { addToast } = useToast();
+  const { activePhase, selectPhase, currentPhaseInfo } = useTheme();
   const [notifications, setNotifications] = useState([]);
 
   // Only show admin portal for the owner account (Upasana / u1)
@@ -43,25 +45,6 @@ export function Navbar({ onOpenTutor }) {
     ADMIN_EMAILS.includes((user.email || '').toLowerCase())
   );
   const [showNotifs, setShowNotifs] = useState(false);
-  const [theme, setTheme] = useState('dark');
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    setTheme(savedTheme);
-    if (savedTheme === 'light') document.documentElement.classList.add('light');
-  }, []);
-
-  const toggleTheme = () => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('light');
-      localStorage.setItem('theme', 'light');
-      setTheme('light');
-    } else {
-      document.documentElement.classList.remove('light');
-      localStorage.setItem('theme', 'dark');
-      setTheme('dark');
-    }
-  };
   const [studyHours, setStudyHours] = useState('0.00');
   const [streak, setStreak] = useState(0);
 
@@ -181,13 +164,17 @@ export function Navbar({ onOpenTutor }) {
               <span className="font-bold">{streak} <span className="hidden sm:inline">Day Streak</span><span className="sm:hidden">d</span></span>
             </div>
 
-            {/* Theme Toggle */}
+            {/* Journey Phase Indicator & Atmosphere Toggle */}
             <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg bg-surface-card hover:bg-slate-800 text-slate-300 transition-colors border border-surface-border"
-              title="Toggle Light/Dark Mode"
+              onClick={() => {
+                const nextPhase = activePhase === 'morning' ? 'day' : activePhase === 'day' ? 'evening' : activePhase === 'evening' ? 'night' : 'morning';
+                selectPhase(nextPhase);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-card hover:bg-surface text-slate-300 transition-colors border border-surface-border text-xs font-semibold"
+              title={`Tutovia Journey: ${currentPhaseInfo.name} (${currentPhaseInfo.label}). Click to cycle through the day.`}
             >
-              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              <span className="text-sm">{currentPhaseInfo.icon}</span>
+              <span className="hidden xl:inline">{currentPhaseInfo.name}</span>
             </button>
 
             {/* Notification Bell */}
