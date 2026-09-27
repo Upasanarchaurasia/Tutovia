@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { 
   GraduationCap, Brain, Sparkles, Check, Zap, 
   BarChart, BookOpen, Timer, Target, Calendar, 
@@ -158,6 +158,10 @@ export default function LandingPage() {
             <a href="#engines" className="hover:text-white transition-colors">Core Features</a>
             <a href="#wellbeing" className="hover:text-white transition-colors">Mindful Study</a>
             <a href="#sandbox" className="hover:text-white transition-colors">Live Demo</a>
+            <Link to="/tutor" className="text-indigo-400 hover:text-indigo-300 font-bold transition-colors flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+              <Bot size={14} />
+              <span>AI Tutor</span>
+            </Link>
           </div>
 
           {/* Right: Time-of-Day Switcher & Auth */}
@@ -830,36 +834,56 @@ export default function LandingPage() {
                     </div>
                     
                     {!aiQuery && (
-                      <div className="grid sm:grid-cols-2 gap-3 mt-auto">
-                        {[
-                          { 
-                            q: "Explain Section 54 Capital Gains exemption simply", 
-                            a: "Under Section 54, if an individual/HUF sells a Long-Term residential house and invests the capital gains into 1 new house (or 2 houses if gains <= Rs. 2 Crores, once in a lifetime), the capital gains are exempt. The new house must be purchased within 1 yr before / 2 yrs after transfer, or constructed within 3 yrs!" 
-                          },
-                          { 
-                            q: "Ind AS 115: 5-step model for revenue", 
-                            a: "The 5 steps are: (1) Identify the contract with the customer, (2) Identify separate performance obligations, (3) Determine the transaction price, (4) Allocate the transaction price to obligations, and (5) Recognize revenue when (or as) the entity satisfies each performance obligation!" 
-                          },
-                          { 
-                            q: "Difference between Qualified vs Adverse Opinion (SA 705)", 
-                            a: "Qualified Opinion: Misstatements are material but NOT pervasive. Adverse Opinion: Misstatements are BOTH material AND pervasive to the financial statements, rendering them misleading overall." 
-                          },
-                          { 
-                            q: "CARO 2020: Physical inventory verification clause", 
-                            a: "Under Clause (ii)(a), the auditor must report whether physical verification of inventory was conducted by management at reasonable intervals, and whether discrepancies of 10% or more in aggregate for each class of inventory were properly dealt with in books." 
-                          }
-                        ].map((q, i) => (
-                          <button key={i} onClick={() => setAiQuery(q)} className="bg-surface border border-surface-border hover:border-sky-500/50 text-left p-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-200 transition-colors flex items-center justify-between group">
-                            <span className="truncate pr-2">{q.q}</span>
-                            <Send size={14} className="text-slate-500 group-hover:text-sky-400 shrink-0" />
-                          </button>
-                        ))}
+                      <div className="space-y-4 w-full mt-auto">
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          {[
+                            { 
+                              q: "Explain Section 54 Capital Gains exemption simply", 
+                              a: "Under Section 54, if an individual/HUF sells a Long-Term residential house and invests the capital gains into 1 new house (or 2 houses if gains <= Rs. 2 Crores, once in a lifetime), the capital gains are exempt. The new house must be purchased within 1 yr before / 2 yrs after transfer, or constructed within 3 yrs!" 
+                            },
+                            { 
+                              q: "Ind AS 115: 5-step model for revenue", 
+                              a: "The 5 steps are: (1) Identify the contract with the customer, (2) Identify separate performance obligations, (3) Determine the transaction price, (4) Allocate the transaction price to obligations, and (5) Recognize revenue when (or as) the entity satisfies each performance obligation!" 
+                            },
+                            { 
+                              q: "Difference between Qualified vs Adverse Opinion (SA 705)", 
+                              a: "Qualified Opinion: Misstatements are material but NOT pervasive. Adverse Opinion: Misstatements are BOTH material AND pervasive to the financial statements, rendering them misleading overall." 
+                            },
+                            { 
+                              q: "CARO 2020: Physical inventory verification clause", 
+                              a: "Under Clause (ii)(a), the auditor must report whether physical verification of inventory was conducted by management at reasonable intervals, and whether discrepancies of 10% or more in aggregate for each class of inventory were properly dealt with in books." 
+                            }
+                          ].map((q, i) => (
+                            <button key={i} onClick={() => setAiQuery(q)} className="bg-surface border border-surface-border hover:border-sky-500/50 text-left p-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-200 transition-colors flex items-center justify-between group">
+                              <span className="truncate pr-2">{q.q}</span>
+                              <Send size={14} className="text-slate-500 group-hover:text-sky-400 shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="pt-2 text-center">
+                          <Link 
+                            to="/tutor"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm transition-all shadow-lg shadow-indigo-600/20"
+                          >
+                            <Bot size={16} />
+                            <span>Ask Your Own Question in Live AI Tutor →</span>
+                          </Link>
+                        </div>
                       </div>
                     )}
                     {aiQuery && (
-                      <button onClick={() => setAiQuery(null)} className="mx-auto mt-4 text-xs sm:text-sm text-slate-400 hover:text-white flex items-center gap-2">
-                        <RotateCcw size={14} /> Try Another Question
-                      </button>
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4">
+                        <button onClick={() => setAiQuery(null)} className="text-xs sm:text-sm text-slate-400 hover:text-white flex items-center gap-2">
+                          <RotateCcw size={14} /> Try Another Question
+                        </button>
+                        <Link 
+                          to={`/tutor?prompt=${encodeURIComponent(aiQuery.q)}`}
+                          className="text-xs sm:text-sm text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1.5"
+                        >
+                          <span>Ask Follow-up in Full AI Tutor →</span>
+                        </Link>
+                      </div>
                     )}
                   </div>
                 )}

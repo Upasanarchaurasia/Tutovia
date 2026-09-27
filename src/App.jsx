@@ -22,6 +22,7 @@ import Contact from './pages/Contact.jsx';
 import AdminPanel from './pages/AdminPanel.jsx';
 import AppExclusive from './pages/AppExclusive.jsx';
 import Syllabus from './pages/Syllabus.jsx';
+import TutorPage from './pages/TutorPage.jsx';
 import OnboardingModal from './components/OnboardingModal.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
@@ -69,6 +70,7 @@ export default function App() {
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/tutor" element={<TutorPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
@@ -104,6 +106,7 @@ export default function App() {
             <Route path="/profile" element={<User />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/pyq" element={<PYQ />} />
+            <Route path="/tutor" element={<TutorPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/contact" element={<Contact />} />
