@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GraduationCap, ArrowRight, Mail, Lock, Sparkles, User as UserIcon, X, Check, KeyRound, Phone } from 'lucide-react';
 import axios from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { StoryAnimation } from '../components/StoryAnimation.jsx';
 
 export default function Login() {
+  const navigate = useNavigate();
   const [isSignUp, setIsSignUp] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -21,7 +23,13 @@ export default function Login() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMsg, setForgotMsg] = useState('');
 
-  const { login, loginWithSupabase, signUpWithSupabase, resetPassword } = useAuth();
+  const { user, login, loginWithSupabase, signUpWithSupabase, resetPassword } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,6 +60,7 @@ export default function Login() {
           const data = await signUpWithSupabase(name.trim(), email.trim().toLowerCase(), password, cleanPhone);
           if (data?.session) {
             setSuccessMsg('Account created successfully! Welcome to Tutovia.');
+            setTimeout(() => navigate('/', { replace: true }), 300);
           } else {
             setSuccessMsg('Account created! Please check your email inbox to verify your account, then sign in.');
             setIsSignUp(false);
@@ -67,6 +76,7 @@ export default function Login() {
           if (regRes.data?.id) {
             login(regRes.data, true);
             setSuccessMsg('Account created successfully! Welcome to Tutovia.');
+            setTimeout(() => navigate('/', { replace: true }), 300);
           } else {
             throw sbErr;
           }
@@ -75,6 +85,7 @@ export default function Login() {
         try {
           await loginWithSupabase(email.trim().toLowerCase(), password);
           setSuccessMsg('Login successful! Redirecting...');
+          setTimeout(() => navigate('/', { replace: true }), 300);
         } catch (sbErr) {
           // VM server fallback
           const logRes = await axios.post('/api/auth/login', { 
@@ -84,6 +95,7 @@ export default function Login() {
           if (logRes.data?.id) {
             login(logRes.data, true);
             setSuccessMsg('Login successful! Redirecting...');
+            setTimeout(() => navigate('/', { replace: true }), 300);
           } else {
             throw sbErr;
           }

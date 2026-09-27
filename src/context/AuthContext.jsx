@@ -11,11 +11,33 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
-  // Cloud Sync state
+  // Cloud Sync state — fully automatic in background
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'synced' | 'error'
   const [lastSyncedAt, setLastSyncedAt] = useState(syncService.getLastSyncedTime());
-  const [isSyncEnabled, setIsSyncEnabled] = useState(syncService.isCloudSyncEnabled());
-  const [showSyncModal, setShowSyncModal] = useState(false);
+  const isSyncEnabled = true;
+
+  // ============================================================
+  // AUTO-SYNC ENGINE — Syncs Supabase, App & Web Every 5 Minutes
+  // ============================================================
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Initial silent sync after 3.5 seconds
+    const initialTimer = setTimeout(() => {
+      triggerSync(true);
+    }, 3500);
+
+    // Automatic recurring background sync every 5 minutes (300,000 ms) for all users
+    const interval = setInterval(() => {
+      console.log('[Tutovia Cloud] Running automatic 5-min background sync...');
+      triggerSync(true);
+    }, 5 * 60 * 1000);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     // 1. Initial check from persistent storage and Supabase session
@@ -138,7 +160,6 @@ export const AuthProvider = ({ children }) => {
 
       if (localStorage.getItem(`tutovia_onboarded_${userId}`) === 'true') {
         setNeedsOnboarding(false);
-        checkSyncPrompt(userId);
         return;
       }
 
@@ -157,7 +178,6 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem(`tutovia_profile_${userId}`, JSON.stringify(sbProfile));
         localStorage.setItem(`tutovia_onboarded_${userId}`, 'true');
         setNeedsOnboarding(false);
-        checkSyncPrompt(userId);
         return;
       }
 
@@ -172,23 +192,12 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem(`tutovia_profile_${userId}`, JSON.stringify(res.data));
         localStorage.setItem(`tutovia_onboarded_${userId}`, 'true');
         setNeedsOnboarding(false);
-        checkSyncPrompt(userId);
       } else {
         // Brand new user: trigger onboarding modal
         setNeedsOnboarding(true);
       }
     } catch {
       setNeedsOnboarding(false);
-    }
-  };
-
-  const checkSyncPrompt = (userId) => {
-    // If user has not seen the cross-device sync prompt yet, show it
-    if (!syncService.hasDismissedSyncPrompt()) {
-      setTimeout(() => setShowSyncModal(true), 1500);
-    } else if (syncService.isCloudSyncEnabled()) {
-      // Trigger background sync
-      triggerSync();
     }
   };
 
@@ -255,27 +264,10 @@ export const AuthProvider = ({ children }) => {
 
     // 3. Background sync to VM backend
     axios.post('/api/profile', { userId: updated.id, ...updated }).catch(() => {});
-
-    // 4. Prompt user to enable cross-device sync if not already prompted
-    if (!syncService.hasDismissedSyncPrompt()) {
-      setTimeout(() => setShowSyncModal(true), 1200);
-    }
   };
 
-  const handleAcceptSync = async (autoSync) => {
-    syncService.setCloudSyncEnabled(autoSync);
-    syncService.setDismissedSyncPrompt(true);
-    setIsSyncEnabled(autoSync);
-    setShowSyncModal(false);
-    if (user?.id) {
-      await triggerSync(true);
-    }
-  };
-
-  const handleDeclineSync = () => {
-    syncService.setDismissedSyncPrompt(true);
-    setShowSyncModal(false);
-  };
+  const handleAcceptSync = async () => {};
+  const handleDeclineSync = () => {};
 
   const logout = async () => {
     const currentUid = user?.id;

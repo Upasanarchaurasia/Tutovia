@@ -24,8 +24,11 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 export default function BottomNav({ onOpenTutor }) {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  const defaultSubjectId = profile?.ca_group === 'Group 2' ? 'cost-management' : 'advanced-accounting';
+  const targetSubjectId = localStorage.getItem('tutovia_last_subject_id') || defaultSubjectId;
 
   const isOwner = user && (
     user.id === 'u1' ||
@@ -34,7 +37,7 @@ export default function BottomNav({ onOpenTutor }) {
 
   const mainTabs = [
     { path: '/', label: 'Home', icon: LayoutDashboard },
-    { path: '/syllabus', label: 'Syllabus', icon: BookOpen },
+    { path: `/subject/${targetSubjectId}`, label: 'Syllabus', icon: BookOpen },
     { path: '/exams', label: 'Exams', icon: GraduationCap },
     { path: '/pyq', label: 'PYQ Bank', icon: BookMarked },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
@@ -162,10 +165,12 @@ export default function BottomNav({ onOpenTutor }) {
         <div className="flex items-center justify-around px-2 py-1.5">
           {mainTabs.map(tab => {
             const Icon = tab.icon;
-            const isActive = location.pathname === tab.path;
+            const isActive = tab.label === 'Syllabus'
+              ? (location.pathname.startsWith('/subject') || location.pathname === '/syllabus')
+              : (location.pathname === tab.path);
             return (
               <Link
-                key={tab.path}
+                key={tab.label}
                 to={tab.path}
                 className={`flex flex-col items-center gap-0.5 min-w-[56px] py-1.5 px-2 rounded-xl transition-all ${
                   isActive

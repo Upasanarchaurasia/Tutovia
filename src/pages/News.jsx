@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Newspaper, ExternalLink, Lightbulb, Sparkles, Bookmark, AlertCircle, FileText, Download, CheckCircle2 } from 'lucide-react';
+import { Newspaper, ExternalLink, Lightbulb, Sparkles, Bookmark, AlertCircle, FileText, Download, CheckCircle2, Eye, X } from 'lucide-react';
 import axios from '../api.js';
 
 export default function News() {
@@ -7,6 +7,7 @@ export default function News() {
   const [profile, setProfile] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [previewArticle, setPreviewArticle] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -124,7 +125,7 @@ export default function News() {
                   <p className="text-xs text-slate-400">{update.summary}</p>
                 </div>
                 <div className="shrink-0 flex items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
-                  {update.pdfUrl ? (
+                  {update.pdfUrl && (
                     <a 
                       href={update.pdfUrl} 
                       target="_blank" 
@@ -133,16 +134,13 @@ export default function News() {
                     >
                       <FileText className="w-3.5 h-3.5" /> Open Circular PDF <ExternalLink className="w-3 h-3" />
                     </a>
-                  ) : update.originalUrl && (
-                    <a 
-                      href={update.originalUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/30 hover:bg-rose-500/30 transition-all"
-                    >
-                      Read Notice <ExternalLink className="w-3 h-3" />
-                    </a>
                   )}
+                  <button
+                    onClick={() => setPreviewArticle(update)}
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-surface border border-surface-border text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-all"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> Preview
+                  </button>
                 </div>
               </div>
             ))}
@@ -239,9 +237,15 @@ export default function News() {
                   rel="noopener noreferrer" 
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold shadow-lg shadow-rose-600/25 transition-all"
                 >
-                  <FileText className="w-4 h-4" /> View Official Circular (PDF) <ExternalLink className="w-3 h-3" />
+                  <FileText className="w-4 h-4" /> Open Official Circular (PDF) <ExternalLink className="w-3 h-3" />
                 </a>
               )}
+              <button 
+                onClick={() => setPreviewArticle(article)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-bold border border-indigo-500/30 transition-all"
+              >
+                <Eye className="w-3.5 h-3.5" /> Read Circular & Notes
+              </button>
               {article.originalUrl && (
                 <a 
                   href={article.originalUrl} 
@@ -249,7 +253,7 @@ export default function News() {
                   rel="noopener noreferrer" 
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-card hover:bg-slate-800 text-slate-300 text-xs font-bold border border-surface-border transition-all"
                 >
-                  Source Web Page <ExternalLink className="w-3 h-3" />
+                  Official Portal Notice <ExternalLink className="w-3 h-3" />
                 </a>
               )}
               <button 
@@ -260,7 +264,7 @@ export default function News() {
               </button>
               <button 
                 onClick={() => window.location.href = `/tutor?prompt=${encodeURIComponent(`Explain the CA exam relevance of: ${article.headline || article.title}`)}`}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-bold border border-indigo-500/30 transition-all sm:ml-auto"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-bold border border-purple-500/30 transition-all sm:ml-auto"
               >
                 <Sparkles className="w-3 h-3" /> ✨ Ask Tutovia AI
               </button>
@@ -269,6 +273,100 @@ export default function News() {
           </div>
         ))}
       </div>
+
+      {/* In-App Official Circular / PDF Viewer Modal */}
+      {previewArticle && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-surface-card border border-surface-border rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="p-6 border-b border-surface-border flex items-start justify-between gap-4 bg-surface/50">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase tracking-wider">
+                    {previewArticle.source || 'Official Statutory Notice'}
+                  </span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                    {previewArticle.category}
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-white leading-snug">
+                  {previewArticle.headline || previewArticle.title}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setPreviewArticle(null)}
+                className="p-2 rounded-xl bg-surface hover:bg-slate-800 text-slate-400 hover:text-white transition-all border border-surface-border shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              
+              {/* Executive Summary */}
+              <div className="p-4 rounded-2xl bg-surface/60 border border-surface-border space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Executive Summary</h4>
+                <p className="text-sm text-slate-200 leading-relaxed">{previewArticle.summary}</p>
+              </div>
+
+              {/* Exam Applicability Highlight */}
+              <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 space-y-2">
+                <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
+                  <Lightbulb className="w-4 h-4 text-indigo-400" />
+                  <span>Why this matters for your CA Exam</span>
+                </div>
+                <p className="text-xs text-slate-200 leading-relaxed font-medium">
+                  {previewArticle.whyItMatters || previewArticle.applicability}
+                </p>
+              </div>
+
+              {/* Direct PDF Actions & Embedded Viewer */}
+              {previewArticle.pdfUrl && (
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30">
+                    <span className="text-xs font-bold text-rose-300 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-rose-400" /> Official Circular PDF Document
+                    </span>
+                    <a 
+                      href={previewArticle.pdfUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5"
+                    >
+                      Open Original PDF in New Window <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+
+                  <div className="w-full h-[450px] rounded-2xl overflow-hidden border border-surface-border bg-slate-950 flex flex-col">
+                    <iframe 
+                      src={`${previewArticle.pdfUrl}#toolbar=1`} 
+                      title="Official Circular PDF"
+                      className="w-full h-full border-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-surface-border bg-surface/50 flex items-center justify-between gap-4">
+              <span className="text-xs text-slate-500">
+                Official statutory notification synchronized for CA Intermediate.
+              </span>
+              <button
+                onClick={() => setPreviewArticle(null)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all border border-slate-700"
+              >
+                Close Preview
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

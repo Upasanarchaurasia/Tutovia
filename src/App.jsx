@@ -23,13 +23,20 @@ import AdminPanel from './pages/AdminPanel.jsx';
 import AppExclusive from './pages/AppExclusive.jsx';
 import Syllabus from './pages/Syllabus.jsx';
 import OnboardingModal from './components/OnboardingModal.jsx';
-import CloudSyncModal from './components/CloudSyncModal.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 
+function SyllabusRedirect() {
+  const { profile } = useAuth();
+  const lastSubId = localStorage.getItem('tutovia_last_subject_id');
+  const defaultSubId = profile?.ca_group === 'Group 2' ? 'cost-management' : 'advanced-accounting';
+  const targetId = lastSubId || defaultSubId;
+  return <Navigate to={`/subject/${targetId}`} replace />;
+}
+
 export default function App() {
   const [isTutorOpen, setIsTutorOpen] = useState(false);
-  const { user, needsOnboarding, loading, showSyncModal, handleAcceptSync, handleDeclineSync } = useAuth();
+  const { user, needsOnboarding, loading } = useAuth();
 
   // If auth state is still initializing from storage, show a minimal loading spinner to avoid route bouncing
   if (loading) {
@@ -47,6 +54,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/dashboard" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
@@ -74,7 +82,10 @@ export default function App() {
         <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
           <Routes>
             <Route path="/" element={<Dashboard onOpenTutor={() => setIsTutorOpen(true)} />} />
-            <Route path="/syllabus" element={<Syllabus />} />
+            <Route path="/dashboard" element={<Navigate to="/" replace />} />
+            <Route path="/home" element={<Navigate to="/" replace />} />
+            <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route path="/syllabus" element={<SyllabusRedirect />} />
             <Route path="/subject/:id" element={<Subject />} />
             <Route path="/exams" element={<Exams />} />
             <Route path="/flashcards" element={<Flashcards />} />
@@ -104,13 +115,6 @@ export default function App() {
         {/* First-time Student CA Onboarding */}
         <OnboardingModal 
           isOpen={needsOnboarding} 
-        />
-
-        {/* Cross-Device Cloud Sync Prompt Modal */}
-        <CloudSyncModal 
-          isOpen={showSyncModal} 
-          onClose={handleDeclineSync} 
-          onAccept={handleAcceptSync} 
         />
 
         {/* Footer */}

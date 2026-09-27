@@ -33,7 +33,7 @@ import { useToast } from '../context/ToastContext.jsx';
 
 export function Navbar({ onOpenTutor }) {
   const location = useLocation();
-  const { user, syncStatus, triggerSync } = useAuth();
+  const { user, profile } = useAuth();
   const { addToast } = useToast();
   const [notifications, setNotifications] = useState([]);
 
@@ -94,9 +94,12 @@ export function Navbar({ onOpenTutor }) {
     return () => clearInterval(interval);
   }, [user?.id]);
 
+  const defaultSubjectId = profile?.ca_group === 'Group 2' ? 'cost-management' : 'advanced-accounting';
+  const targetSubjectId = localStorage.getItem('tutovia_last_subject_id') || defaultSubjectId;
+
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/syllabus', label: 'Syllabus', icon: BookOpen },
+    { path: `/subject/${targetSubjectId}`, label: 'Syllabus', icon: BookOpen },
     { path: '/exams', label: 'Exams & Quizzes', icon: GraduationCap },
     { path: '/flashcards', label: 'Flashcards', icon: Layers },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
@@ -130,10 +133,12 @@ export function Navbar({ onOpenTutor }) {
           <nav className="hidden md:flex flex-nowrap overflow-x-auto no-scrollbar items-center gap-1 mx-4 max-w-full">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              const isActive = item.label === 'Syllabus' 
+                ? (location.pathname.startsWith('/subject') || location.pathname === '/syllabus')
+                : (location.pathname === item.path);
               return (
                 <Link
-                  key={item.path}
+                  key={item.label}
                   to={item.path}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
                     isActive
@@ -173,35 +178,6 @@ export function Navbar({ onOpenTutor }) {
               <Flame className="w-4 h-4 text-amber-500 animate-bounce shrink-0" />
               <span className="font-bold">{streak} <span className="hidden sm:inline">Day Streak</span><span className="sm:hidden">d</span></span>
             </div>
-
-                        {/* Cloud Sync Status & Quick-Sync Button */}
-            {user && (
-              <button
-                onClick={async () => {
-                  addToast('Syncing with Supabase Cloud...', 'info');
-                  const res = await triggerSync(true);
-                  if (res?.success) {
-                    addToast('App & Web data successfully synchronized!', 'success');
-                  } else {
-                    addToast(res?.reason || 'Synced with local data.', 'info');
-                  }
-                }}
-                className={`relative p-2 rounded-lg bg-surface-card hover:bg-slate-800 transition-colors border border-surface-border ${
-                  syncStatus === 'synced' ? 'text-emerald-400' : syncStatus === 'syncing' ? 'text-amber-400' : 'text-slate-300'
-                }`}
-                title="Cross-Device Cloud Sync (App ↔ Web)"
-                aria-label="Cross-Device Cloud Sync"
-              >
-                {syncStatus === 'syncing' ? (
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Cloud className="w-5 h-5" />
-                )}
-                {syncStatus === 'synced' && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-background" />
-                )}
-              </button>
-            )}
 
             {/* Theme Toggle */}
             <button

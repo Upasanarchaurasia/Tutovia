@@ -16,12 +16,7 @@ export default function User() {
   const { 
     user, 
     logout, 
-    syncStatus, 
-    lastSyncedAt, 
-    isSyncEnabled, 
-    triggerSync, 
-    toggleCloudSync, 
-    setShowSyncModal 
+    lastSyncedAt
   } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { addToast } = useToast();
@@ -76,17 +71,6 @@ export default function User() {
       addToast('Failed to save profile. Please try again.', 'error');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleManualSync = async () => {
-    addToast('Initiating cloud sync with Supabase...', 'info');
-    const res = await triggerSync(true);
-    if (res?.success) {
-      addToast('Data successfully synced between iOS App and Website!', 'success');
-      fetchProfile();
-    } else {
-      addToast(res?.reason || 'Sync completed with local defaults.', 'info');
     }
   };
 
@@ -603,44 +587,20 @@ export default function User() {
 
               <div className="p-4 rounded-2xl bg-surface border border-surface-border">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sync Status</span>
-                  <span className="text-xs text-indigo-300">
-                    {lastSyncedAt ? `Last: ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Ready to sync'}
+              <div className="p-4 rounded-2xl bg-surface border border-surface-border sm:col-span-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Automated Background Cloud Sync</span>
+                  </div>
+                  <span className="text-xs text-slate-400">
+                    {lastSyncedAt ? `Last synced: ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Active'}
                   </span>
                 </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-slate-300">Background Auto-Sync</span>
-                  <button
-                    type="button"
-                    onClick={() => toggleCloudSync(!isSyncEnabled)}
-                    className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 ${isSyncEnabled ? 'bg-indigo-600' : 'bg-slate-700'}`}
-                  >
-                    <div className={`w-5 h-5 rounded-full bg-white transition-transform ${isSyncEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-                <p className="text-xs text-slate-400 mt-2">Continuous background sync keeps all study metrics identical.</p>
+                <p className="text-xs text-slate-300">
+                  Your study timetable, streak, syllabus progress, notes, and mock scores are synced automatically every 5 minutes in the background across Supabase, iOS App, and Website.
+                </p>
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={handleManualSync}
-                disabled={syncStatus === 'syncing'}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
-              >
-                <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                <span>{syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now (Force Update)'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowSyncModal(true)}
-                className="px-4 py-2.5 rounded-xl bg-surface hover:bg-surface-hover text-slate-300 hover:text-white text-sm font-semibold border border-surface-border transition-colors cursor-pointer"
-              >
-                Open Sync Settings Dialog
-              </button>
             </div>
           </div>
 

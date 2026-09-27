@@ -10,21 +10,18 @@ const SYNC_PREF_KEY = 'tutovia_cloud_sync_enabled';
 const SYNC_PROMPT_KEY = 'tutovia_cloud_sync_prompt_dismissed';
 const LAST_SYNC_KEY = 'tutovia_last_synced_at';
 
-export const isCloudSyncEnabled = () => {
-  const val = localStorage.getItem(SYNC_PREF_KEY);
-  return val === null ? true : val === 'true';
+// Cloud sync is always enabled automatically in background every 5 mins for all users
+export const isCloudSyncEnabled = () => true;
+
+export const setCloudSyncEnabled = () => {
+  localStorage.setItem(SYNC_PREF_KEY, 'true');
 };
 
-export const setCloudSyncEnabled = (enabled) => {
-  localStorage.setItem(SYNC_PREF_KEY, enabled ? 'true' : 'false');
-};
+// Prompts are permanently dismissed since sync is 100% automated
+export const hasDismissedSyncPrompt = () => true;
 
-export const hasDismissedSyncPrompt = () => {
-  return localStorage.getItem(SYNC_PROMPT_KEY) === 'true';
-};
-
-export const setDismissedSyncPrompt = (dismissed) => {
-  localStorage.setItem(SYNC_PROMPT_KEY, dismissed ? 'true' : 'false');
+export const setDismissedSyncPrompt = () => {
+  localStorage.setItem(SYNC_PROMPT_KEY, 'true');
 };
 
 export const getLastSyncedTime = () => {

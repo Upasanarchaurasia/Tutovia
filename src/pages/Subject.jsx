@@ -66,6 +66,9 @@ export default function Subject() {
   };
 
   useEffect(() => {
+    if (id) {
+      localStorage.setItem('tutovia_last_subject_id', id);
+    }
     fetchSubject();
   }, [id, user?.id]);
 
@@ -203,14 +206,51 @@ export default function Subject() {
     p.title?.toLowerCase().includes(subject.title?.toLowerCase().split(' ')[0])
   );
 
+  const ALL_CA_SUBJECTS = [
+    { id: 'advanced-accounting', title: 'Advanced Accounting', code: 'P1', group: 'Group 1' },
+    { id: 'corporate-laws', title: 'Corporate Laws', code: 'P2', group: 'Group 1' },
+    { id: 'taxation', title: 'Taxation', code: 'P3', group: 'Group 1' },
+    { id: 'cost-management', title: 'Cost & Management', code: 'P4', group: 'Group 2' },
+    { id: 'auditing-ethics', title: 'Auditing & Ethics', code: 'P5', group: 'Group 2' },
+    { id: 'fm-sm', title: 'FM & SM', code: 'P6', group: 'Group 2' }
+  ];
+
+  const groupSubjects = ALL_CA_SUBJECTS.filter(s => {
+    if (!profile?.ca_group || profile.ca_group === 'Both Groups') return true;
+    return s.group === profile.ca_group;
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
-      {/* Breadcrumb & Header */}
+      {/* Breadcrumb & Subject Switcher Header */}
       <div>
-        <Link to="/" className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors mb-4">
-          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-        </Link>
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          </Link>
+
+          {/* Quick Subject Switcher for Syllabus */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1 hidden sm:inline">Subjects:</span>
+            {groupSubjects.map(s => {
+              const isCurrent = s.id === id;
+              return (
+                <Link
+                  key={s.id}
+                  to={`/subject/${s.id}`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border ${
+                    isCurrent
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                      : 'bg-surface-card hover:bg-slate-800 text-slate-400 hover:text-slate-200 border-surface-border'
+                  }`}
+                >
+                  {s.title}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
         <div className="glass-panel p-8 rounded-3xl relative overflow-hidden border border-surface-border">
           <div className={`absolute top-0 right-0 w-64 h-64 bg-${subject.color}-500/10 rounded-full blur-3xl pointer-events-none`} />
           
@@ -585,7 +625,7 @@ export default function Subject() {
                   {/* Chapter Cards List */}
                   <div className="space-y-6">
                     {(chapters.length > 0 ? chapters : (CHAPTER_DETAILS[id]?.chapters || []))
-                      .filter(chap => selectedRevisionChapter === 'all' || selectedRevisionChapter === String(chap.number))
+                      .filter((chap, idx) => selectedRevisionChapter === 'all' || selectedRevisionChapter === String(chap.number || idx + 1))
                       .map((chap, idx) => {
                         const chapData = getChapterSpecificData(id, chap.number || idx + 1, chap.title);
                         return (
