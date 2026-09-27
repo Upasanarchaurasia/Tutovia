@@ -15,6 +15,8 @@ export const AuthProvider = ({ children }) => {
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'synced' | 'error'
   const [lastSyncedAt, setLastSyncedAt] = useState(syncService.getLastSyncedTime());
   const isSyncEnabled = true;
+  const showSyncModal = false;
+  const setShowSyncModal = () => {};
 
   // ============================================================
   // AUTO-SYNC ENGINE — Syncs Supabase, App & Web Every 5 Minutes
