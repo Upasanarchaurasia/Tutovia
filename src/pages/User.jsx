@@ -587,18 +587,17 @@ export default function User() {
 
               <div className="p-4 rounded-2xl bg-surface border border-surface-border">
                 <div className="flex items-center justify-between mb-2">
-              <div className="p-4 rounded-2xl bg-surface border border-surface-border sm:col-span-2">
-                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Automated Background Cloud Sync</span>
+                    <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Automated Background Sync</span>
                   </div>
                   <span className="text-xs text-slate-400">
-                    {lastSyncedAt ? `Last synced: ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Active'}
+                    {lastSyncedAt ? `Last: ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Active'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-300">
-                  Your study timetable, streak, syllabus progress, notes, and mock scores are synced automatically every 5 minutes in the background across Supabase, iOS App, and Website.
+                <p className="text-sm text-white font-medium">Auto-Sync Every 5 Minutes</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Your study timetable, streak, syllabus, notes, and mock scores sync automatically in the background across devices.
                 </p>
               </div>
             </div>
