@@ -12,6 +12,17 @@ import { SYLLABUS_BY_STAGE } from '../data/syllabusData.js';
 import { syncCompletedChapters } from '../services/syncService.js';
 import { getChapterSpecificData, CHAPTER_DETAILS } from '../data/chapterDetailsData.js';
 
+export const ALL_CA_SUBJECTS = [
+  { id: 'advanced-accounting', title: 'Advanced Accounting', code: 'P1', group: 'Group 1', color: 'emerald' },
+  { id: 'corporate-laws', title: 'Corporate & Other Laws', code: 'P2', group: 'Group 1', color: 'blue' },
+  { id: 'taxation', title: 'Taxation', code: 'P3', group: 'Group 1', color: 'rose' },
+  { id: 'cost-management', title: 'Cost & Management Accounting', code: 'P4', group: 'Group 2', color: 'purple' },
+  { id: 'auditing-ethics', title: 'Auditing & Ethics', code: 'P5', group: 'Group 2', color: 'amber' },
+  { id: 'fm-sm', title: 'FM & SM', code: 'P6', group: 'Group 2', color: 'indigo' }
+];
+
+export const VALID_SUBJECT_IDS = ALL_CA_SUBJECTS.map(s => s.id);
+
 export default function Subject() {
   const { id } = useParams();
   const [subject, setSubject] = useState(null);
@@ -66,7 +77,7 @@ export default function Subject() {
   };
 
   useEffect(() => {
-    if (id) {
+    if (id && VALID_SUBJECT_IDS.includes(id)) {
       localStorage.setItem('tutovia_last_subject_id', id);
     }
     fetchSubject();
@@ -76,6 +87,9 @@ export default function Subject() {
     setLoading(true);
     const uid = user?.id || '';
     const attempt = profile?.attempt || user?.attempt || 'September 2026';
+    const fallbackSub = ALL_CA_SUBJECTS.find(s => s.id === id) || 
+      (profile?.ca_group === 'Group 2' ? ALL_CA_SUBJECTS[3] : ALL_CA_SUBJECTS[0]);
+
     try {
       const [resSub, resChap, resMat, resNotes] = await Promise.all([
         axios.get(`/api/subjects/${id}${uid ? `?userId=${uid}` : ''}`).catch(() => ({ data: null })),
@@ -83,12 +97,21 @@ export default function Subject() {
         axios.get(`/api/materials?subjectId=${id}&attempt=${encodeURIComponent(attempt)}`).catch(() => ({ data: [] })),
         axios.get(`/api/notes?subjectId=${id}${uid ? `&userId=${uid}` : ''}`).catch(() => ({ data: { notes: '' } }))
       ]);
-      if (resSub?.data) setSubject(resSub.data);
-      if (resChap?.data) setChapters(resChap.data);
-      if (resMat?.data) setMaterials(resMat.data);
+      if (resSub?.data && resSub.data.id && !resSub.data.error) {
+        setSubject(resSub.data);
+      } else {
+        setSubject(fallbackSub);
+      }
+      if (resChap?.data && Array.isArray(resChap.data) && resChap.data.length > 0) {
+        setChapters(resChap.data);
+      } else if (CHAPTER_DETAILS[id]?.chapters) {
+        setChapters(CHAPTER_DETAILS[id].chapters);
+      }
+      if (resMat?.data && Array.isArray(resMat.data)) setMaterials(resMat.data);
       setNotes(resNotes?.data?.notes || '');
     } catch (err) {
       console.error(err);
+      setSubject(fallbackSub);
     } finally {
       setLoading(false);
     }
@@ -205,15 +228,6 @@ export default function Subject() {
     p.shortTitle?.toLowerCase() === subject.title?.toLowerCase() ||
     p.title?.toLowerCase().includes(subject.title?.toLowerCase().split(' ')[0])
   );
-
-  const ALL_CA_SUBJECTS = [
-    { id: 'advanced-accounting', title: 'Advanced Accounting', code: 'P1', group: 'Group 1' },
-    { id: 'corporate-laws', title: 'Corporate Laws', code: 'P2', group: 'Group 1' },
-    { id: 'taxation', title: 'Taxation', code: 'P3', group: 'Group 1' },
-    { id: 'cost-management', title: 'Cost & Management', code: 'P4', group: 'Group 2' },
-    { id: 'auditing-ethics', title: 'Auditing & Ethics', code: 'P5', group: 'Group 2' },
-    { id: 'fm-sm', title: 'FM & SM', code: 'P6', group: 'Group 2' }
-  ];
 
   const groupSubjects = ALL_CA_SUBJECTS.filter(s => {
     if (!profile?.ca_group || profile.ca_group === 'Both Groups') return true;

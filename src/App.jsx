@@ -26,11 +26,20 @@ import OnboardingModal from './components/OnboardingModal.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 
+const VALID_SUBJECT_IDS = [
+  'advanced-accounting',
+  'corporate-laws',
+  'taxation',
+  'cost-management',
+  'auditing-ethics',
+  'fm-sm'
+];
+
 function SyllabusRedirect() {
   const { profile } = useAuth();
   const lastSubId = localStorage.getItem('tutovia_last_subject_id');
   const defaultSubId = profile?.ca_group === 'Group 2' ? 'cost-management' : 'advanced-accounting';
-  const targetId = lastSubId || defaultSubId;
+  const targetId = (lastSubId && VALID_SUBJECT_IDS.includes(lastSubId)) ? lastSubId : defaultSubId;
   return <Navigate to={`/subject/${targetId}`} replace />;
 }
 

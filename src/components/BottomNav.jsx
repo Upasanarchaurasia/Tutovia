@@ -27,8 +27,10 @@ export default function BottomNav({ onOpenTutor }) {
   const { user, profile } = useAuth();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
+  const VALID_SUBJECT_IDS = ['advanced-accounting', 'corporate-laws', 'taxation', 'cost-management', 'auditing-ethics', 'fm-sm'];
   const defaultSubjectId = profile?.ca_group === 'Group 2' ? 'cost-management' : 'advanced-accounting';
-  const targetSubjectId = localStorage.getItem('tutovia_last_subject_id') || defaultSubjectId;
+  const rawSubId = localStorage.getItem('tutovia_last_subject_id');
+  const targetSubjectId = (rawSubId && VALID_SUBJECT_IDS.includes(rawSubId)) ? rawSubId : defaultSubjectId;
 
   const isOwner = user && (
     user.id === 'u1' ||

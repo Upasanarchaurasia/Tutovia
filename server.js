@@ -676,8 +676,26 @@ app.get('/api/subjects', (req, res) => {
 });
 
 app.get('/api/subjects/:id', (req, res) => {
-  const subject = caSubjectsDB.find(sub => sub.id === req.params.id);
-  if (!subject) return res.status(404).json({ error: "Subject not found" });
+  const reqId = req.params.id;
+  let subject = caSubjectsDB.find(sub => sub.id === reqId || reqId.includes(sub.id));
+  if (!subject) {
+    for (const stageKey of Object.keys(SYLLABUS_BY_STAGE)) {
+      const stage = SYLLABUS_BY_STAGE[stageKey];
+      const matched = stage?.papers?.find(p => p.id === reqId || reqId.includes(p.id));
+      if (matched) {
+        subject = {
+          id: matched.id,
+          title: matched.title || matched.shortTitle,
+          group: matched.group || 'Group 1',
+          color: matched.color || 'indigo'
+        };
+        break;
+      }
+    }
+  }
+  if (!subject) {
+    subject = caSubjectsDB[0];
+  }
   res.json(subject);
 });
 
