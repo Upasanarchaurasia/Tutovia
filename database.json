@@ -130,6 +130,12 @@
       "advacc-chapter-1-introduction-to-accounting-standards-1": "mastered",
       "advacc-chapter-1-introduction-to-accounting-standards-6": "hard",
       "advacc-chapter-1-introduction-to-accounting-standards-2": "good"
+    },
+    "c6338d8a-33ec-4ab0-a748-2436cb6b87a5": {
+      "law-ch10-audit-1": "mastered",
+      "advacc-chapter-1-introduction-to-accounting-standards-1": "mastered",
+      "advacc-chapter-1-introduction-to-accounting-standards-6": "hard",
+      "advacc-chapter-1-introduction-to-accounting-standards-2": "good"
     }
   },
   "importedFlashcards": [],
@@ -250,5 +256,6 @@
   },
   "waitlistDB": [],
   "notesDB": {},
-  "supportMessagesDB": []
+  "supportMessagesDB": [],
+  "syllabusProgressDB": {}
 }

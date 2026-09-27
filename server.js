@@ -1520,23 +1520,56 @@ app.post('/api/schedule/ai-generate', (req, res) => {
   const groupSubjectTitles = availableSubjects.map(s => s.title);
   const groupWeaknesses = weaknesses.filter(w => groupSubjectTitles.includes(w.subject));
 
-  // --- SIMULATOR SUBJECT GAP WEIGHTING ---
-  // subjectGaps comes from CaAggregateSimulator: [{paperId, paperName, currentScore, targetScore}]
+  // --- SIMULATOR SUBJECT GAP & EXEMPTION WEIGHTING ---
+  // subjectGaps comes from CaAggregateSimulator: [{paperId, paperName, subjectId, currentScore, targetScore, isExemptionTarget}]
   const subjectGaps = req.body.subjectGaps || [];
-  // Build a gap score map: higher gap = more study time priority
+  const reqExemptionTargets = req.body.exemptionTargets || [];
+
+  // Identify all subjects targeted for an ICAI Exemption (>= 60 Marks)
+  const exemptionSubjectMap = {};
+  availableSubjects.forEach(s => {
+    const sTitle = s.title.toLowerCase();
+    const sId = s.id.toLowerCase();
+    
+    // Check if explicitly passed in exemptionTargets array
+    const isExplicit = reqExemptionTargets.includes(s.id) || reqExemptionTargets.some(t => sTitle.includes(String(t).toLowerCase()));
+    
+    // Check if score is >= 60 in subjectGaps
+    const matchedGap = subjectGaps.find(sg => {
+      const name = (sg.paperName || '').toLowerCase();
+      const pId = (sg.subjectId || sg.paperId || '').toLowerCase();
+      return pId === sId || sTitle.includes(name.split(' ')[0]) || name.includes(sTitle.split(' ')[0]);
+    });
+
+    const isScoreExempt = matchedGap && (matchedGap.targetScore >= 60 || matchedGap.currentScore >= 60 || matchedGap.isExemptionTarget);
+
+    if (isExplicit || isScoreExempt) {
+      exemptionSubjectMap[s.id] = {
+        subject: s,
+        targetScore: matchedGap?.targetScore || 65,
+        currentScore: matchedGap?.currentScore || 50
+      };
+    }
+  });
+
+  const exemptionSubjectIds = new Set(Object.keys(exemptionSubjectMap));
+  const hasExemptionTargets = exemptionSubjectIds.size > 0;
+
+  // Build a gap score map: higher gap or exemption target = more study time priority
   const gapScoreMap = {};
   subjectGaps.forEach(sg => {
     const gap = Math.max(0, (sg.targetScore || 50) - (sg.currentScore || 0));
-    // Normalize paper name to match caSubjectsDB title
     const name = (sg.paperName || '').toLowerCase();
+    const pId = (sg.subjectId || sg.paperId || '').toLowerCase();
     availableSubjects.forEach(s => {
       const title = s.title.toLowerCase();
-      if (title.includes(name.split(' ')[0]) || name.includes(title.split(' ')[0])) {
-        gapScoreMap[s.id] = (gapScoreMap[s.id] || 0) + gap;
+      if (s.id.toLowerCase() === pId || title.includes(name.split(' ')[0]) || name.includes(title.split(' ')[0])) {
+        // Exemption target gets an extra priority boost
+        const boost = exemptionSubjectIds.has(s.id) ? 25 : 0;
+        gapScoreMap[s.id] = (gapScoreMap[s.id] || 0) + gap + boost;
       }
     });
   });
-
 
   // --- SMART ALLOCATOR ALGORITHM ---
   const wakeTime = req.body.wakeTime || profile.wake_time || "07:00";
@@ -1655,12 +1688,20 @@ app.post('/api/schedule/ai-generate', (req, res) => {
   }
 
   let priorityIndex = 0;
+  const exemptionDrillIndex = {};
+
   const getNextStudyTopic = () => {
     const prioritySubjects = [...availableSubjects].sort((a, b) => {
-      // Simulator gap takes highest priority
+      // Exemption targets come first
+      const aIsExempt = exemptionSubjectIds.has(a.id);
+      const bIsExempt = exemptionSubjectIds.has(b.id);
+      if (aIsExempt && !bIsExempt) return -1;
+      if (!aIsExempt && bIsExempt) return 1;
+
+      // Simulator gap takes next priority
       const aGap = gapScoreMap[a.id] || 0;
       const bGap = gapScoreMap[b.id] || 0;
-      if (aGap !== bGap) return bGap - aGap; // higher gap first
+      if (aGap !== bGap) return bGap - aGap;
 
       // Fall back to exam weakness data
       const aWeak = groupWeaknesses.find(w => w.subject === a.title);
@@ -1673,7 +1714,51 @@ app.post('/api/schedule/ai-generate', (req, res) => {
     const subj = prioritySubjects[priorityIndex % prioritySubjects.length];
     priorityIndex++;
     
-    // Build focus label
+    // --- SPECIALIZED EXEMPTION DRILL GENERATION ---
+    if (exemptionSubjectIds.has(subj.id)) {
+      exemptionDrillIndex[subj.id] = (exemptionDrillIndex[subj.id] || 0) + 1;
+      const drillStep = (exemptionDrillIndex[subj.id] - 1) % 4;
+
+      if (drillStep === 0) {
+        return {
+          activity: `${subj.title} — 🎯 Exemption PYQ Drill`,
+          focus: `[60+ Exemption Drill] Past 5-Yr Exam Papers (PYQs) & Step-by-Step Writing Practice`,
+          id: subj.id,
+          link: `/pyq`,
+          isExemption: true,
+          drillType: 'pyq'
+        };
+      } else if (drillStep === 1) {
+        return {
+          activity: `${subj.title} — 🎯 Exemption RTP Practice`,
+          focus: `[60+ Exemption Drill] Current & Past RTP Questions + Module Advanced Numerical`,
+          id: subj.id,
+          link: `/subject/${subj.id}`,
+          isExemption: true,
+          drillType: 'rtp'
+        };
+      } else if (drillStep === 2) {
+        return {
+          activity: `${subj.title} — 🎯 Speed & Accuracy Test`,
+          focus: `[60+ Exemption Drill] Timed Mock Test (45 Mins) + Suggested Answers Self-Audit`,
+          id: subj.id,
+          link: `/exams`,
+          isExemption: true,
+          drillType: 'mock'
+        };
+      } else {
+        return {
+          activity: `${subj.title} — 🎯 Standards & Provisions Sprint`,
+          focus: `[60+ Exemption Drill] Standards (AS/SA), Key Sections & Formulas Active Recall`,
+          id: subj.id,
+          link: `/flashcards`,
+          isExemption: true,
+          drillType: 'flashcards'
+        };
+      }
+    }
+
+    // Build standard gap / weakness label
     const gap = gapScoreMap[subj.id];
     if (gap && gap > 0) {
       const matchedGap = subjectGaps.find(sg => {
@@ -1682,13 +1767,13 @@ app.post('/api/schedule/ai-generate', (req, res) => {
       });
       const currentScore = matchedGap?.currentScore ?? '?';
       const targetScore = matchedGap?.targetScore ?? 50;
-      return { activity: subj.title, focus: `Gap Focus: ${currentScore} → ${targetScore} marks needed`, id: subj.id };
+      return { activity: subj.title, focus: `Gap Focus: ${currentScore} → ${targetScore} marks needed`, id: subj.id, link: `/subject/${subj.id}` };
     }
     const w = groupWeaknesses.find(w => w.subject === subj.title);
     if (w && w.topics.length > 0) {
-      return { activity: subj.title, focus: `Weak Topic: ${w.topics[0]}`, id: subj.id };
+      return { activity: subj.title, focus: `Weak Topic: ${w.topics[0]}`, id: subj.id, link: `/subject/${subj.id}` };
     }
-    return { activity: subj.title, focus: 'New Topic / Practice', id: subj.id };
+    return { activity: subj.title, focus: 'Comprehensive Practice & Concept Revision', id: subj.id, link: `/subject/${subj.id}` };
   };
 
   for (const s of sessions) {
@@ -1699,8 +1784,10 @@ app.post('/api/schedule/ai-generate', (req, res) => {
         time: `${formatTime12(s.start)} - ${formatTime12(s.end)}`,
         activity: topic.activity,
         focus: topic.focus,
-        type: "study",
-        link: `/subject/${topic.id}`
+        type: topic.isExemption ? "practice" : "study",
+        link: topic.link || `/subject/${topic.id}`,
+        isExemption: topic.isExemption || false,
+        drillType: topic.drillType || null
       });
     } else {
       finalSchedule.push({
@@ -1723,32 +1810,46 @@ app.post('/api/schedule/ai-generate', (req, res) => {
     type: s.type,
     done: false,
     status: 'Not Completed',
-    link: s.link
+    link: s.link,
+    isExemption: !!s.isExemption,
+    drillType: s.drillType || null
   }));
 
-  let whyThisSchedule = "We prioritized ";
-  const topGapSubject = availableSubjects
-    .filter(s => gapScoreMap[s.id] > 0)
-    .sort((a, b) => (gapScoreMap[b.id] || 0) - (gapScoreMap[a.id] || 0))[0];
+  // Explain why this schedule was constructed
+  let whyThisSchedule = "";
+  const exemptionNames = Object.values(exemptionSubjectMap).map(e => e.subject.title);
 
-  if (topGapSubject) {
-    const matchedGap = subjectGaps.find(sg => {
-      const name = (sg.paperName || '').toLowerCase();
-      return topGapSubject.title.toLowerCase().includes(name.split(' ')[0]);
-    });
-    const diff = matchedGap ? (matchedGap.targetScore - matchedGap.currentScore) : gapScoreMap[topGapSubject.id];
-    whyThisSchedule += `**${topGapSubject.title}** most heavily (${diff} mark gap from your CA Simulator scores). `;
-  } else if (groupWeaknesses.length > 0) {
-    whyThisSchedule += `**${groupWeaknesses[0].subject} (${groupWeaknesses[0].topics[0] || 'weak areas'})** because of your recent mock exam scores. `;
+  if (exemptionNames.length > 0) {
+    whyThisSchedule = `🎯 **Exemption Strategy Activated for: ${exemptionNames.join(', ')} (60+ Marks Target)!** To secure your exemption and create a massive aggregate cushion, your schedule has been packed with **gold-standard practice sessions**: intensive **ICAI Past Year Questions (PYQ) with step-marking**, **Revision Test Paper (RTP) problem solving**, and **timed mock exam drills**. Your remaining study hours are balanced across your other papers to ensure you comfortably clear the 40-mark threshold.`;
   } else {
-    whyThisSchedule += `a balanced mix of your CA subjects. `;
-  }
-  whyThisSchedule += `We fit your ${studyHours} target study hours perfectly around your wake/sleep times and fixed commitments.`;
+    whyThisSchedule = "We prioritized ";
+    const topGapSubject = availableSubjects
+      .filter(s => gapScoreMap[s.id] > 0)
+      .sort((a, b) => (gapScoreMap[b.id] || 0) - (gapScoreMap[a.id] || 0))[0];
 
+    if (topGapSubject) {
+      const matchedGap = subjectGaps.find(sg => {
+        const name = (sg.paperName || '').toLowerCase();
+        return topGapSubject.title.toLowerCase().includes(name.split(' ')[0]);
+      });
+      const diff = matchedGap ? (matchedGap.targetScore - matchedGap.currentScore) : gapScoreMap[topGapSubject.id];
+      whyThisSchedule += `**${topGapSubject.title}** most heavily (${diff} mark gap from your CA Simulator scores). `;
+    } else if (groupWeaknesses.length > 0) {
+      whyThisSchedule += `**${groupWeaknesses[0].subject} (${groupWeaknesses[0].topics[0] || 'weak areas'})** because of your recent mock exam scores. `;
+    } else {
+      whyThisSchedule += `a balanced mix of your CA subjects. `;
+    }
+    whyThisSchedule += `We fit your ${studyHours} target study hours perfectly around your wake/sleep times and fixed commitments.`;
+  }
 
   scheduleDB = scheduleData;
-  userProfileDB[userId].whyThisSchedule = whyThisSchedule; // Save the explanation to profile
-  
+  userScheduleDB[userId] = scheduleData;
+  if (!userProfileDB[userId]) {
+    userProfileDB[userId] = { id: userId, ca_group: ca_group };
+  }
+  userProfileDB[userId].whyThisSchedule = whyThisSchedule;
+  userProfileDB[userId].exemptionTargets = Array.from(exemptionSubjectIds);
+
   res.json(scheduleDB);
 });
 

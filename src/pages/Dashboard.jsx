@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, Award, Clock, AlertTriangle, CheckCircle2, Calendar, 
   Smile, ArrowRight, Play, Sparkles, Timer, Brain, BellRing, 
-  AlertCircle, BookOpen, Target, ChevronRight, X, RotateCcw, Moon
+  AlertCircle, BookOpen, Target, ChevronRight, X, RotateCcw, Moon, Star
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import axios from '../api.js';
@@ -277,13 +277,16 @@ export default function Dashboard({ onOpenTutor }) {
 
   const submitGenerateAI = async (config) => {
     setIsGeneratingAI(true);
-    addToast('Analyzing weaknesses and generating AI Timetable...', 'info');
+    addToast('Analyzing exemption goals and generating AI Timetable...', 'info');
     try {
       const res = await axios.post('/api/schedule/ai-generate', { 
         userId: user.id,
         ...config
       });
       setSchedule(res.data);
+      // Fetch updated profile for immediate whyThisSchedule reflection
+      const profRes = await axios.get(`/api/profile?userId=${user.id}`).catch(() => null);
+      if (profRes?.data) setProfile(profRes.data);
       addToast('AI Timetable successfully generated!', 'success');
     } catch (err) {
       console.error('Error generating AI schedule:', err);
@@ -847,6 +850,28 @@ export default function Dashboard({ onOpenTutor }) {
               </div>
             </div>
 
+            {/* Exemption Master Strategy Banner */}
+            {schedule.some(s => s.isExemption || s.focus?.includes('Exemption') || s.activity?.includes('Exemption')) && (
+              <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 text-amber-200">
+                  <div className="w-7 h-7 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-amber-300 block">60+ Exemption Practice Protocol Active</span>
+                    <span className="text-[11px] text-slate-300">Specialized sessions allocated for ICAI PYQ Writing, RTP Solving & Timed Tests!</span>
+                  </div>
+                </div>
+                <Link
+                  to="/pyq"
+                  className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs font-bold shrink-0 transition-all flex items-center gap-1"
+                >
+                  <span>Open PYQs</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            )}
+
             <div className="mt-2 overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -858,50 +883,82 @@ export default function Dashboard({ onOpenTutor }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {schedule.map((item) => (
-                    <tr 
-                      key={item.id}
-                      className={`border-b border-surface-border/50 transition-colors ${
-                        item.status === 'Completed'
-                          ? 'opacity-50 text-slate-500 hover:bg-surface-card/20' 
-                          : 'text-slate-200 hover:bg-surface-card'
-                      }`}
-                    >
-                      <td className="py-3 pr-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[11px] font-mono font-bold ${item.status === 'Completed' ? 'line-through text-slate-500' : 'text-indigo-400'}`}>{item.timeRange || item.time12 || item.time}</span>
-                        </div>
-                      </td>
-                      <td className={`py-3 pr-4 text-xs font-semibold ${item.status === 'Completed' ? 'line-through' : ''}`}>
-                        {item.activity || item.title}
-                      </td>
-                      <td className={`py-3 text-[11px] ${item.status === 'Completed' ? 'line-through' : ''}`}>
-                        {item.focus ? (
-                          <span className={`px-2 py-0.5 rounded-full whitespace-nowrap ${
-                            item.type === 'study' ? 'bg-indigo-500/10 text-indigo-300' :
-                            item.type === 'break' ? 'bg-emerald-500/10 text-emerald-300' :
-                            item.type === 'commitment' ? 'bg-amber-500/10 text-amber-300' :
-                            'bg-slate-500/10 text-slate-300'
-                          }`}>
-                            {item.focus}
-                          </span>
-                        ) : (
-                           item.duration && <span className="text-slate-400">{item.duration}</span>
-                        )}
-                      </td>
-                      <td className="py-3 text-right">
-                        <select
-                          value={item.status || (item.done ? 'Completed' : 'Not Completed')}
-                          onChange={(e) => handleStatusUpdate(item, e.target.value)}
-                          className="bg-surface-card border border-surface-border rounded-lg text-xs px-2 py-1 text-slate-300 focus:outline-none focus:border-indigo-500"
-                        >
-                          <option value="Not Completed">❌ Not Completed</option>
-                          <option value="Partially Completed">⚠️ Partially Completed</option>
-                          <option value="Completed">✅ Completed</option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                  {schedule.map((item) => {
+                    const isExemptionDrill = item.isExemption || item.focus?.includes('Exemption') || item.activity?.includes('Exemption');
+                    return (
+                      <tr 
+                        key={item.id}
+                        className={`border-b border-surface-border/50 transition-colors ${
+                          item.status === 'Completed'
+                            ? 'opacity-50 text-slate-500 hover:bg-surface-card/20' 
+                            : isExemptionDrill
+                              ? 'text-slate-200 hover:bg-amber-500/10 bg-amber-500/5'
+                              : 'text-slate-200 hover:bg-surface-card'
+                        }`}
+                      >
+                        <td className="py-3 pr-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[11px] font-mono font-bold ${
+                              item.status === 'Completed'
+                                ? 'line-through text-slate-500' 
+                                : isExemptionDrill 
+                                  ? 'text-amber-400' 
+                                  : 'text-indigo-400'
+                            }`}>
+                              {item.timeRange || item.time12 || item.time}
+                            </span>
+                          </div>
+                        </td>
+                        <td className={`py-3 pr-4 text-xs font-semibold ${item.status === 'Completed' ? 'line-through' : ''}`}>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>{item.activity || item.title}</span>
+                              {isExemptionDrill && (
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                  <Star className="w-2.5 h-2.5 fill-amber-300" /> 60+ Drill
+                                </span>
+                              )}
+                            </div>
+                            {isExemptionDrill && item.link && item.status !== 'Completed' && (
+                              <Link 
+                                to={item.link} 
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 hover:text-amber-300 transition-colors mt-0.5"
+                              >
+                                <Play className="w-2.5 h-2.5 fill-amber-400" />
+                                <span>Start Practice Drill →</span>
+                              </Link>
+                            )}
+                          </div>
+                        </td>
+                        <td className={`py-3 text-[11px] ${item.status === 'Completed' ? 'line-through' : ''}`}>
+                          {item.focus ? (
+                            <span className={`px-2 py-0.5 rounded-full whitespace-nowrap ${
+                              isExemptionDrill ? 'bg-amber-500/20 text-amber-200 border border-amber-500/30 font-medium' :
+                              item.type === 'study' ? 'bg-indigo-500/10 text-indigo-300' :
+                              item.type === 'break' ? 'bg-emerald-500/10 text-emerald-300' :
+                              item.type === 'commitment' ? 'bg-amber-500/10 text-amber-300' :
+                              'bg-slate-500/10 text-slate-300'
+                            }`}>
+                              {item.focus}
+                            </span>
+                          ) : (
+                             item.duration && <span className="text-slate-400">{item.duration}</span>
+                          )}
+                        </td>
+                        <td className="py-3 text-right">
+                          <select
+                            value={item.status || (item.done ? 'Completed' : 'Not Completed')}
+                            onChange={(e) => handleStatusUpdate(item, e.target.value)}
+                            className="bg-surface-card border border-surface-border rounded-lg text-xs px-2 py-1 text-slate-300 focus:outline-none focus:border-indigo-500"
+                          >
+                            <option value="Not Completed">❌ Not Completed</option>
+                            <option value="Partially Completed">⚠️ Partially Completed</option>
+                            <option value="Completed">✅ Completed</option>
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

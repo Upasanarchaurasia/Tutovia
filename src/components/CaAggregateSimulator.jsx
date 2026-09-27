@@ -8,14 +8,14 @@ import {
 
 const INTER_PAPERS = {
   g1: [
-    { id: 'p1', code: 'Paper 1', name: 'Advanced Accounting', defaultMarks: 55, group: 1 },
-    { id: 'p2', code: 'Paper 2', name: 'Corporate and Other Laws', defaultMarks: 50, group: 1 },
-    { id: 'p3', code: 'Paper 3', name: 'Taxation (DT & GST)', defaultMarks: 50, group: 1 }
+    { id: 'p1', code: 'Paper 1', name: 'Advanced Accounting', defaultMarks: 55, group: 1, subjectId: 'advanced-accounting' },
+    { id: 'p2', code: 'Paper 2', name: 'Corporate and Other Laws', defaultMarks: 50, group: 1, subjectId: 'corporate-laws' },
+    { id: 'p3', code: 'Paper 3', name: 'Taxation (DT & GST)', defaultMarks: 50, group: 1, subjectId: 'taxation' }
   ],
   g2: [
-    { id: 'p4', code: 'Paper 4', name: 'Cost and Management Accounting', defaultMarks: 55, group: 2 },
-    { id: 'p5', code: 'Paper 5', name: 'Auditing and Ethics', defaultMarks: 48, group: 2 },
-    { id: 'p6', code: 'Paper 6', name: 'FM & Strategic Management', defaultMarks: 52, group: 2 }
+    { id: 'p4', code: 'Paper 4', name: 'Cost and Management Accounting', defaultMarks: 55, group: 2, subjectId: 'cost-management' },
+    { id: 'p5', code: 'Paper 5', name: 'Auditing and Ethics', defaultMarks: 48, group: 2, subjectId: 'auditing-ethics' },
+    { id: 'p6', code: 'Paper 6', name: 'FM & Strategic Management', defaultMarks: 52, group: 2, subjectId: 'fm-sm' }
   ]
 };
 
@@ -69,10 +69,16 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
       ? INTER_PAPERS.g2 
       : [...INTER_PAPERS.g1, ...INTER_PAPERS.g2];
 
-
   const handleMarkChange = (paperId, val) => {
     const num = Math.min(100, Math.max(0, parseInt(val) || 0));
     setMarks(prev => ({ ...prev, [paperId]: num }));
+  };
+
+  const setExemptionTarget = (paperId, targetVal = 65) => {
+    setMarks(prev => ({
+      ...prev,
+      [paperId]: (prev[paperId] || 0) >= 60 ? 50 : Math.max(targetVal, 65)
+    }));
   };
 
   const applyPreset = (presetMarks) => {
@@ -91,14 +97,24 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
 
   const generateTimetable = async () => {
     const userId = localStorage.getItem('tutovia_user_id') || 'u1';
-    // Build subjectGaps array: use simulator marks as currentScore, 50 as baseline target (50% passing)
     const allPapers = [...INTER_PAPERS.g1, ...INTER_PAPERS.g2];
-    const subjectGaps = allPapers.map(p => ({
-      paperId: p.id,
-      paperName: p.name,
-      currentScore: marks[p.id] || 0,
-      targetScore: Math.max(50, Math.ceil((marks[p.id] || 0) < 50 ? 55 : 60), 60)
-    }));
+    
+    // Build subject gaps and identify exemption targets (>= 60 marks)
+    const subjectGaps = allPapers.map(p => {
+      const mark = marks[p.id] || 0;
+      return {
+        paperId: p.id,
+        subjectId: p.subjectId,
+        paperName: p.name,
+        currentScore: mark,
+        targetScore: mark,
+        isExemptionTarget: mark >= 60
+      };
+    });
+
+    const exemptionTargets = allPapers
+      .filter(p => (marks[p.id] || 0) >= 60)
+      .map(p => p.subjectId);
 
     setGenerating(true);
     setGenSuccess(false);
@@ -109,15 +125,16 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
         body: JSON.stringify({
           userId,
           studyHours: 8,
-          subjectGaps
+          subjectGaps,
+          exemptionTargets
         })
       });
       if (res.ok) {
         setGenSuccess(true);
         setTimeout(() => {
           setGenSuccess(false);
-          navigate('/dashboard');
-        }, 2000);
+          navigate('/');
+        }, 1800);
       }
     } catch (e) {
       console.error('Schedule gen error', e);
@@ -302,20 +319,32 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
                     isFail 
                       ? 'border-rose-500/30 bg-rose-500/5' 
                       : isExempt 
-                        ? 'border-amber-500/30 bg-amber-500/5' 
+                        ? 'border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent' 
                         : 'border-surface-border'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-start sm:items-center justify-between gap-2 mb-2 flex-col sm:flex-row">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] font-mono font-bold text-sky-400 uppercase tracking-wider">
                           {paper.code}
                         </span>
-                        {isExempt && (
-                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                            <Star className="w-3 h-3 fill-amber-300" /> 60+ Exemption
-                          </span>
+                        {isExempt ? (
+                          <button
+                            onClick={() => setExemptionTarget(paper.id)}
+                            title="Click to toggle exemption target off"
+                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 hover:bg-amber-500/30 transition-all cursor-pointer"
+                          >
+                            <Star className="w-3 h-3 fill-amber-300" /> 60+ Exemption Target Active ✓
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setExemptionTarget(paper.id, 65)}
+                            title="Click to set 65 marks and activate AI Exemption Practice Mode"
+                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-surface hover:bg-amber-500/10 text-slate-400 hover:text-amber-300 font-medium border border-surface-border hover:border-amber-500/30 transition-all cursor-pointer"
+                          >
+                            <Target className="w-3 h-3 text-amber-400" /> Aim for 60+ Exemption
+                          </button>
                         )}
                         {isFail && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30">
@@ -324,10 +353,15 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
                         )}
                       </div>
                       <h4 className="text-sm font-bold text-white mt-0.5">{paper.name}</h4>
+                      {isExempt && (
+                        <p className="text-[10px] text-amber-300/80 font-medium mt-0.5">
+                          ⚡ AI Practice Mode: Will schedule ICAI PYQ Writing & RTP Problem Solving drills!
+                        </p>
+                      )}
                     </div>
 
                     {/* Numeric Input */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
                       <input
                         type="number"
                         min="0"
@@ -371,6 +405,39 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
             })}
           </div>
 
+          {/* AI Exemption Preparation Protocol Blueprint (Visible when student targets 60+) */}
+          {exemptions.length > 0 && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 shadow-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                  AI Exemption Strategy Active ({exemptions.length} Subject{exemptions.length > 1 ? 's' : ''} Targeted)
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed mb-3">
+                Scoring 60+ requires rigorous active output. When generating your timetable, the AI will build specialized high-intensity practice sessions:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-300">
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-surface-card border border-surface-border">
+                  <span className="text-amber-400 text-sm">✍️</span>
+                  <span><strong>ICAI PYQ Writing:</strong> Past 5-yr exam papers with step-marking</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-surface-card border border-surface-border">
+                  <span className="text-amber-400 text-sm">📖</span>
+                  <span><strong>RTP & MTP Solving:</strong> Latest revision test paper questions</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-surface-card border border-surface-border">
+                  <span className="text-amber-400 text-sm">⏱️</span>
+                  <span><strong>Timed 45-Min Tests:</strong> Speed drills & suggested answers audit</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-surface-card border border-surface-border">
+                  <span className="text-amber-400 text-sm">🧠</span>
+                  <span><strong>Standards & Formulas:</strong> AS/SA active recall sprints</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between pt-2">
             <button
               onClick={handleReset}
@@ -397,13 +464,17 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
                 ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
                 : generating
                   ? 'bg-violet-500/10 border border-violet-500/20 text-violet-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-violet-600/30 to-sky-600/30 hover:from-violet-600/50 hover:to-sky-600/50 border border-violet-500/30 text-white hover:text-violet-100'
+                  : exemptions.length > 0
+                    ? 'bg-gradient-to-r from-amber-600/40 via-violet-600/40 to-sky-600/40 hover:from-amber-600/60 hover:to-sky-600/60 border border-amber-500/40 text-white shadow-amber-500/10'
+                    : 'bg-gradient-to-r from-violet-600/30 to-sky-600/30 hover:from-violet-600/50 hover:to-sky-600/50 border border-violet-500/30 text-white hover:text-violet-100'
             }`}
           >
             {generating ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /><span>Planning your timetable…</span></>
+              <><Loader2 className="w-4 h-4 animate-spin" /><span>Planning your personalized exemption timetable…</span></>
             ) : genSuccess ? (
-              <><CalendarDays className="w-4 h-4" /><span>Timetable ready! Redirecting to Dashboard…</span></>
+              <><CalendarDays className="w-4 h-4" /><span>Exemption Timetable ready! Redirecting to Dashboard…</span></>
+            ) : exemptions.length > 0 ? (
+              <><CalendarDays className="w-4 h-4 text-amber-300" /><span>Generate AI Exemption Timetable & Practice Plan 🚀</span></>
             ) : (
               <><CalendarDays className="w-4 h-4" /><span>Generate AI Timetable from My Scores</span></>
             )}
