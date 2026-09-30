@@ -4,6 +4,12 @@ import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
 import { icaiMaterialsDB, chaptersDB } from './icaiData.js';
+import { 
+  getOrRefreshStudyMaterials, 
+  searchMaterials, 
+  buildCatalogHierarchy, 
+  scrapeIcaiPage 
+} from './icaiPdfScraper.js';
 import { examsDB } from './examsData.js';
 import { flashcardsDB } from './flashcardsData.js';
 import { group2Flashcards } from './group2Flashcards.js';
@@ -112,6 +118,7 @@ let usersDB = [
 ];
 let notesDB = {};
 let syllabusProgressDB = {};
+let icaiStudyCatalogDB = [];
 
 let userProfileDB = {
   'u1': {
@@ -158,6 +165,14 @@ if (fs.existsSync(DB_FILE)) {
     console.error('[DB] Failed to load database.json:', err);
   }
 }
+
+// Initial indexing of ICAI BoS Study Material PDFs
+getOrRefreshStudyMaterials(false).then(items => {
+  icaiStudyCatalogDB = items;
+  console.log(`[ICAI Catalog] Indexed ${icaiStudyCatalogDB.length} official BoS study materials.`);
+}).catch(err => {
+  console.warn('[ICAI Catalog] Warning initializing study material catalog:', err.message);
+});
 
 // Auto-save every 5 seconds
 setInterval(() => {
@@ -2751,6 +2766,136 @@ app.post('/api/admin/questions', requireAdmin, (req, res) => {
     res.json({ success: true, examId: targetExam.id });
   } else {
     res.status(404).json({ error: 'Exam not found' });
+  }
+});
+
+// ============================================================================
+// ICAI STUDY MATERIAL INDEXING & DELIVERY APIS
+// Official BoS Study Material PDFs with 1-click access & CDN redirects
+// ============================================================================
+
+// 1. GET /api/catalog — List all courses, subjects, modules, and available units
+app.get('/api/catalog', (req, res) => {
+  try {
+    const hierarchy = buildCatalogHierarchy(icaiStudyCatalogDB);
+    res.json({
+      success: true,
+      totalPdfs: hierarchy.totalPdfs,
+      totalStandards: hierarchy.totalStandards,
+      courses: hierarchy.courses,
+      groups: hierarchy.groups,
+      subjects: hierarchy.subjects,
+      tree: hierarchy.tree,
+      materials: icaiStudyCatalogDB
+    });
+  } catch (err) {
+    console.error('Error generating catalog:', err);
+    res.status(500).json({ error: 'Failed to retrieve catalog', details: err.message });
+  }
+});
+
+// 2. GET /api/search — Instant search by title, standard (e.g. AS 7), or keyword
+app.get('/api/search', (req, res) => {
+  try {
+    const { q, course, group, subject, onlyStandards } = req.query;
+    const results = searchMaterials(icaiStudyCatalogDB, q, {
+      course,
+      group,
+      subject,
+      onlyStandards: onlyStandards === 'true'
+    });
+    res.json({
+      success: true,
+      query: q || '',
+      count: results.length,
+      results
+    });
+  } catch (err) {
+    console.error('Search error:', err);
+    res.status(500).json({ error: 'Search failed', details: err.message });
+  }
+});
+
+// Alias: GET /api/catalog/search
+app.get('/api/catalog/search', (req, res) => {
+  const { q, course, group, subject, onlyStandards } = req.query;
+  const results = searchMaterials(icaiStudyCatalogDB, q, {
+    course,
+    group,
+    subject,
+    onlyStandards: onlyStandards === 'true'
+  });
+  res.json({ success: true, query: q || '', count: results.length, results });
+});
+
+// 3. GET /api/pdf/redirect?id={id} — Direct link or browser inline viewing trigger
+app.get('/api/pdf/redirect', (req, res) => {
+  const { id, inline } = req.query;
+  if (!id) {
+    return res.status(400).json({ error: 'Missing id parameter' });
+  }
+
+  const material = icaiStudyCatalogDB.find(m => m.id === id);
+  if (!material) {
+    return res.status(404).json({ error: 'Study material PDF not found' });
+  }
+
+  // If client wants direct JSON payload for in-app iframe embedding
+  if (inline === 'true' || req.headers.accept?.includes('application/json')) {
+    return res.json({
+      success: true,
+      id: material.id,
+      chapter_title: material.chapter_title,
+      subject: material.subject,
+      course: material.course,
+      pdf_url: material.pdf_url,
+      portal_source_url: material.portal_source_url
+    });
+  }
+
+  // Clean HTTP 302 redirect directly to the official ICAI CDN link
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.redirect(302, material.pdf_url);
+});
+
+// 4. GET /api/catalog/as7 — Instant 1-click shortcut for AS 7 Construction Contracts
+app.get('/api/catalog/as7', (req, res) => {
+  const as7 = icaiStudyCatalogDB.find(m => m.standard_code === 'AS 7' || m.id.includes('as7'));
+  if (as7) {
+    res.json({ success: true, material: as7 });
+  } else {
+    res.status(404).json({ error: 'AS 7 not found' });
+  }
+});
+
+// 5. POST /api/scraper/trigger — On-demand live re-index or portal verification
+app.post('/api/scraper/trigger', async (req, res) => {
+  try {
+    const { force, customUrl, course, group, subject } = req.body || {};
+    if (customUrl) {
+      const scraped = await scrapeIcaiPage(customUrl, { course, group, subject });
+      const currentMap = new Map(icaiStudyCatalogDB.map(m => [m.id, m]));
+      scraped.forEach(item => currentMap.set(item.id, item));
+      icaiStudyCatalogDB = Array.from(currentMap.values());
+      return res.json({
+        success: true,
+        message: `Scraped ${scraped.length} items from custom URL`,
+        scrapedCount: scraped.length,
+        totalItems: icaiStudyCatalogDB.length
+      });
+    }
+
+    const refreshed = await getOrRefreshStudyMaterials(force === true);
+    icaiStudyCatalogDB = refreshed;
+    res.json({
+      success: true,
+      message: 'ICAI Study Material catalog refreshed successfully',
+      totalItems: icaiStudyCatalogDB.length,
+      lastScrapedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Scraper trigger error:', err);
+    res.status(500).json({ error: 'Scraper trigger failed', details: err.message });
   }
 });
 

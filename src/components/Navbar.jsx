@@ -21,7 +21,8 @@ import {
   Cloud,
   RefreshCw,
   Shield,
-  BookOpen
+  BookOpen,
+  FileText
 } from 'lucide-react';
 
 // Owner account IDs — admin portal only shows for these accounts
@@ -89,6 +90,7 @@ export function Navbar({ onOpenTutor }) {
     { path: '/flashcards', label: 'Flashcards', icon: Layers },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/pyq', label: 'PYQ Bank', icon: BookMarked },
+    { path: '/study-material', label: 'BoS Material', icon: FileText },
     { path: '/news', label: 'News', icon: Newspaper },
   ];
 
