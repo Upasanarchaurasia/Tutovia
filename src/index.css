@@ -4,127 +4,189 @@
 
 @layer base {
   :root {
-    /* Calm Velvet Obsidian & Nordic Midnight Palette — Anti-glare for long CA study sessions */
-    --bg-main: #080C15;
-    --bg-surface: #0E1526;
-    --bg-surface-card: #131E33;
-    --bg-surface-border: rgba(148, 163, 184, 0.12);
+    /* Base default design tokens */
+    --bg-main: #0B0E17;
+    --bg-surface: #121828;
+    --bg-surface-card: #172036;
+    --bg-surface-border: rgba(148, 163, 184, 0.16);
+    --border: rgba(148, 163, 184, 0.16);
     
     --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    --text-muted: #64748B;
-    --text-faint: #475569;
+    --text-secondary: #CBD5E1;
+    --text-muted: #94A3B8;
+    --text-faint: #64748B;
     
-    --glass-bg: rgba(14, 21, 38, 0.78);
-    --glass-card-bg: rgba(19, 30, 51, 0.65);
-    --glass-card-hover: rgba(24, 38, 64, 0.9);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-shadow: rgba(14, 165, 233, 0.12);
+    --input-bg: #111726;
+    --input-border: rgba(148, 163, 184, 0.24);
 
-    /* Purpose-driven semantic accents: Emerald for progress, Amber for streaks, Rose for urgency */
+    --glass-bg: rgba(18, 24, 40, 0.88);
+    --glass-card-bg: rgba(23, 32, 54, 0.82);
+    --glass-card-hover: rgba(30, 41, 69, 0.95);
+    --glass-border: rgba(148, 163, 184, 0.16);
+    --glass-shadow: rgba(0, 0, 0, 0.45);
+
+    --phase-accent: #818CF8;
+    --phase-soft: rgba(129, 140, 248, 0.18);
+    --accent: var(--phase-accent);
+    --accent-soft: var(--phase-soft);
+    --background: var(--bg-main);
+    --surface: var(--bg-surface);
+    --surface-secondary: var(--bg-surface-card);
+    --shadow: var(--glass-shadow);
+    --input-background: var(--input-bg);
+
+    /* Purpose-driven semantic accents */
     --color-progress: #10B981;
     --color-streak: #F59E0B;
     --color-urgency: #F43F5E;
   }
 
-  /* ☀️ MORNING THEME — “FRESH START” (Warm, optimistic, peaceful) */
+  /* 🌅 1. MORNING THEME — 05:00 AM – 10:59 AM (Fresh, warm, positive, energetic, clean, motivating) */
   .phase-morning {
-    --bg-main: #FFF9EF;
+    --bg-main: #FFF8F1;
     --bg-surface: #FFFFFF;
-    --bg-surface-card: #FFFDF8;
-    --bg-surface-border: rgba(245, 158, 114, 0.22);
+    --bg-surface-card: #FFFDF9;
+    --bg-surface-border: rgba(234, 138, 86, 0.22);
+    --border: rgba(234, 138, 86, 0.22);
     
-    --text-primary: #283044;
-    --text-secondary: #525C76;
-    --text-muted: #7E879E;
-    --text-faint: #A4ADC0;
+    --text-primary: #2B2338;
+    --text-secondary: #584F66;
+    --text-muted: #837A92;
+    --text-faint: #ACA4B8;
     
-    --glass-bg: rgba(255, 249, 239, 0.88);
-    --glass-card-bg: rgba(255, 255, 255, 0.9);
-    --glass-card-hover: #FFFFFF;
-    --glass-border: rgba(245, 158, 114, 0.24);
-    --glass-shadow: rgba(245, 158, 114, 0.15);
+    --input-bg: #FFFFFF;
+    --input-border: rgba(234, 138, 86, 0.32);
 
-    --phase-accent: #F59E72;
-    --phase-soft: #FFE7A3;
+    --glass-bg: rgba(255, 252, 248, 0.92);
+    --glass-card-bg: rgba(255, 255, 255, 0.95);
+    --glass-card-hover: #FFFFFF;
+    --glass-border: rgba(234, 138, 86, 0.24);
+    --glass-shadow: rgba(234, 138, 86, 0.12);
+
+    --phase-accent: #E06D38;
+    --phase-soft: #FDE6D2;
     --phase-peach: #FFD1B8;
-    --phase-ambient-1: rgba(255, 231, 163, 0.35);
-    --phase-ambient-2: rgba(255, 209, 184, 0.25);
+    --phase-ambient-1: rgba(253, 230, 210, 0.45);
+    --phase-ambient-2: rgba(254, 215, 170, 0.28);
+
+    --accent: var(--phase-accent);
+    --accent-soft: var(--phase-soft);
+    --background: var(--bg-main);
+    --surface: var(--bg-surface);
+    --surface-secondary: var(--bg-surface-card);
+    --shadow: var(--glass-shadow);
+    --input-background: var(--input-bg);
   }
 
-  /* 🌤️ DAY THEME — “FOCUS MODE” (Clean, bright, productive) */
+  /* ☀️ 2. DAY THEME — 11:00 AM – 04:59 PM (Bright, focused, productive, clean, clear, energetic) */
   .phase-day {
     --bg-main: #F8FAFC;
     --bg-surface: #FFFFFF;
     --bg-surface-card: #FFFFFF;
-    --bg-surface-border: rgba(226, 232, 240, 0.85);
+    --bg-surface-border: #E2E8F0;
+    --border: #E2E8F0;
     
-    --text-primary: #1E293B;
-    --text-secondary: #475569;
+    --text-primary: #0F172A;
+    --text-secondary: #334155;
     --text-muted: #64748B;
     --text-faint: #94A3B8;
     
-    --glass-bg: rgba(255, 255, 255, 0.88);
-    --glass-card-bg: rgba(255, 255, 255, 0.94);
-    --glass-card-hover: #FFFFFF;
-    --glass-border: rgba(99, 102, 241, 0.15);
-    --glass-shadow: rgba(99, 102, 241, 0.08);
+    --input-bg: #F8FAFC;
+    --input-border: #CBD5E1;
 
-    --phase-accent: #6366F1;
-    --phase-soft: #E0F2FE;
+    --glass-bg: rgba(255, 255, 255, 0.92);
+    --glass-card-bg: rgba(255, 255, 255, 0.96);
+    --glass-card-hover: #FFFFFF;
+    --glass-border: rgba(79, 70, 229, 0.16);
+    --glass-shadow: rgba(79, 70, 229, 0.08);
+
+    --phase-accent: #4F46E5;
+    --phase-soft: #EEF2FF;
     --phase-mint: #DDF5E9;
     --phase-ambient-1: rgba(224, 242, 254, 0.45);
-    --phase-ambient-2: rgba(221, 245, 233, 0.35);
+    --phase-ambient-2: rgba(238, 242, 255, 0.35);
+
+    --accent: var(--phase-accent);
+    --accent-soft: var(--phase-soft);
+    --background: var(--bg-main);
+    --surface: var(--bg-surface);
+    --surface-secondary: var(--bg-surface-card);
+    --shadow: var(--glass-shadow);
+    --input-background: var(--input-bg);
   }
 
-  /* 🌇 EVENING THEME — “REFLECT & RECHARGE” (Warm, comforting, rewarding) */
+  /* 🌇 3. EVENING THEME — 05:00 PM – 07:59 PM (Warm, calm, comfortable, reflective, relaxing sunset tones) */
   .phase-evening {
-    --bg-main: #FFF5F0;
-    --bg-surface: #FFFFFF;
-    --bg-surface-card: #FFF9F6;
-    --bg-surface-border: rgba(244, 165, 138, 0.25);
+    --bg-main: #FAF5F0;
+    --bg-surface: #FFFDFB;
+    --bg-surface-card: #FDF8F3;
+    --bg-surface-border: rgba(217, 119, 87, 0.22);
+    --border: rgba(217, 119, 87, 0.22);
     
-    --text-primary: #3B3448;
-    --text-secondary: #635A74;
-    --text-muted: #8E84A2;
-    --text-faint: #B1A8C4;
+    --text-primary: #2C2237;
+    --text-secondary: #584A68;
+    --text-muted: #827493;
+    --text-faint: #A89CB7;
     
-    --glass-bg: rgba(255, 245, 240, 0.88);
-    --glass-card-bg: rgba(255, 255, 255, 0.92);
-    --glass-card-hover: #FFFFFF;
-    --glass-border: rgba(196, 181, 253, 0.25);
-    --glass-shadow: rgba(244, 165, 138, 0.16);
+    --input-bg: #FFFDFB;
+    --input-border: rgba(217, 119, 87, 0.32);
 
-    --phase-accent: #F4A58A;
-    --phase-soft: #C4B5FD;
+    --glass-bg: rgba(253, 248, 243, 0.92);
+    --glass-card-bg: rgba(255, 255, 255, 0.95);
+    --glass-card-hover: #FFFFFF;
+    --glass-border: rgba(217, 119, 87, 0.24);
+    --glass-shadow: rgba(217, 119, 87, 0.12);
+
+    --phase-accent: #D96041;
+    --phase-soft: #FCE8E2;
     --phase-peach: #FBCFE8;
-    --phase-ambient-1: rgba(251, 207, 232, 0.35);
-    --phase-ambient-2: rgba(196, 181, 253, 0.25);
+    --phase-ambient-1: rgba(252, 232, 226, 0.40);
+    --phase-ambient-2: rgba(233, 213, 255, 0.28);
+
+    --accent: var(--phase-accent);
+    --accent-soft: var(--phase-soft);
+    --background: var(--bg-main);
+    --surface: var(--bg-surface);
+    --surface-secondary: var(--bg-surface-card);
+    --shadow: var(--glass-shadow);
+    --input-background: var(--input-bg);
   }
 
-  /* 🌙 NIGHT THEME — “WIND DOWN” (Soft twilight, calming, restorative) */
+  /* 🌙 4. NIGHT THEME — 08:00 PM – 04:59 AM (Calm, peaceful, comfortable, eye-friendly, soft dark surfaces) */
   .phase-night {
-    --bg-main: #13121F;
-    --bg-surface: #1B192B;
-    --bg-surface-card: #222036;
-    --bg-surface-border: rgba(221, 214, 254, 0.14);
+    --bg-main: #0B0E17;
+    --bg-surface: #121828;
+    --bg-surface-card: #172036;
+    --bg-surface-border: rgba(148, 163, 184, 0.16);
+    --border: rgba(148, 163, 184, 0.16);
     
-    --text-primary: #F4F3FA;
-    --text-secondary: #DDD6FE;
-    --text-muted: #9F9BB8;
-    --text-faint: #6E6A8A;
+    --text-primary: #F1F5F9;
+    --text-secondary: #CBD5E1;
+    --text-muted: #94A3B8;
+    --text-faint: #64748B;
     
-    --glass-bg: rgba(27, 25, 43, 0.84);
-    --glass-card-bg: rgba(34, 32, 54, 0.78);
-    --glass-card-hover: rgba(43, 40, 68, 0.92);
-    --glass-border: rgba(221, 214, 254, 0.16);
-    --glass-shadow: rgba(191, 219, 254, 0.08);
+    --input-bg: #111726;
+    --input-border: rgba(148, 163, 184, 0.24);
 
-    --phase-accent: #DDD6FE;
-    --phase-soft: #BFDBFE;
+    --glass-bg: rgba(18, 24, 40, 0.88);
+    --glass-card-bg: rgba(23, 32, 54, 0.82);
+    --glass-card-hover: rgba(30, 41, 69, 0.95);
+    --glass-border: rgba(148, 163, 184, 0.16);
+    --glass-shadow: rgba(0, 0, 0, 0.45);
+
+    --phase-accent: #818CF8;
+    --phase-soft: rgba(129, 140, 248, 0.18);
     --phase-deep-accent: #4C4A6D;
-    --phase-ambient-1: rgba(221, 214, 254, 0.12);
-    --phase-ambient-2: rgba(191, 219, 254, 0.08);
+    --phase-ambient-1: rgba(129, 140, 248, 0.10);
+    --phase-ambient-2: rgba(167, 139, 250, 0.08);
+
+    --accent: var(--phase-accent);
+    --accent-soft: var(--phase-soft);
+    --background: var(--bg-main);
+    --surface: var(--bg-surface);
+    --surface-secondary: var(--bg-surface-card);
+    --shadow: var(--glass-shadow);
+    --input-background: var(--input-bg);
   }
 
   h1, h2, h3, .font-heading {
@@ -138,7 +200,7 @@
     color: var(--text-primary);
     min-height: 100vh;
     overflow-x: hidden;
-    transition: background-color 0.5s ease, color 0.5s ease;
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
@@ -158,6 +220,32 @@
     pointer-events: none;
     z-index: 0;
     transition: background 0.8s ease;
+  }
+
+  /* Smooth atmosphere transitions across entire UI */
+  header,
+  nav,
+  aside,
+  .glass-panel,
+  .glass-card,
+  input,
+  textarea,
+  select,
+  button {
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Respect user accessibility preference for reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 

@@ -1,15 +1,13 @@
 import axios from 'axios';
 import { supabase } from './supabaseClient.js';
 
-// Route to VM server when in mobile app or when configured
-const isMobileOrLocal = typeof window !== 'undefined' && (
+// Route to VM server only when in mobile app (Capacitor)
+const isCapacitor = typeof window !== 'undefined' && (
   window.Capacitor !== undefined || 
-  window.location.protocol === 'capacitor:' || 
-  window.location.hostname === 'localhost' ||
-  !window.location.origin.includes('161.118.173.142')
+  window.location.protocol === 'capacitor:'
 );
 
-const API_BASE = import.meta.env.VITE_API_URL || (isMobileOrLocal ? 'http://161.118.173.142' : '');
+const API_BASE = import.meta.env.VITE_API_URL || (isCapacitor ? 'http://161.118.173.142' : '');
 
 const api = axios.create({
   baseURL: API_BASE,

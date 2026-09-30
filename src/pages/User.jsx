@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User as UserIcon, Settings, Target, Flame, Trophy, Clock, BookOpen, ChevronRight, LogOut, Shield, Edit2, Check, Loader2, Moon, Sun, AlertTriangle, Cloud, Smartphone, Laptop, RefreshCw } from 'lucide-react';
+import { User as UserIcon, Settings, Target, Flame, Trophy, Clock, BookOpen, ChevronRight, LogOut, Shield, Edit2, Check, Loader2, Moon, Sun, AlertTriangle, Cloud, Smartphone, Laptop, RefreshCw, Sparkles } from 'lucide-react';
 import axios from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -16,9 +16,22 @@ export default function User() {
   const { 
     user, 
     logout, 
+    syncStatus,
     lastSyncedAt
   } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { 
+    theme, 
+    toggleTheme, 
+    activePhase, 
+    themePreference, 
+    setThemePreference, 
+    manualPhaseOverride,
+    selectPhase, 
+    resetToAuto, 
+    isAuto, 
+    currentPhaseInfo, 
+    TIME_THEME_CONFIG 
+  } = useTheme();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -344,18 +357,172 @@ export default function User() {
                   <div className="text-white font-medium">{profile.phone || user?.phone || "Not set"}</div>
                 )}
               </div>
-              <div className="p-4 rounded-2xl bg-surface-card border border-surface-border">
-                <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">UI Theme</label>
-                <button 
-                  onClick={toggleTheme}
-                  className="flex items-center justify-center gap-3 px-4 py-2 w-full rounded-xl bg-surface border border-surface-border text-white text-sm hover:bg-surface-border/50 transition-colors font-medium shadow-sm"
-                >
-                  {theme === 'dark' ? (
-                    <><Sun className="w-4 h-4 text-amber-400" /> Switch to Light Mode</>
-                  ) : (
-                    <><Moon className="w-4 h-4 text-indigo-500" /> Switch to Dark Mode</>
+              <div className="col-span-1 md:col-span-2 lg:col-span-3 p-5 rounded-2xl bg-surface-card border border-surface-border">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-indigo-400" />
+                      Visual Theme & Atmosphere
+                    </label>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Tutovia adapts its visual atmosphere throughout your study day based on your local device time.
+                    </p>
+                  </div>
+                  {isAuto && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold self-start sm:self-auto">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      Active: {currentPhaseInfo.icon} {currentPhaseInfo.name} ({currentPhaseInfo.timeLabel})
+                    </span>
                   )}
-                </button>
+                </div>
+
+                {/* 3 Theme Options: Automatic, Light, Dark */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Option 1: Automatic */}
+                  <button 
+                    type="button"
+                    onClick={() => setThemePreference('auto')}
+                    className={`flex flex-col justify-between p-4 rounded-xl border text-left transition-all ${
+                      themePreference === 'auto'
+                        ? 'bg-indigo-600/15 border-indigo-500/60 shadow-md ring-1 ring-indigo-500/30'
+                        : 'bg-surface border-surface-border text-slate-300 hover:border-slate-500 hover:bg-surface/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-bold text-white">Automatic</span>
+                      </div>
+                      {themePreference === 'auto' && (
+                        <div className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                          <Check className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                      Follows 4 time-based modes: Morning (5 AM), Day (11 AM), Evening (5 PM), Night (8 PM).
+                    </p>
+                    <div className="text-[11px] font-semibold text-indigo-400 flex items-center gap-1">
+                      <span>🌅 5am</span>
+                      <span className="text-slate-500">&rarr;</span>
+                      <span>☀️ 11am</span>
+                      <span className="text-slate-500">&rarr;</span>
+                      <span>🌇 5pm</span>
+                      <span className="text-slate-500">&rarr;</span>
+                      <span>🌙 8pm</span>
+                    </div>
+                  </button>
+
+                  {/* Option 2: Light */}
+                  <button 
+                    type="button"
+                    onClick={() => setThemePreference('light')}
+                    className={`flex flex-col justify-between p-4 rounded-xl border text-left transition-all ${
+                      themePreference === 'light'
+                        ? 'bg-amber-500/15 border-amber-500/60 shadow-md ring-1 ring-amber-500/30'
+                        : 'bg-surface border-surface-border text-slate-300 hover:border-slate-500 hover:bg-surface/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+                          <Sun className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-bold text-white">Light</span>
+                      </div>
+                      {themePreference === 'light' && (
+                        <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center">
+                          <Check className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                      Bright, focused productivity theme. Does not automatically switch into Night Mode.
+                    </p>
+                    <div className="text-[11px] font-semibold text-amber-400">
+                      Permanent Daytime Focus
+                    </div>
+                  </button>
+
+                  {/* Option 3: Dark */}
+                  <button 
+                    type="button"
+                    onClick={() => setThemePreference('dark')}
+                    className={`flex flex-col justify-between p-4 rounded-xl border text-left transition-all ${
+                      themePreference === 'dark'
+                        ? 'bg-purple-500/15 border-purple-500/60 shadow-md ring-1 ring-purple-500/30'
+                        : 'bg-surface border-surface-border text-slate-300 hover:border-slate-500 hover:bg-surface/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+                          <Moon className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-bold text-white">Dark</span>
+                      </div>
+                      {themePreference === 'dark' && (
+                        <div className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center">
+                          <Check className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                      Deep, soft dark surfaces with anti-glare contrast for long, comfortable study sessions.
+                    </p>
+                    <div className="text-[11px] font-semibold text-purple-400">
+                      Permanent Eye-Friendly Dark
+                    </div>
+                  </button>
+                </div>
+
+                {/* Sub-bar showing active phase details & preview options */}
+                <div className="mt-4 pt-3 border-t border-surface-border/60 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="text-slate-400 flex items-center gap-2">
+                    {themePreference === 'auto' ? (
+                      <>
+                        <span>Showing: <strong className="text-white">{currentPhaseInfo.icon} {currentPhaseInfo.name} Mode</strong> ({currentPhaseInfo.timeLabel})</span>
+                        <span className="hidden md:inline text-slate-500">&bull; {currentPhaseInfo.description}</span>
+                      </>
+                    ) : themePreference === 'light' ? (
+                      <><span>Locked to <strong className="text-white">Light Mode</strong> &bull; Stays in daytime mode</span></>
+                    ) : (
+                      <><span>Locked to <strong className="text-white">Dark Mode</strong> &bull; Soft dark surfaces for late-night study</span></>
+                    )}
+                  </div>
+
+                  {themePreference === 'auto' && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] text-slate-400 mr-1 hidden sm:inline">Preview:</span>
+                      {Object.values(TIME_THEME_CONFIG).map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => selectPhase(p.id)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                            activePhase === p.id && manualPhaseOverride === p.id
+                              ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                              : 'bg-surface border-surface-border text-slate-300 hover:text-white'
+                          }`}
+                          title={`Preview ${p.name} theme (${p.timeLabel})`}
+                        >
+                          {p.icon} {p.name}
+                        </button>
+                      ))}
+                      {manualPhaseOverride && (
+                        <button
+                          type="button"
+                          onClick={resetToAuto}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30"
+                        >
+                          Reset to Current Time
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="p-4 rounded-2xl bg-surface-card border border-surface-border">
                 <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Official ICAI Exam Date</label>

@@ -36,7 +36,7 @@ export function Navbar({ onOpenTutor }) {
   const location = useLocation();
   const { user, profile } = useAuth();
   const { addToast } = useToast();
-  const { activePhase, selectPhase, currentPhaseInfo } = useTheme();
+  const { activePhase, selectPhase, currentPhaseInfo, isAuto } = useTheme();
   const [notifications, setNotifications] = useState([]);
 
   // Only show admin portal for the owner account (Upasana / u1)
@@ -169,12 +169,16 @@ export function Navbar({ onOpenTutor }) {
               onClick={() => {
                 const nextPhase = activePhase === 'morning' ? 'day' : activePhase === 'day' ? 'evening' : activePhase === 'evening' ? 'night' : 'morning';
                 selectPhase(nextPhase);
+                addToast(`Atmosphere switched to ${nextPhase.charAt(0).toUpperCase() + nextPhase.slice(1)} Mode`, 'info');
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-card hover:bg-surface text-slate-300 transition-colors border border-surface-border text-xs font-semibold"
-              title={`Tutovia Journey: ${currentPhaseInfo.name} (${currentPhaseInfo.label}). Click to cycle through the day.`}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-card hover:bg-surface text-slate-300 transition-colors border border-surface-border text-xs font-semibold relative"
+              title={`Tutovia Atmosphere: ${currentPhaseInfo.name} (${currentPhaseInfo.timeLabel || currentPhaseInfo.label}). ${isAuto ? 'Automatic local-time mode active.' : 'Manual override mode.'} Click to cycle atmospheres.`}
             >
               <span className="text-sm">{currentPhaseInfo.icon}</span>
               <span className="hidden xl:inline">{currentPhaseInfo.name}</span>
+              {isAuto && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" title="Automatic Local Time Sync Active" />
+              )}
             </button>
 
             {/* Notification Bell */}
