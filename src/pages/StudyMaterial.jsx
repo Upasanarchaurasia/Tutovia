@@ -44,6 +44,7 @@ export default function StudyMaterial() {
   const [copiedId, setCopiedId] = useState(null);
   const [viewMode, setViewMode] = useState('grouped'); // 'grouped' | 'grid'
   const [collapsedModules, setCollapsedModules] = useState({});
+  const [viewerEngine, setViewerEngine] = useState('direct'); // 'direct' | 'google'
 
   // Quick search keywords
   const QUICK_SEARCHES = [
@@ -606,21 +607,60 @@ export default function StudyMaterial() {
                 </div>
               </div>
 
-              {/* Informational Sub-banner */}
-              <div className="bg-slate-900/50 px-5 py-2 border-b border-surface-border/60 flex items-center justify-between text-xs text-slate-400">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Streaming directly from official ICAI CDN ({activeViewerMaterial.file_size_approx})</span>
+              {/* Informational Sub-banner with Engine Switcher */}
+              <div className="bg-slate-900/60 px-5 py-2 border-b border-surface-border/60 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>ICAI CDN Stream ({activeViewerMaterial.file_size_approx})</span>
+                  </div>
+
+                  {/* Engine Switcher */}
+                  <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-surface-border text-[11px]">
+                    <button
+                      onClick={() => setViewerEngine('direct')}
+                      className={`px-2 py-0.5 rounded-md transition-all ${
+                        viewerEngine === 'direct' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Direct Stream
+                    </button>
+                    <button
+                      onClick={() => setViewerEngine('google')}
+                      className={`px-2 py-0.5 rounded-md transition-all ${
+                        viewerEngine === 'google' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Google PDF Engine
+                    </button>
+                  </div>
                 </div>
-                <div className="truncate max-w-sm text-[11px] text-slate-500 font-mono">
-                  {activeViewerMaterial.pdf_url}
+
+                <div className="flex items-center gap-3">
+                  <a
+                    href={activeViewerMaterial.portal_source_url || 'https://www.icai.org'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-indigo-400 hover:underline flex items-center gap-1"
+                  >
+                    <Globe className="w-3 h-3" />
+                    <span>Portal Source</span>
+                  </a>
+                  <span className="text-[11px] text-slate-500 font-mono hidden sm:inline truncate max-w-xs">
+                    {activeViewerMaterial.pdf_url}
+                  </span>
                 </div>
               </div>
 
               {/* Iframe Viewer */}
               <div className="flex-1 bg-slate-950 relative">
                 <iframe
-                  src={activeViewerMaterial.pdf_url}
+                  key={viewerEngine}
+                  src={
+                    viewerEngine === 'google'
+                      ? `https://docs.google.com/viewer?url=${encodeURIComponent(activeViewerMaterial.pdf_url)}&embedded=true`
+                      : activeViewerMaterial.pdf_url
+                  }
                   title={activeViewerMaterial.chapter_title}
                   className="w-full h-full border-none"
                 />
