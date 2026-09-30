@@ -102,7 +102,9 @@ export async function syncProfile(userId, localProfile = null) {
         commitments: merged.commitments || ''
       };
 
-      await supabase.from('profiles').upsert(sbPayload).catch(() => {});
+      try {
+        await supabase.from('profiles').upsert(sbPayload);
+      } catch (e) {}
       localStorage.setItem(`tutovia_profile_${userId}`, JSON.stringify(merged));
       return merged;
     } else if (cloudProfile) {
@@ -160,7 +162,9 @@ export async function syncProgress(userId, localProgress = null) {
     };
 
     // Upsert to Supabase
-    await supabase.from('user_progress').upsert(merged).catch(() => {});
+    try {
+      await supabase.from('user_progress').upsert(merged);
+    } catch (e) {}
 
     // Save to local backend/cache
     const formattedLocal = {
@@ -205,8 +209,10 @@ export async function syncSchedule(userId, localSchedule = null) {
       }));
 
       // Delete old user schedule and re-insert to keep exact order
-      await supabase.from('schedule').delete().eq('user_id', userId).catch(() => {});
-      await supabase.from('schedule').insert(rows).catch(() => {});
+      try {
+        await supabase.from('schedule').delete().eq('user_id', userId);
+        await supabase.from('schedule').insert(rows);
+      } catch (e) {}
 
       localStorage.setItem(`tutovia_schedule_${userId}`, JSON.stringify(localSchedule));
       return localSchedule;
@@ -346,7 +352,9 @@ export async function syncExamAttempt(userId, attemptData) {
       weak_topics: attemptData.weakTopics || attemptData.weak_topics || []
     };
 
-    await supabase.from('exam_attempts').insert(row).catch(() => {});
+    try {
+      await supabase.from('exam_attempts').insert(row);
+    } catch (e) {}
     return row;
   } catch (err) {
     console.error('[Sync] Exam attempt sync error:', err);
