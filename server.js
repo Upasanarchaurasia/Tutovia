@@ -2682,42 +2682,263 @@ app.post('/api/contact', (req, res) => {
   res.json({ success: true, message: 'Message sent successfully.' });
 });
 
-// Admin Stats
-app.get('/api/admin/stats', requireAdmin, (req, res) => {
-  // Merge usersDB + userProfileDB to get all unique real users
-  const allUserIds = new Set([
-    ...usersDB.map(u => u.id),
-    ...Object.keys(userProfileDB)
-  ]);
-  const realUserCount = [...allUserIds].filter(id => {
-    const u = userProfileDB[id] || usersDB.find(x => x.id === id) || {};
-    return isRealUser({ id, email: u.email || '' });
-  }).length;
+// Unified Admin Users Aggregator with Supabase Cloud & Local DB Integration
+async function getUnifiedAdminUsers() {
+  let supabaseProfiles = [];
+  let supabaseProgress = [];
 
-  res.json({
-    totalUsers: realUserCount,
-    totalFlashcards: combinedFlashcardsDB.length + importedFlashcards.length,
-    totalExamQuestions: examsDB.reduce((acc, e) => acc + (e.questions?.length || 0), 0),
-    totalDoubts: doubtsDB.length,
-    totalAttempts: attemptsDB.length,
-    totalMessages: supportMessagesDB.length
+  if (supabase) {
+    try {
+      const [pRes, progRes] = await Promise.race([
+        Promise.all([
+          supabase.from('profiles').select('*'),
+          supabase.from('user_progress').select('*')
+        ]),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase timeout')), 3000))
+      ]);
+      if (pRes?.data) supabaseProfiles = pRes.data;
+      if (progRes?.data) supabaseProgress = progRes.data;
+    } catch (err) {
+      console.warn('[Admin] Supabase query notice:', err.message);
+    }
+  }
+
+  const userMap = new Map();
+
+  // 1. Ingest Supabase profiles first
+  for (const sp of supabaseProfiles) {
+    if (!sp.id) continue;
+    userMap.set(sp.id, {
+      id: sp.id,
+      name: sp.name || 'CA Aspirant',
+      email: sp.email || '',
+      phone: sp.phone || '',
+      ca_stage: sp.ca_stage || 'intermediate',
+      ca_group: sp.ca_group || 'Both Groups',
+      attempt: sp.attempt || 'September 2026',
+      target_score: sp.target_score || '60%',
+      daily_study_hours: sp.daily_study_hours || 6,
+      wake_time: sp.wake_time || '',
+      sleep_time: sp.sleep_time || '',
+      commitments: sp.commitments || '',
+      joined: sp.created_at ? new Date(sp.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+      created_at_raw: sp.created_at || null,
+      source: 'Supabase Cloud'
+    });
+  }
+
+  // 2. Ingest local userProfileDB & usersDB
+  for (const [uid, p] of Object.entries(userProfileDB)) {
+    const existing = userMap.get(uid) || {};
+    const localUser = usersDB.find(u => u.id === uid) || {};
+    userMap.set(uid, {
+      id: uid,
+      name: p.name || existing.name || localUser.name || 'CA Aspirant',
+      email: p.email || existing.email || localUser.email || '',
+      phone: p.phone || existing.phone || localUser.phone || '',
+      ca_stage: p.ca_stage || existing.ca_stage || 'intermediate',
+      ca_group: p.ca_group || existing.ca_group || 'Both Groups',
+      attempt: p.attempt || existing.attempt || 'September 2026',
+      target_score: p.target_score || existing.target_score || '60%',
+      daily_study_hours: p.daily_study_hours || existing.daily_study_hours || 6,
+      wake_time: p.wake_time || existing.wake_time || '',
+      sleep_time: p.sleep_time || existing.sleep_time || '',
+      commitments: p.commitments || existing.commitments || '',
+      joined: p.createdAt || existing.joined || 'N/A',
+      created_at_raw: existing.created_at_raw || null,
+      source: existing.source || 'Local Database'
+    });
+  }
+
+  // 3. Also include users in usersDB
+  for (const u of usersDB) {
+    if (!userMap.has(u.id)) {
+      userMap.set(u.id, {
+        id: u.id,
+        name: u.name || 'CA Aspirant',
+        email: u.email || '',
+        phone: u.phone || '',
+        ca_stage: 'intermediate',
+        ca_group: 'Both Groups',
+        attempt: 'September 2026',
+        target_score: '60%',
+        daily_study_hours: 6,
+        joined: u.createdAt || 'N/A',
+        source: 'Local Database'
+      });
+    }
+  }
+
+  const sbProgMap = new Map(supabaseProgress.map(p => [p.user_id, p]));
+  const todayIST = getTodayIST();
+  const yesterdayIST = getYesterdayIST();
+
+  // Deduplicate and merge accounts sharing the same email (e.g. u1 and Supabase UUID for Upasana)
+  const emailToPrimaryId = new Map();
+  for (const [uid, uData] of userMap.entries()) {
+    const em = (uData.email || '').toLowerCase().trim();
+    if (em && em.includes('@')) {
+      if (!emailToPrimaryId.has(em)) {
+        emailToPrimaryId.set(em, uid);
+      } else {
+        const currentPrimary = emailToPrimaryId.get(em);
+        if (currentPrimary.startsWith('u') && !uid.startsWith('u')) {
+          emailToPrimaryId.set(em, uid);
+        }
+      }
+    }
+  }
+
+  const userList = [];
+  const processedPrimaryIds = new Set();
+
+  for (const [uid, uData] of userMap.entries()) {
+    // Filter out dummy seed account u2 if student2@icai.org
+    if (uid === 'u2' && uData.email?.includes('student2@icai.org')) continue;
+    if (uid === 'newuser') continue;
+
+    const em = (uData.email || '').toLowerCase().trim();
+    let primaryId = uid;
+    if (em && emailToPrimaryId.has(em)) {
+      primaryId = emailToPrimaryId.get(em);
+      if (processedPrimaryIds.has(primaryId)) continue;
+      processedPrimaryIds.add(primaryId);
+    }
+
+    const primaryData = userMap.get(primaryId) || uData;
+
+    // Collect all related IDs that share this email or primary ID
+    const relatedIds = [primaryId];
+    if (em) {
+      for (const [otherId, otherData] of userMap.entries()) {
+        if (otherId !== primaryId && (otherData.email || '').toLowerCase().trim() === em) {
+          relatedIds.push(otherId);
+          if (otherData.phone && !primaryData.phone) primaryData.phone = otherData.phone;
+          if (otherData.name && otherData.name !== 'CA Aspirant' && primaryData.name === 'CA Aspirant') {
+            primaryData.name = otherData.name;
+          }
+        }
+      }
+    }
+
+    let total_study_minutes = 0;
+    let completed_pomodoros = 0;
+    let completed_exams = 0;
+    let current_streak = 0;
+    let last_active_date = null;
+
+    for (const rid of relatedIds) {
+      const localProg = userProgressDB[rid] || {};
+      const sbProg = sbProgMap.get(rid) || {};
+      total_study_minutes += Math.max(localProg.total_study_minutes || 0, sbProg.total_study_minutes || 0);
+      completed_pomodoros += Math.max(localProg.completed_pomodoros || 0, sbProg.completed_pomodoros || 0);
+      completed_exams += Math.max(localProg.completed_exams || 0, sbProg.completed_exams || 0);
+      current_streak = Math.max(current_streak, localProg.current_streak || 0, sbProg.current_streak || 0);
+      if (localProg.last_active_date) {
+        if (!last_active_date || localProg.last_active_date > last_active_date) {
+          last_active_date = localProg.last_active_date;
+        }
+      }
+    }
+
+    if (!last_active_date && total_study_minutes > 0) {
+      last_active_date = todayIST;
+    }
+
+    let activity_status = 'inactive';
+    let status_label = 'Inactive';
+
+    if (last_active_date === todayIST) {
+      activity_status = 'active_today';
+      status_label = 'Active Today';
+    } else if (last_active_date === yesterdayIST || current_streak > 0 || total_study_minutes > 0) {
+      activity_status = 'active_recent';
+      status_label = last_active_date === yesterdayIST ? 'Active Yesterday' : 'Active Recently';
+    }
+
+    const hours = (total_study_minutes / 60).toFixed(1);
+
+    userList.push({
+      ...primaryData,
+      total_study_minutes,
+      study_hours: `${hours}h`,
+      completed_pomodoros,
+      completed_exams,
+      current_streak,
+      last_active_date: last_active_date || 'Never',
+      activity_status,
+      status_label
+    });
+  }
+
+  userList.sort((a, b) => {
+    if (a.activity_status === 'active_today' && b.activity_status !== 'active_today') return -1;
+    if (b.activity_status === 'active_today' && a.activity_status !== 'active_today') return 1;
+    return b.total_study_minutes - a.total_study_minutes;
   });
+
+  return userList;
+}
+
+// Admin Stats
+app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+  try {
+    const users = await getUnifiedAdminUsers();
+    const activeTodayCount = users.filter(u => u.activity_status === 'active_today').length;
+    const activeRecentCount = users.filter(u => u.activity_status === 'active_recent' || u.activity_status === 'active_today').length;
+    const totalMinutesLogged = users.reduce((acc, u) => acc + (u.total_study_minutes || 0), 0);
+    const totalHoursLogged = (totalMinutesLogged / 60).toFixed(1);
+    const totalPomodoros = users.reduce((acc, u) => acc + (u.completed_pomodoros || 0), 0);
+
+    res.json({
+      totalUsers: users.length,
+      activeUsersToday: activeTodayCount,
+      activeUsersThisWeek: activeRecentCount,
+      totalStudyHours: totalHoursLogged,
+      totalPomodoros,
+      totalFlashcards: combinedFlashcardsDB.length + importedFlashcards.length,
+      totalExamQuestions: examsDB.reduce((acc, e) => acc + (e.questions?.length || 0), 0),
+      totalDoubts: doubtsDB.length,
+      totalAttempts: attemptsDB.length,
+      totalMessages: supportMessagesDB.length
+    });
+  } catch (err) {
+    console.error('[Admin] Error fetching stats:', err);
+    res.status(500).json({ error: 'Failed to fetch admin stats' });
+  }
 });
 
-// Admin Users — real users only
-app.get('/api/admin/users', requireAdmin, (req, res) => {
-  const users = usersDB.map(u => ({ id: u.id, name: u.name, email: u.email, phone: u.phone || '', joined: u.createdAt || 'N/A' }));
-  const profileUsers = Object.entries(userProfileDB).map(([id, p]) => ({
-    id, name: p.name, email: p.email, phone: p.phone || '', ca_stage: p.ca_stage, ca_group: p.ca_group, attempt: p.attempt, joined: p.createdAt || 'N/A'
-  }));
-  // Merge, prefer profileUsers
-  const all = Object.values([...users, ...profileUsers].reduce((acc, u) => { 
-    acc[u.id] = { ...acc[u.id], ...u, phone: u.phone || acc[u.id]?.phone || '' }; 
-    return acc; 
-  }, {}));
-  // Filter to real users only
-  const realUsers = all.filter(u => isRealUser(u));
-  res.json(realUsers);
+// Admin Users — full active users list
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const users = await getUnifiedAdminUsers();
+    res.json(users);
+  } catch (err) {
+    console.error('[Admin] Error fetching users:', err);
+    res.status(500).json({ error: 'Failed to fetch admin users' });
+  }
+});
+
+// Admin User Details by ID
+app.get('/api/admin/users/:id', requireAdmin, async (req, res) => {
+  try {
+    const users = await getUnifiedAdminUsers();
+    const user = users.find(u => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const userAttempts = attemptsDB.filter(a => a.user_id === user.id || a.user === user.id);
+    const userSchedule = scheduleDB[user.id] || [];
+    const userNotes = notesDB[user.id] || [];
+
+    res.json({
+      ...user,
+      attempts: userAttempts,
+      schedule: userSchedule,
+      notes: userNotes
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch user details' });
+  }
 });
 
 // Admin Support Inbox Messages

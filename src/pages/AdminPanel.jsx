@@ -3,7 +3,8 @@ import {
   BarChart3, Users, FileText, HelpCircle, Shield, LogOut,
   Trash2, Plus, Search, CheckCircle, AlertCircle, RefreshCw,
   Newspaper, MessageSquare, BookOpen, ChevronRight, Eye, EyeOff,
-  Mail
+  Mail, Flame, Clock, Calendar, Award, Sparkles, Phone, ExternalLink,
+  Check, X, Copy, Lock, Unlock, UserCheck, Activity, Target
 } from 'lucide-react';
 
 const ADMIN_PASSWORD = 'tutovia@admin2026';
@@ -15,22 +16,31 @@ const apiFetch = (url, opts = {}) =>
   fetch(url, { ...opts, headers: { ...ADMIN_KEY_HEADER, ...(opts.headers || {}) } }).then(r => r.json());
 
 // ── Stat Card ──────────────────────────────────────────────────────────────────
-function StatCard({ icon: Icon, label, value, color }) {
+function StatCard({ icon: Icon, label, value, subtext, color, pulse = false }) {
   return (
-    <div className="bg-surface-card border border-surface-border rounded-2xl p-5 flex items-center gap-4">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color}`}>
+    <div className="bg-surface-card border border-surface-border rounded-2xl p-5 flex items-center gap-4 relative overflow-hidden group hover:border-slate-700 transition-all">
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
         <Icon size={22} className="text-white" />
       </div>
-      <div>
-        <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-        <p className="text-2xl font-bold text-white">{value ?? '—'}</p>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-slate-400 uppercase tracking-widest">{label}</p>
+          {pulse && (
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+          )}
+        </div>
+        <p className="text-2xl font-bold text-white tracking-tight">{value ?? '—'}</p>
+        {subtext && <p className="text-[11px] text-slate-400 mt-0.5 truncate">{subtext}</p>}
       </div>
     </div>
   );
 }
 
 // ── Tab Button ─────────────────────────────────────────────────────────────────
-function TabBtn({ active, onClick, icon: Icon, children }) {
+function TabBtn({ active, onClick, icon: Icon, badge, children }) {
   return (
     <button
       onClick={onClick}
@@ -41,55 +51,456 @@ function TabBtn({ active, onClick, icon: Icon, children }) {
       }`}
     >
       <Icon size={16} />
-      {children}
+      <span>{children}</span>
+      {badge !== undefined && badge !== null && (
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+          active ? 'bg-indigo-950 text-indigo-200' : 'bg-white/10 text-slate-300'
+        }`}>
+          {badge}
+        </span>
+      )}
     </button>
   );
 }
 
-// ── Overview Tab ───────────────────────────────────────────────────────────────
-function OverviewTab() {
-  const [stats, setStats] = useState(null);
+// ── Student Dossier Modal ──────────────────────────────────────────────────────
+function StudentDossierModal({ user, onClose }) {
+  const [detailedData, setDetailedData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [copiedField, setCopiedField] = useState(null);
 
   useEffect(() => {
-    apiFetch('/api/admin/stats')
-      .then(setStats)
-      .catch(() => {})
+    if (!user?.id) return;
+    setLoading(true);
+    apiFetch(`/api/admin/users/${encodeURIComponent(user.id)}`)
+      .then(data => setDetailedData(data))
+      .catch(() => setDetailedData(user))
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  const copyToClipboard = (text, fieldName) => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const u = detailedData || user;
+  if (!u) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-surface-border flex items-start justify-between bg-white/[0.02]">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg shrink-0">
+              {(u.name || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-bold text-white">{u.name || 'CA Aspirant'}</h3>
+                {u.activity_status === 'active_today' && (
+                  <span className="flex items-center gap-1.5 text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Active Today
+                  </span>
+                )}
+                {u.activity_status === 'active_recent' && (
+                  <span className="text-xs bg-sky-500/20 text-sky-400 border border-sky-500/30 px-2.5 py-0.5 rounded-full font-medium">
+                    Active Recently
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-400 mt-0.5">{u.email || 'No email registered'}</p>
+              <span className="inline-block mt-1 text-[11px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700">
+                Source: {u.source || 'Database'} · ID: <span className="font-mono text-slate-300">{u.id}</span>
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-6 flex-1">
+          {/* Contact Bar */}
+          <div className="bg-slate-800/50 border border-slate-700/60 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <Phone size={18} />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Mobile Number</p>
+                <p className="text-sm font-semibold text-white font-mono">{u.phone || 'Not provided'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {u.phone && (
+                <>
+                  <button
+                    onClick={() => copyToClipboard(u.phone, 'phone')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-300 hover:text-white transition-all border border-white/5"
+                  >
+                    {copiedField === 'phone' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                    {copiedField === 'phone' ? 'Copied' : 'Copy Phone'}
+                  </button>
+                  <a
+                    href={`https://wa.me/${u.phone.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-medium transition-all shadow-md shadow-emerald-900/30"
+                  >
+                    <ExternalLink size={14} /> WhatsApp
+                  </a>
+                </>
+              )}
+              {u.email && (
+                <button
+                  onClick={() => copyToClipboard(u.email, 'email')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-300 hover:text-white transition-all border border-white/5"
+                >
+                  {copiedField === 'email' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                  {copiedField === 'email' ? 'Copied' : 'Copy Email'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Academic & Study KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3.5">
+              <p className="text-[11px] text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Clock size={13} className="text-amber-400" /> Study Logged
+              </p>
+              <p className="text-xl font-bold text-white">{u.study_hours || `${((u.total_study_minutes || 0) / 60).toFixed(1)}h`}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">{u.total_study_minutes || 0} mins total</p>
+            </div>
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3.5">
+              <p className="text-[11px] text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Flame size={13} className="text-orange-400" /> Active Streak
+              </p>
+              <p className="text-xl font-bold text-orange-400">{u.current_streak ? `${u.current_streak} days` : '0 days'}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Consecutive study</p>
+            </div>
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3.5">
+              <p className="text-[11px] text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Target size={13} className="text-indigo-400" /> Pomodoros
+              </p>
+              <p className="text-xl font-bold text-white">{u.completed_pomodoros || 0}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Focus sessions</p>
+            </div>
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3.5">
+              <p className="text-[11px] text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Award size={13} className="text-emerald-400" /> Exam Tests
+              </p>
+              <p className="text-xl font-bold text-white">{u.completed_exams || (u.attempts?.length ?? 0)}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Mocks completed</p>
+            </div>
+          </div>
+
+          {/* Academic Profile Details */}
+          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 space-y-3">
+            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <BookOpen size={14} className="text-indigo-400" /> Academic Profile & Targets
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+              <div>
+                <span className="text-xs text-slate-400 block">CA Stage</span>
+                <span className="font-medium text-white capitalize">{u.ca_stage || 'Intermediate'}</span>
+              </div>
+              <div>
+                <span className="text-xs text-slate-400 block">Group Target</span>
+                <span className="font-medium text-white">{u.ca_group || 'Both Groups'}</span>
+              </div>
+              <div>
+                <span className="text-xs text-slate-400 block">Exam Attempt</span>
+                <span className="font-medium text-amber-300">{u.attempt || 'September 2026'}</span>
+              </div>
+              <div>
+                <span className="text-xs text-slate-400 block">Target Score</span>
+                <span className="font-medium text-emerald-300">{u.target_score || '60%'}</span>
+              </div>
+              <div>
+                <span className="text-xs text-slate-400 block">Daily Target</span>
+                <span className="font-medium text-white">{u.daily_study_hours || 6} hours / day</span>
+              </div>
+              <div>
+                <span className="text-xs text-slate-400 block">Last Active</span>
+                <span className="font-medium text-slate-300">{u.last_active_date || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Daily Schedule & Routine */}
+          {(u.wake_time || u.sleep_time || u.commitments) && (
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 space-y-2">
+              <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={14} className="text-violet-400" /> Daily Routine & Commitments
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <span className="text-xs text-slate-400 block">Wake Time</span>
+                  <span className="font-medium text-white">{u.wake_time || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400 block">Sleep Time</span>
+                  <span className="font-medium text-white">{u.sleep_time || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400 block">Commitments</span>
+                  <span className="font-medium text-white">{u.commitments || 'Self-study focus'}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Mock Attempts */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <Award size={14} className="text-amber-400" /> Exam & Quiz Attempts ({u.attempts?.length || 0})
+            </h4>
+            {(!u.attempts || u.attempts.length === 0) ? (
+              <p className="text-xs text-slate-400 bg-slate-800/30 p-3 rounded-xl border border-slate-800">
+                No mock exam attempts logged by this student yet.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {u.attempts.map((att, idx) => (
+                  <div key={att.id || idx} className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-3 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="text-white font-medium">{att.exam_title || att.subject || 'Practice Exam'}</p>
+                      <p className="text-slate-400">{att.submitted_at ? new Date(att.submitted_at).toLocaleDateString('en-IN') : 'Completed'}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-emerald-400 text-sm">{att.score ?? '—'}</span>
+                      <span className="text-slate-400 block">{att.percentage ? `${att.percentage}%` : ''}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-surface-border bg-white/[0.01] flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium transition-all"
+          >
+            Close Dossier
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Overview Tab ───────────────────────────────────────────────────────────────
+function OverviewTab({ onSelectStudent, onViewAllUsers }) {
+  const [stats, setStats] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      apiFetch('/api/admin/stats').catch(() => null),
+      apiFetch('/api/admin/users').catch(() => [])
+    ])
+      .then(([sData, uData]) => {
+        if (sData) setStats(sData);
+        if (Array.isArray(uData)) setUsers(uData);
+      })
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   const deployDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const activeStudents = users.filter(u => u.activity_status === 'active_today' || u.activity_status === 'active_recent' || (u.total_study_minutes || 0) > 0);
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-white">📊 Platform Overview</h2>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            📊 Platform & Student Analytics
+          </h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Real-time synchronization between Supabase Cloud and Tutovia production VM.
+          </p>
+        </div>
+        <button
+          onClick={loadData}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs text-slate-300 transition-all border border-surface-border"
+        >
+          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+        </button>
+      </div>
 
-      {loading ? (
-        <div className="flex items-center gap-3 text-slate-400"><RefreshCw size={18} className="animate-spin" /> Loading stats…</div>
+      {/* KPI Stat Cards */}
+      {loading && !stats ? (
+        <div className="flex items-center gap-3 text-slate-400 py-6">
+          <RefreshCw size={18} className="animate-spin" /> Loading stats…
+        </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          <StatCard icon={Users} label="Total Users" value={stats?.totalUsers} color="bg-indigo-600" />
-          <StatCard icon={BookOpen} label="Exam Questions" value={stats?.totalExamQuestions} color="bg-violet-600" />
-          <StatCard icon={MessageSquare} label="Community Doubts" value={stats?.totalDoubts} color="bg-sky-600" />
-          <StatCard icon={FileText} label="Flashcards" value={stats?.totalFlashcards} color="bg-emerald-600" />
-          <StatCard icon={BarChart3} label="Exam Attempts" value={stats?.totalAttempts} color="bg-amber-600" />
-          <StatCard icon={Mail} label="Support Inbox" value={stats?.totalMessages ?? 0} color="bg-rose-600" />
+          <StatCard
+            icon={Users}
+            label="Total Students"
+            value={stats?.totalUsers ?? users.length}
+            subtext="Registered accounts"
+            color="bg-indigo-600"
+          />
+          <StatCard
+            icon={Activity}
+            label="Active Today"
+            value={stats?.activeUsersToday ?? users.filter(u => u.activity_status === 'active_today').length}
+            subtext="Studying right now"
+            color="bg-emerald-600"
+            pulse={true}
+          />
+          <StatCard
+            icon={Clock}
+            label="Study Hours"
+            value={`${stats?.totalStudyHours ?? '0'}h`}
+            subtext="Total focus time"
+            color="bg-amber-600"
+          />
+          <StatCard
+            icon={Flame}
+            label="Active Streaks"
+            value={users.filter(u => (u.current_streak || 0) > 0).length}
+            subtext="Daily learners"
+            color="bg-orange-600"
+          />
+          <StatCard
+            icon={BookOpen}
+            label="Exam Bank"
+            value={stats?.totalExamQuestions ?? '—'}
+            subtext="CA Mock questions"
+            color="bg-violet-600"
+          />
+          <StatCard
+            icon={Mail}
+            label="Support Inbox"
+            value={stats?.totalMessages ?? 0}
+            subtext="Student inquiries"
+            color="bg-rose-600"
+          />
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-surface-card border border-surface-border rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-slate-300 mb-4">🖥️ Site Health</h3>
-          <div className="flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-white font-medium">PM2 Process: Online</span>
+      {/* Live Spotlight: Active Students */}
+      <div className="bg-surface-card border border-surface-border rounded-2xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-3 w-3 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+            </span>
+            <h3 className="text-base font-bold text-white">Active Students Live Spotlight</h3>
           </div>
-          <p className="text-xs text-slate-500 mt-2">Tutovia backend is running via PM2 on Oracle Cloud VM.</p>
+          {onViewAllUsers && (
+            <button
+              onClick={onViewAllUsers}
+              className="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 hover:underline"
+            >
+              View All {users.length} Students <ChevronRight size={14} />
+            </button>
+          )}
+        </div>
+
+        {activeStudents.length === 0 ? (
+          <div className="py-6 text-center text-slate-400 text-sm bg-black/20 rounded-xl">
+            No active students recorded in the current session.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {activeStudents.slice(0, 6).map(u => (
+              <div
+                key={u.id}
+                onClick={() => onSelectStudent && onSelectStudent(u)}
+                className="bg-slate-800/40 hover:bg-slate-800/80 border border-slate-700/60 rounded-xl p-4 cursor-pointer transition-all duration-200 group hover:border-indigo-500/50 hover:shadow-lg hover:shadow-indigo-950/30"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-bold text-base group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                      {(u.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors truncate">
+                        {u.name || 'CA Aspirant'}
+                      </p>
+                      <p className="text-xs text-slate-400 truncate">{u.email || u.phone || 'No contact'}</p>
+                    </div>
+                  </div>
+                  {u.activity_status === 'active_today' ? (
+                    <span className="shrink-0 flex items-center gap-1 text-[11px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Today
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[11px] bg-sky-500/15 text-sky-400 border border-sky-500/30 px-2 py-0.5 rounded-full font-medium">
+                      Recent
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-slate-700/40 grid grid-cols-3 gap-1 text-center">
+                  <div className="bg-black/20 rounded-lg p-1.5">
+                    <span className="text-[10px] text-slate-400 block">Study</span>
+                    <span className="text-xs font-bold text-amber-300">{u.study_hours || '0h'}</span>
+                  </div>
+                  <div className="bg-black/20 rounded-lg p-1.5">
+                    <span className="text-[10px] text-slate-400 block">Streak</span>
+                    <span className="text-xs font-bold text-orange-400">🔥 {u.current_streak || 0}d</span>
+                  </div>
+                  <div className="bg-black/20 rounded-lg p-1.5">
+                    <span className="text-[10px] text-slate-400 block">Stage</span>
+                    <span className="text-xs font-medium text-slate-300 truncate block">{u.ca_group || 'Inter'}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Infrastructure & Sync Health */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-surface-card border border-surface-border rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            Backend PM2 Daemon
+          </h3>
+          <p className="text-white font-medium">tutovia (Node.js Express)</p>
+          <p className="text-xs text-slate-400 mt-1">Host: Oracle Cloud VM · 161.118.173.142</p>
         </div>
         <div className="bg-surface-card border border-surface-border rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-slate-300 mb-4">🚀 Last Deploy</h3>
+          <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-teal-400" />
+            Supabase Cloud Sync
+          </h3>
+          <p className="text-white font-medium">Profiles & Progress Live</p>
+          <p className="text-xs text-slate-400 mt-1">Synchronized with tivosvngnljlpfufulgj.supabase.co</p>
+        </div>
+        <div className="bg-surface-card border border-surface-border rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
+            Production Release
+          </h3>
           <p className="text-white font-medium">{deployDate}</p>
-          <p className="text-xs text-slate-500 mt-2">Frontend built with Vite + React. Nginx serving from /var/www/tutovia/dist.</p>
+          <p className="text-xs text-slate-400 mt-1">Nginx serving dist build from /var/www/tutovia</p>
         </div>
       </div>
     </div>
@@ -97,74 +508,323 @@ function OverviewTab() {
 }
 
 // ── Users Tab ──────────────────────────────────────────────────────────────────
-function UsersTab() {
+function UsersTab({ selectedUserForDossier, onClearDossier }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [dossierUser, setDossierUser] = useState(selectedUserForDossier || null);
+  const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
+    if (selectedUserForDossier) {
+      setDossierUser(selectedUserForDossier);
+    }
+  }, [selectedUserForDossier]);
+
+  const loadUsers = useCallback(() => {
+    setLoading(true);
     apiFetch('/api/admin/users')
       .then(data => setUsers(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = users.filter(u =>
-    (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (u.email || '').toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  const copyText = (text, id) => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  // Filter logic
+  const filtered = users.filter(u => {
+    const s = search.toLowerCase();
+    const matchesSearch =
+      (u.name || '').toLowerCase().includes(s) ||
+      (u.email || '').toLowerCase().includes(s) ||
+      (u.phone || '').includes(s) ||
+      (u.ca_group || '').toLowerCase().includes(s) ||
+      (u.attempt || '').toLowerCase().includes(s);
+
+    if (!matchesSearch) return false;
+
+    if (activeFilter === 'today') return u.activity_status === 'active_today';
+    if (activeFilter === 'recent') return u.activity_status === 'active_recent' || u.activity_status === 'active_today';
+    if (activeFilter === 'streaks') return (u.current_streak || 0) > 0;
+    if (activeFilter === 'group1') return (u.ca_group || '').toLowerCase().includes('group 1') || (u.ca_group || '').toLowerCase().includes('both');
+    if (activeFilter === 'group2') return (u.ca_group || '').toLowerCase().includes('group 2') || (u.ca_group || '').toLowerCase().includes('both');
+    if (activeFilter === 'both') return (u.ca_group || '').toLowerCase().includes('both');
+
+    return true;
+  });
+
+  const activeTodayCount = users.filter(u => u.activity_status === 'active_today').length;
+  const streaksCount = users.filter(u => (u.current_streak || 0) > 0).length;
+  const totalStudyMinutes = users.reduce((acc, u) => acc + (u.total_study_minutes || 0), 0);
+  const totalHours = (totalStudyMinutes / 60).toFixed(1);
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <h2 className="text-xl font-bold text-white">👥 Users ({users.length})</h2>
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search name or email…"
-            className="pl-9 pr-4 py-2 rounded-xl bg-white/5 border border-surface-border text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64"
-          />
+      {/* Student Dossier Modal */}
+      {dossierUser && (
+        <StudentDossierModal
+          user={dossierUser}
+          onClose={() => {
+            setDossierUser(null);
+            if (onClearDossier) onClearDossier();
+          }}
+        />
+      )}
+
+      {/* Top Header & Metrics Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-surface-card border border-surface-border rounded-xl p-3.5 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Enrolled</p>
+            <p className="text-xl font-bold text-white">{users.length}</p>
+          </div>
+          <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+            <Users size={18} />
+          </div>
+        </div>
+        <div className="bg-surface-card border border-surface-border rounded-xl p-3.5 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Active Today
+            </p>
+            <p className="text-xl font-bold text-emerald-400">{activeTodayCount}</p>
+          </div>
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+            <Activity size={18} />
+          </div>
+        </div>
+        <div className="bg-surface-card border border-surface-border rounded-xl p-3.5 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] text-slate-400 uppercase tracking-wider">Active Streaks</p>
+            <p className="text-xl font-bold text-orange-400">🔥 {streaksCount}</p>
+          </div>
+          <div className="w-9 h-9 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-400">
+            <Flame size={18} />
+          </div>
+        </div>
+        <div className="bg-surface-card border border-surface-border rounded-xl p-3.5 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] text-slate-400 uppercase tracking-wider">Total Study Time</p>
+            <p className="text-xl font-bold text-amber-300">{totalHours}h</p>
+          </div>
+          <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+            <Clock size={18} />
+          </div>
         </div>
       </div>
 
+      {/* Filter and Search Controls */}
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between pt-1">
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { key: 'all', label: `All (${users.length})` },
+            { key: 'today', label: `Active Today (${activeTodayCount})`, activeDot: true },
+            { key: 'recent', label: 'Active Recently' },
+            { key: 'streaks', label: 'Streaks 🔥' },
+            { key: 'group1', label: 'Group 1' },
+            { key: 'group2', label: 'Group 2' },
+            { key: 'both', label: 'Both Groups' },
+          ].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setActiveFilter(f.key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
+                activeFilter === f.key
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/40'
+                  : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              {f.activeDot && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 sm:w-72">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search student, email, phone…"
+              className="w-full pl-9 pr-4 py-2 rounded-xl bg-white/5 border border-surface-border text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            onClick={loadUsers}
+            disabled={loading}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-surface-border text-slate-400 hover:text-white transition-all"
+            title="Refresh Users"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      </div>
+
+      {/* Users Table */}
       {loading ? (
-        <div className="flex items-center gap-3 text-slate-400"><RefreshCw size={18} className="animate-spin" /> Loading users…</div>
+        <div className="flex items-center gap-3 text-slate-400 py-10 justify-center">
+          <RefreshCw size={18} className="animate-spin" /> Loading active users…
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-surface-border">
+        <div className="overflow-x-auto rounded-2xl border border-surface-border shadow-xl">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-white/5 text-slate-400 text-left">
-                <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Mobile</th>
-                <th className="px-4 py-3 font-medium">CA Stage</th>
-                <th className="px-4 py-3 font-medium">Group</th>
-                <th className="px-4 py-3 font-medium">Attempt</th>
-                <th className="px-4 py-3 font-medium">Joined</th>
-                <th className="px-4 py-3 font-medium">Badges</th>
+              <tr className="bg-white/[0.03] text-slate-400 text-left border-b border-surface-border">
+                <th className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wider">Student Profile</th>
+                <th className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wider">Status & Activity</th>
+                <th className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wider">Phone / Mobile</th>
+                <th className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wider">Academic Details</th>
+                <th className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wider">Study Logged</th>
+                <th className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wider">Streak</th>
+                <th className="px-4 py-3.5 font-semibold text-xs uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-surface-border">
+            <tbody className="divide-y divide-surface-border bg-slate-900/40">
               {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No users found.</td></tr>
-              ) : filtered.map((u, i) => (
-                <tr key={u.id || i} className="hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3 text-white font-medium">{u.name || '—'}</td>
-                  <td className="px-4 py-3 text-slate-400">{u.email || '—'}</td>
-                  <td className="px-4 py-3 text-indigo-300 font-mono text-xs">{u.phone || '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-xs bg-indigo-900/50 text-indigo-300 border border-indigo-700/40">
-                      {u.ca_stage || '—'}
-                    </span>
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                    <p className="text-base font-semibold text-slate-300">No students found matching your criteria</p>
+                    <p className="text-xs text-slate-500 mt-1">Try resetting the filter or search query.</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-400">{u.ca_group || '—'}</td>
-                  <td className="px-4 py-3 text-slate-400">{u.attempt || '—'}</td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">{u.joined || 'N/A'}</td>
-                  <td className="px-4 py-3 text-slate-500">—</td>
                 </tr>
-              ))}
+              ) : (
+                filtered.map((u, i) => (
+                  <tr key={u.id || i} className="hover:bg-white/[0.04] transition-colors group">
+                    {/* Student Name & Email */}
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-300 shrink-0">
+                          {(u.name || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-white truncate group-hover:text-indigo-300 transition-colors">
+                            {u.name || 'CA Aspirant'}
+                          </p>
+                          <p className="text-xs text-slate-400 truncate">{u.email || '—'}</p>
+                          <span className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                            {u.source === 'Supabase Cloud' ? (
+                              <span className="text-teal-400/90 font-mono">Cloud</span>
+                            ) : (
+                              <span className="text-purple-400/90 font-mono">Local</span>
+                            )}
+                            · Joined: {u.joined || '—'}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Status & Activity */}
+                    <td className="px-4 py-3.5">
+                      {u.activity_status === 'active_today' ? (
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            Active Today
+                          </span>
+                          <p className="text-[11px] text-slate-400">Today {u.last_active_date !== 'Never' ? `(${u.last_active_date})` : ''}</p>
+                        </div>
+                      ) : u.activity_status === 'active_recent' ? (
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                            <Clock size={11} /> {u.status_label || 'Active Recently'}
+                          </span>
+                          <p className="text-[11px] text-slate-400">{u.last_active_date}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                            Inactive
+                          </span>
+                          <p className="text-[11px] text-slate-500">{u.last_active_date || 'Never'}</p>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Phone / Mobile */}
+                    <td className="px-4 py-3.5">
+                      {u.phone ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-indigo-300 font-mono text-xs font-medium">{u.phone}</span>
+                          <button
+                            onClick={() => copyText(u.phone, `phone-${u.id}`)}
+                            className="p-1 rounded text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
+                            title="Copy Phone"
+                          >
+                            {copiedId === `phone-${u.id}` ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-slate-600 text-xs italic">Not provided</span>
+                      )}
+                    </td>
+
+                    {/* Academic Details */}
+                    <td className="px-4 py-3.5">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-900/40 text-indigo-300 border border-indigo-700/30 capitalize">
+                            {u.ca_stage || 'Intermediate'}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                            {u.ca_group || 'Both Groups'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-amber-400/90 font-medium">
+                          Attempt: {u.attempt || 'Sept 2026'}
+                        </p>
+                      </div>
+                    </td>
+
+                    {/* Study Logged & Progress */}
+                    <td className="px-4 py-3.5">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-bold text-white">{u.study_hours || '0h'}</span>
+                          <span className="text-[11px] text-slate-400">({u.total_study_minutes || 0}m)</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                          <span>🍅 {u.completed_pomodoros || 0} pomodoros</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Streak */}
+                    <td className="px-4 py-3.5">
+                      {u.current_streak > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                          <Flame size={13} className="text-orange-400 fill-orange-400" />
+                          {u.current_streak} {u.current_streak === 1 ? 'day' : 'days'}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600 text-xs">—</span>
+                      )}
+                    </td>
+
+                    {/* Action */}
+                    <td className="px-4 py-3.5 text-right">
+                      <button
+                        onClick={() => setDossierUser(u)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 text-xs font-semibold transition-all duration-200 shadow-sm"
+                        title="View Student Dossier"
+                      >
+                        <Eye size={13} />
+                        Dossier
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -728,24 +1388,73 @@ function SupportInboxTab() {
   );
 }
 
-// ── Access Denied (for non-owner users trying /admin directly) ─────────────────
-function AccessDenied() {
+// ── Admin Unlock Screen ────────────────────────────────────────────────────────
+function AdminUnlockScreen({ password, setPassword, onUnlock, error }) {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="bg-surface-card border border-rose-500/30 rounded-2xl p-8 w-full max-w-sm space-y-4 shadow-2xl text-center">
-        <div className="w-14 h-14 bg-rose-500/20 rounded-2xl flex items-center justify-center mx-auto">
-          <Shield size={28} className="text-rose-400" />
+      <div className="bg-surface-card border border-amber-500/30 rounded-2xl p-8 w-full max-w-md space-y-6 shadow-2xl relative overflow-hidden">
+        {/* Glow accent */}
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="text-center space-y-3">
+          <div className="w-16 h-16 bg-amber-500/20 border border-amber-500/40 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
+            <Shield size={32} className="text-amber-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-white">Tutovia Admin Portal</h1>
+          <p className="text-sm text-slate-400">
+            Owner & Administrator Authentication. Enter your Master Admin Key to access student metrics and management.
+          </p>
         </div>
-        <h1 className="text-xl font-bold text-white">Access Denied</h1>
-        <p className="text-sm text-slate-400">
-          This portal is restricted to the site owner only. Please log in with the correct account.
-        </p>
-        <a
-          href="/"
-          className="inline-block mt-2 w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all"
-        >
-          Go to Dashboard
-        </a>
+
+        {error && (
+          <div className="p-3 bg-rose-500/20 border border-rose-500/40 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+            <AlertCircle size={15} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={onUnlock} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              Admin Master Key
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Enter admin password…"
+                autoFocus
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-surface-border text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/60 focus:border-amber-500 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-sm transition-all shadow-lg shadow-amber-900/30 flex items-center justify-center gap-2"
+          >
+            <Unlock size={16} /> Unlock Admin Portal
+          </button>
+        </form>
+
+        <div className="pt-2 text-center border-t border-surface-border">
+          <a
+            href="/"
+            className="text-xs text-slate-400 hover:text-white transition-colors inline-flex items-center gap-1.5"
+          >
+            ← Back to Student Dashboard
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -765,6 +1474,16 @@ function isOwnerUser(userData) {
 // ── Main Admin Panel ───────────────────────────────────────────────────────────
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [adminUnlocked, setAdminUnlocked] = useState(() => {
+    try {
+      return sessionStorage.getItem(SESSION_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [masterPassword, setMasterPassword] = useState('');
+  const [unlockError, setUnlockError] = useState('');
+  const [selectedStudentForDossier, setSelectedStudentForDossier] = useState(null);
 
   // Read user from localStorage (same mechanism as AuthContext)
   const rawUser = (() => {
@@ -775,18 +1494,51 @@ export default function AdminPanel() {
     }
   })();
 
-  // Only allow access if the currently logged-in user is the owner
-  if (!isOwnerUser(rawUser)) {
-    return <AccessDenied />;
+  const isOwner = isOwnerUser(rawUser) || adminUnlocked;
+
+  const handleUnlock = (e) => {
+    e?.preventDefault();
+    if (masterPassword === ADMIN_PASSWORD) {
+      try {
+        sessionStorage.setItem(SESSION_KEY, 'true');
+      } catch {}
+      setAdminUnlocked(true);
+      setUnlockError('');
+    } else {
+      setUnlockError('Invalid Master Key. Access denied.');
+    }
+  };
+
+  const handleLock = () => {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {}
+    setAdminUnlocked(false);
+  };
+
+  if (!isOwner) {
+    return (
+      <AdminUnlockScreen
+        password={masterPassword}
+        setPassword={setMasterPassword}
+        onUnlock={handleUnlock}
+        error={unlockError}
+      />
+    );
   }
 
   const tabs = [
     { key: 'overview', label: 'Overview', icon: BarChart3 },
-    { key: 'users', label: 'Users', icon: Users },
+    { key: 'users', label: 'Active Students', icon: Users },
     { key: 'content', label: 'Content', icon: FileText },
     { key: 'questions', label: 'Question Bank', icon: HelpCircle },
     { key: 'inbox', label: 'Support Inbox', icon: Mail },
   ];
+
+  const handleSelectStudent = (student) => {
+    setSelectedStudentForDossier(student);
+    setActiveTab('users');
+  };
 
   return (
     <div className="min-h-screen bg-background text-slate-100">
@@ -799,17 +1551,26 @@ export default function AdminPanel() {
             </div>
             <div>
               <h1 className="text-base font-bold text-white leading-tight">Tutovia Admin</h1>
-              <p className="text-xs text-slate-500">
-                Logged in as <span className="text-amber-400 font-semibold">{rawUser?.name || 'Owner'}</span> · Owner Access
+              <p className="text-xs text-slate-400">
+                Logged in as <span className="text-amber-400 font-semibold">{rawUser?.name || 'Administrator'}</span> · Full Access
               </p>
             </div>
           </div>
-          <a
-            href="/"
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 text-sm font-medium transition-all"
-          >
-            <LogOut size={15} /> Back to App
-          </a>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleLock}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 font-medium transition-all border border-transparent hover:border-rose-500/20"
+              title="Lock admin session"
+            >
+              <Lock size={13} /> Lock
+            </button>
+            <a
+              href="/"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 text-xs font-medium transition-all border border-surface-border"
+            >
+              <LogOut size={13} /> Back to App
+            </a>
+          </div>
         </div>
       </div>
 
@@ -825,8 +1586,18 @@ export default function AdminPanel() {
 
         {/* Tab Content */}
         <div>
-          {activeTab === 'overview' && <OverviewTab />}
-          {activeTab === 'users' && <UsersTab />}
+          {activeTab === 'overview' && (
+            <OverviewTab
+              onSelectStudent={handleSelectStudent}
+              onViewAllUsers={() => setActiveTab('users')}
+            />
+          )}
+          {activeTab === 'users' && (
+            <UsersTab
+              selectedUserForDossier={selectedStudentForDossier}
+              onClearDossier={() => setSelectedStudentForDossier(null)}
+            />
+          )}
           {activeTab === 'content' && <ContentTab />}
           {activeTab === 'questions' && <QuestionBankTab />}
           {activeTab === 'inbox' && <SupportInboxTab />}
