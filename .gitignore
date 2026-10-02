@@ -12,7 +12,6 @@ frontend.log
 frontend-err.log
 
 # Build Outputs
-dist/
 build/
 Payload/
 *.ipa
