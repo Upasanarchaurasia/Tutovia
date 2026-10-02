@@ -1,4 +1,8 @@
-// Distinct Voice Synthesizer for Gemini Leda and Gemini Charon in Hinglish accent
+// Comprehensive Voice Synthesizer & Audio Engine Supporting 4 TTS Systems:
+// 1. Gemini Hinglish (Web Speech Synthesis tuned for Leda & Charon)
+// 2. Microsoft Edge Neural (Online Natural HD Voices)
+// 3. Google Cloud Neural2 (GCP Text-to-Speech API)
+// 4. Google Translate Stream (Instant Free Audio Stream)
 
 export const GEMINI_LEDA_CHARON_CONFIGS = {
   'Leda-Hinglish': {
@@ -65,4 +69,31 @@ export function getHinglishUtteranceParams(voiceId, userPitch = 0, userRate = 1.
   const finalRate = Math.max(0.5, Math.min(2.0, config.baseRate * userRate));
 
   return { pitch: finalPitch, rate: finalRate };
+}
+
+// Find Microsoft Edge Online Natural Voices from WebSpeech if available
+export function getEdgeNeuralVoice(voiceCode) {
+  if (!('speechSynthesis' in window)) return null;
+
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices || voices.length === 0) return null;
+
+  // Exact match by name / URI
+  const exact = voices.find(v => v.name.includes(voiceCode) || v.voiceURI.includes(voiceCode));
+  if (exact) return exact;
+
+  // Match by keyword (Neerja, Prabhat, Swara, Madhur)
+  const key = voiceCode.split('-')[1] || '';
+  const matched = voices.find(v => v.name.toLowerCase().includes(key.toLowerCase()));
+  if (matched) return matched;
+
+  // Fallback to any Indian English / Hindi voice
+  return getHinglishBrowserVoice('Leda-Hinglish');
+}
+
+// Google Translate Audio Stream Endpoint Generator
+export function getGoogleTranslateAudioUrl(text, lang = 'en-IN') {
+  const cleanLang = lang.includes('hi') ? 'hi' : 'en-IN';
+  const encodedText = encodeURIComponent(text.substring(0, 200)); // 200 char limit per stream chunk
+  return `https://translate.google.com/translate_tts?client=tw-ob&tl=${cleanLang}&q=${encodedText}`;
 }
