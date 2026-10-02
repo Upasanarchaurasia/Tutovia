@@ -13,6 +13,7 @@ export default function User() {
   const [isSaving, setIsSaving] = useState(false);
   const [progressData, setProgressData] = useState(null);
   const [icaiDates, setIcaiDates] = useState(null);
+  const [upcomingAttempts, setUpcomingAttempts] = useState([]);
   const { 
     user, 
     logout, 
@@ -38,6 +39,14 @@ export default function User() {
   useEffect(() => {
     fetchProfile();
   }, [user?.id]);
+
+  useEffect(() => {
+    axios.get('/api/exam-attempts/upcoming')
+      .then(res => {
+        if (Array.isArray(res.data)) setUpcomingAttempts(res.data);
+      })
+      .catch(err => console.error('Failed to load upcoming attempts:', err));
+  }, []);
 
   useEffect(() => {
     if (isEditing && formData.attempt) {
@@ -75,6 +84,12 @@ export default function User() {
     try {
       const res = await axios.post(`/api/profile?userId=${uid}`, formData);
       setProfile(res.data);
+      if (formData.attempt && formData.attempt !== 'Not set') {
+        await axios.post('/api/user/attempt-preference', {
+          attempt: formData.attempt,
+          userId: uid
+        }).catch(() => {});
+      }
       const datesRes = await axios.get(`/api/icai-exam-dates?attempt=${encodeURIComponent(res.data?.attempt || '')}`).catch(() => ({ data: null }));
       if (datesRes?.data) setIcaiDates(datesRes.data);
       setIsEditing(false);
@@ -319,28 +334,77 @@ export default function User() {
                 )}
               </div>
 
-              <div className="p-4 rounded-2xl bg-surface-card border border-surface-border">
-                <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Target Attempt</label>
+              <div className="p-4 rounded-2xl bg-surface-card border border-surface-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Target Attempt</label>
+                  {profile?.attempt && profile.attempt !== 'Not set' && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      icaiDates?.isOfficial 
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    }`}>
+                      {icaiDates?.isOfficial ? '🟢 Official ICAI' : '🟡 Tentative ICAI'}
+                    </span>
+                  )}
+                </div>
+
                 {isEditing ? (
-                  <select 
-                    value={formData.attempt}
-                    onChange={(e) => setFormData({...formData, attempt: e.target.value})}
-                    className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="Not set">Select Attempt</option>
-                    <option value="May 2024">May 2024</option>
-                    <option value="September 2024">September 2024</option>
-                    <option value="January 2025">January 2025</option>
-                    <option value="May 2025">May 2025</option>
-                    <option value="September 2025">September 2025</option>
-                    <option value="January 2026">January 2026</option>
-                    <option value="May 2026">May 2026</option>
-                    <option value="September 2026">September 2026</option>
-                    <option value="January 2027">January 2027</option>
-                    <option value="May 2027">May 2027</option>
-                  </select>
+                  <div className="space-y-2">
+                    <select 
+                      value={formData.attempt || 'January 2027'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData({...formData, attempt: val});
+                        if (val && val !== 'Not set') {
+                          axios.get(`/api/icai-exam-dates?attempt=${encodeURIComponent(val)}`)
+                            .then(res => setIcaiDates(res.data))
+                            .catch(() => {});
+                        }
+                      }}
+                      className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                    >
+                      <option value="Not set">Select Attempt</option>
+                      {upcomingAttempts.length > 0 ? (
+                        upcomingAttempts.map((att) => (
+                          <option key={att.id || att.attempt_code} value={att.attempt_code}>
+                            {att.attempt_code} {att.status === 'official' ? '— 🟢 Official' : '— 🟡 Tentative'}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="January 2027">January 2027 — 🟢 Official</option>
+                          <option value="May 2027">May 2027 — 🟡 Tentative</option>
+                          <option value="September 2027">September 2027 — 🟡 Tentative</option>
+                          <option value="January 2028">January 2028 — 🟡 Tentative</option>
+                        </>
+                      )}
+                    </select>
+
+                    <p className="text-[11px] text-slate-400">
+                      Tutovia displays only upcoming CA Intermediate attempts. Once ICAI officially announces dates, they will automatically update.
+                    </p>
+                  </div>
                 ) : (
-                  <div className="text-white font-medium">{profile.attempt || "Not set"}</div>
+                  <div>
+                    <div className="text-white font-semibold text-base flex items-center gap-2">
+                      <span>{profile?.attempt || "Not set"}</span>
+                    </div>
+
+                    {profile?.attempt && profile.attempt !== 'Not set' && (
+                      <div className="mt-1.5 space-y-1">
+                        {icaiDates?.isOfficial ? (
+                          <div className="text-xs text-emerald-300 font-medium">
+                            <span>Dates: {icaiDates.displayDate || 'Jan 2 – Jan 12, 2027'} (2:00 PM – 5:00 PM IST)</span>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-amber-300/90 font-medium">
+                            <span>Tentative — Official dates not yet announced by ICAI</span>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Estimated based on standard ICAI trimester cycle.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="p-4 rounded-2xl bg-surface-card border border-surface-border">

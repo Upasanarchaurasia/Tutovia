@@ -4,7 +4,8 @@ import {
   Trash2, Plus, Search, CheckCircle, AlertCircle, RefreshCw,
   Newspaper, MessageSquare, BookOpen, ChevronRight, Eye, EyeOff,
   Mail, Flame, Clock, Calendar, Award, Sparkles, Phone, ExternalLink,
-  Check, X, Copy, Lock, Unlock, UserCheck, Activity, Target
+  Check, X, Copy, Lock, Unlock, UserCheck, Activity, Target,
+  CheckCircle2, AlertTriangle, ShieldCheck, History, ArrowRight, Edit2
 } from 'lucide-react';
 
 const ADMIN_PASSWORD = 'tutovia@admin2026';
@@ -1388,6 +1389,480 @@ function SupportInboxTab() {
   );
 }
 
+// ── Exam Schedules Tab ─────────────────────────────────────────────────────────
+function ExamSchedulesTab() {
+  const [attempts, setAttempts] = useState([]);
+  const [auditHistory, setAuditHistory] = useState([]);
+  const [lastChecked, setLastChecked] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+  const [editingAttempt, setEditingAttempt] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const loadData = useCallback(() => {
+    setLoading(true);
+    apiFetch('/api/admin/exam-attempts')
+      .then(res => {
+        if (res.attempts) setAttempts(res.attempts);
+        if (res.auditHistory) setAuditHistory(res.auditHistory);
+        if (res.lastChecked) setLastChecked(res.lastChecked);
+      })
+      .catch(err => {
+        showToast('Failed to load exam cycles: ' + err.message, 'error');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleVerifyNow = async () => {
+    setVerifying(true);
+    try {
+      const res = await apiFetch('/api/admin/exam-attempts/verify-now', { method: 'POST' });
+      if (res.success) {
+        showToast('ICAI portal verification complete! Updated schedules.', 'success');
+        loadData();
+      } else {
+        showToast('Verification check did not find new notices.', 'info');
+      }
+    } catch (err) {
+      showToast('ICAI verification error: ' + err.message, 'error');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const openEditModal = (att) => {
+    setEditingAttempt(att);
+    setEditForm({
+      status: att.status || 'tentative',
+      official_start_date: att.official_start_date || '',
+      official_end_date: att.official_end_date || '',
+      official_dates_text: att.official_dates_text || '',
+      official_notice_title: att.official_notice_title || '',
+      official_notice_url: att.official_notice_url || '',
+      official_notice_date: att.official_notice_date || '',
+      tentative_period_label: att.tentative_period_label || '',
+      estimation_method: att.estimation_method || ''
+    });
+  };
+
+  const handleSaveAttempt = async (e) => {
+    e.preventDefault();
+    if (!editingAttempt) return;
+    setSavingEdit(true);
+    try {
+      const res = await apiFetch(`/api/admin/exam-attempts/${editingAttempt.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(editForm)
+      });
+      if (res.success) {
+        showToast(`Attempt ${editingAttempt.attempt_code} updated successfully!`, 'success');
+        setEditingAttempt(null);
+        loadData();
+      }
+    } catch (err) {
+      showToast('Failed to update attempt: ' + err.message, 'error');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const officialCount = attempts.filter(a => a.status === 'official').length;
+  const tentativeCount = attempts.filter(a => a.status === 'tentative').length;
+
+  return (
+    <div className="space-y-6">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`p-4 rounded-xl text-sm font-medium border flex items-center justify-between shadow-lg animate-in fade-in duration-200 ${
+          toast.type === 'error' ? 'bg-rose-500/20 border-rose-500/40 text-rose-300' :
+          toast.type === 'info' ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' :
+          'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+        }`}>
+          <div className="flex items-center gap-2">
+            {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+            <span>{toast.message}</span>
+          </div>
+          <button onClick={() => setToast(null)} className="text-slate-400 hover:text-white">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Header Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-card border border-surface-border rounded-2xl p-5">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Calendar className="text-indigo-400" size={22} />
+            CA Intermediate Trimester Exam Cycles
+          </h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Dynamic tracking engine monitoring official ICAI notifications for January, May, and September cycles.
+          </p>
+          {lastChecked && (
+            <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1 font-mono">
+              <Clock size={11} /> Last verified with ICAI portal: {new Date(lastChecked).toLocaleString('en-IN')}
+            </p>
+          )}
+        </div>
+
+        <button
+          onClick={handleVerifyNow}
+          disabled={verifying}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs transition-all shadow-lg shadow-emerald-950/40 disabled:opacity-50 shrink-0 self-start sm:self-auto"
+        >
+          <RefreshCw size={14} className={verifying ? "animate-spin" : ""} />
+          <span>{verifying ? "Checking ICAI Portal…" : "Check ICAI Announcements Now"}</span>
+        </button>
+      </div>
+
+      {/* Metric Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <StatCard icon={Calendar} label="Total Cycles" value={attempts.length} subtext="Tracked trimester cycles" color="bg-indigo-600" />
+        <StatCard icon={ShieldCheck} label="Official Announced" value={officialCount} subtext="Verified ICAI schedules" color="bg-emerald-600" pulse={officialCount > 0} />
+        <StatCard icon={AlertTriangle} label="Tentative Cycles" value={tentativeCount} subtext="Unannounced estimates" color="bg-amber-600" />
+        <StatCard icon={Clock} label="Check Cadence" value="12 Hours" subtext="Automated background scan" color="bg-purple-600" />
+      </div>
+
+      {/* Attempts Table */}
+      <div className="bg-surface-card border border-surface-border rounded-2xl overflow-hidden shadow-xl">
+        <div className="p-4 border-b border-surface-border flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <Sparkles size={16} className="text-indigo-400" />
+            Active & Upcoming CA Intermediate Cycles
+          </h3>
+          <button onClick={loadData} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="py-12 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+            <RefreshCw size={16} className="animate-spin text-indigo-400" />
+            <span>Loading cycles and ICAI verification status…</span>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-white/[0.02] border-b border-surface-border text-slate-400 uppercase tracking-wider font-semibold">
+                <tr>
+                  <th className="px-4 py-3">Cycle & Attempt</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Dates / Schedule</th>
+                  <th className="px-4 py-3">Authoritative Notice</th>
+                  <th className="px-4 py-3">Last Verified</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border">
+                {attempts.map(att => {
+                  const isOfficial = att.status === 'official';
+                  const isCompleted = att.status === 'completed';
+                  return (
+                    <tr key={att.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-4 py-3.5">
+                        <div className="font-bold text-white text-sm">{att.attempt_code}</div>
+                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                          {att.trimester_month} {att.exam_year} Trimester
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {isOfficial ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            <ShieldCheck size={13} /> Official ICAI
+                          </span>
+                        ) : isCompleted ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                            Archived / Past
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            <AlertTriangle size={13} /> Tentative
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {isOfficial ? (
+                          <div>
+                            <p className="font-medium text-emerald-300 text-xs">{att.official_dates_text || att.official_start_date}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">2:00 PM – 5:00 PM IST (Standard ICAI Timing)</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="font-medium text-amber-200/90 text-xs">
+                              {att.tentative_period_label || `${att.trimester_month} ${att.exam_year}`}
+                            </p>
+                            <p className="text-[11px] text-slate-500 italic mt-0.5">
+                              {att.estimation_method || "Based on standard ICAI trimester examination cycle"}
+                            </p>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 max-w-xs">
+                        {isOfficial ? (
+                          <div>
+                            <p className="text-white font-medium truncate" title={att.official_notice_title}>
+                              {att.official_notice_title || "ICAI Official Notification"}
+                            </p>
+                            {att.official_notice_url ? (
+                              <a
+                                href={att.official_notice_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1 text-[11px] mt-0.5 hover:underline"
+                              >
+                                <span>View Notice</span>
+                                <ExternalLink size={10} />
+                              </a>
+                            ) : (
+                              <span className="text-[11px] text-slate-500">Official Portal verified</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500 text-[11px] italic">
+                            Official notice not yet published by ICAI
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-400 text-[11px] font-mono">
+                        {att.last_verified_at 
+                          ? new Date(att.last_verified_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : 'Pending check'}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <button
+                          onClick={() => openEditModal(att)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface border border-surface-border text-slate-300 hover:text-white hover:border-slate-600 transition-colors text-xs font-semibold"
+                        >
+                          <Edit2 size={12} />
+                          <span>Edit</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Audit History Log */}
+      <div className="bg-surface-card border border-surface-border rounded-2xl overflow-hidden shadow-xl space-y-4 p-5">
+        <div className="flex items-center justify-between border-b border-surface-border pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <History size={16} className="text-amber-400" />
+              Examination Schedule Audit History Log
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Immutable record of date estimates replaced by verified ICAI official announcements.
+            </p>
+          </div>
+          <span className="text-xs text-slate-500 font-mono">
+            {auditHistory.length} event{auditHistory.length === 1 ? '' : 's'} logged
+          </span>
+        </div>
+
+        {auditHistory.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-500">
+            No schedule updates logged yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-slate-400 border-b border-surface-border text-[11px] uppercase tracking-wider font-semibold">
+                <tr>
+                  <th className="py-2 px-3">Attempt</th>
+                  <th className="py-2 px-3">Previous Estimate</th>
+                  <th className="py-2 px-3">Replaced By (Official)</th>
+                  <th className="py-2 px-3">Official Notice</th>
+                  <th className="py-2 px-3">Timestamp & Method</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border">
+                {auditHistory.map(entry => (
+                  <tr key={entry.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="py-3 px-3 font-bold text-white">{entry.attempt_code}</td>
+                    <td className="py-3 px-3 text-amber-300/80 max-w-xs truncate">
+                      {entry.previous_estimate || 'Tentative schedule'}
+                    </td>
+                    <td className="py-3 px-3 text-emerald-400 font-medium">
+                      {entry.new_official_dates || 'Official announcement'}
+                    </td>
+                    <td className="py-3 px-3 max-w-xs">
+                      <div className="truncate text-slate-300">{entry.official_notice_title || 'ICAI Circular'}</div>
+                      {entry.official_notice_url && (
+                        <a
+                          href={entry.official_notice_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-400 hover:underline inline-flex items-center gap-1 text-[10px]"
+                        >
+                          Notice link <ExternalLink size={9} />
+                        </a>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-slate-400 font-mono text-[11px]">
+                      <div>{new Date(entry.verified_at).toLocaleString('en-IN')}</div>
+                      <div className="text-[10px] text-slate-500">{entry.verification_method}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Edit Cycle Modal */}
+      {editingAttempt && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-surface-border">
+              <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-indigo-400" />
+                <h3 className="text-base font-bold text-white">Edit Schedule: {editingAttempt.attempt_code}</h3>
+              </div>
+              <button
+                onClick={() => setEditingAttempt(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAttempt} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 uppercase tracking-wider text-[11px]">
+                  Cycle Status
+                </label>
+                <select
+                  value={editForm.status}
+                  onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                >
+                  <option value="official">Official (Announced by ICAI)</option>
+                  <option value="tentative">Tentative (Unannounced)</option>
+                  <option value="completed">Completed / Archived</option>
+                </select>
+              </div>
+
+              {editForm.status === 'official' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1 text-[11px]">Start Date (YYYY-MM-DD)</label>
+                      <input
+                        type="date"
+                        value={editForm.official_start_date}
+                        onChange={e => setEditForm({ ...editForm, official_start_date: e.target.value })}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1 text-[11px]">End Date (YYYY-MM-DD)</label>
+                      <input
+                        type="date"
+                        value={editForm.official_end_date}
+                        onChange={e => setEditForm({ ...editForm, official_end_date: e.target.value })}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1 text-[11px]">Dates Display Text</label>
+                    <input
+                      type="text"
+                      value={editForm.official_dates_text}
+                      onChange={e => setEditForm({ ...editForm, official_dates_text: e.target.value })}
+                      placeholder="e.g. January 2 - January 12, 2027"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1 text-[11px]">Official ICAI Notice Title</label>
+                    <input
+                      type="text"
+                      value={editForm.official_notice_title}
+                      onChange={e => setEditForm({ ...editForm, official_notice_title: e.target.value })}
+                      placeholder="e.g. ICAI Examination Notification - January 2027"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1 text-[11px]">Official Notice URL (Must be icai.org)</label>
+                    <input
+                      type="url"
+                      value={editForm.official_notice_url}
+                      onChange={e => setEditForm({ ...editForm, official_notice_url: e.target.value })}
+                      placeholder="https://www.icai.org/category/student-examination"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1 text-[11px]">Tentative Period Label</label>
+                    <input
+                      type="text"
+                      value={editForm.tentative_period_label}
+                      onChange={e => setEditForm({ ...editForm, tentative_period_label: e.target.value })}
+                      placeholder="e.g. Early May 2027"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1 text-[11px]">Estimation Methodology</label>
+                    <input
+                      type="text"
+                      value={editForm.estimation_method}
+                      onChange={e => setEditForm({ ...editForm, estimation_method: e.target.value })}
+                      placeholder="Based on standard ICAI trimester examination cycle"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="pt-3 border-t border-surface-border flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingAttempt(null)}
+                  className="px-4 py-2 rounded-xl bg-surface border border-surface-border text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold disabled:opacity-50"
+                >
+                  {savingEdit ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Admin Unlock Screen ────────────────────────────────────────────────────────
 function AdminUnlockScreen({ password, setPassword, onUnlock, error }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -1530,6 +2005,7 @@ export default function AdminPanel() {
   const tabs = [
     { key: 'overview', label: 'Overview', icon: BarChart3 },
     { key: 'users', label: 'Active Students', icon: Users },
+    { key: 'exams', label: 'Exam Schedules', icon: Calendar },
     { key: 'content', label: 'Content', icon: FileText },
     { key: 'questions', label: 'Question Bank', icon: HelpCircle },
     { key: 'inbox', label: 'Support Inbox', icon: Mail },
@@ -1598,6 +2074,7 @@ export default function AdminPanel() {
               onClearDossier={() => setSelectedStudentForDossier(null)}
             />
           )}
+          {activeTab === 'exams' && <ExamSchedulesTab />}
           {activeTab === 'content' && <ContentTab />}
           {activeTab === 'questions' && <QuestionBankTab />}
           {activeTab === 'inbox' && <SupportInboxTab />}

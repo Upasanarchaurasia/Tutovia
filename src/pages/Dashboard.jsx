@@ -15,6 +15,7 @@ import TimetableGeneratorModal from '../components/TimetableGeneratorModal.jsx';
 import EditTimetableModal from '../components/EditTimetableModal.jsx';
 import BadgeGallery from '../components/BadgeGallery.jsx';
 import ExamCountdown from '../components/ExamCountdown.jsx';
+import OfficialDatesAnnouncementModal from '../components/OfficialDatesAnnouncementModal.jsx';
 import ZenStudyRoom from '../components/ZenStudyRoom.jsx';
 import CaAggregateSimulator from '../components/CaAggregateSimulator.jsx';
 import StudyMilestoneTimeline from '../components/StudyMilestoneTimeline.jsx';
@@ -358,29 +359,26 @@ export default function Dashboard({ onOpenTutor }) {
   const [officialExamMeta, setOfficialExamMeta] = useState(null);
   
   useEffect(() => {
-    if (profile?.attempt) {
-      const attempt = profile.attempt || "September 2026";
-      const group = profile.ca_group || "Both Groups";
-      const stage = profile.ca_stage || "intermediate";
+    const attempt = profile?.attempt && profile.attempt !== 'Not set' && !profile.attempt.includes('2024') && !profile.attempt.includes('2025') && !profile.attempt.includes('September 2026')
+      ? profile.attempt 
+      : "January 2027";
+    const group = profile?.ca_group || "Both Groups";
+    const stage = profile?.ca_stage || "intermediate";
 
-      axios.get(`/api/icai-exam-dates?attempt=${encodeURIComponent(attempt)}&group=${encodeURIComponent(group)}&stage=${encodeURIComponent(stage)}`)
-        .then(res => {
-          if (res?.data) {
-            setDaysToExam(res.data.daysLeft !== undefined ? res.data.daysLeft : 0);
-            setOfficialExamMeta(res.data);
+    axios.get(`/api/icai-exam-dates?attempt=${encodeURIComponent(attempt)}&group=${encodeURIComponent(group)}&stage=${encodeURIComponent(stage)}`)
+      .then(res => {
+        if (res?.data) {
+          setOfficialExamMeta(res.data);
+          if (res.data.isOfficial && res.data.daysLeft !== null && res.data.daysLeft !== undefined) {
+            setDaysToExam(res.data.daysLeft);
+          } else {
+            setDaysToExam(null);
           }
-        })
-        .catch(() => {
-          const [monthStr, yearStr] = attempt.split(' ');
-          const monthMap = { 'January': 0, 'Jan': 0, 'May': 4, 'September': 8, 'Sep': 8, 'November': 10 };
-          const monthIndex = monthMap[monthStr] !== undefined ? monthMap[monthStr] : 8;
-          const year = parseInt(yearStr, 10) || 2026;
-          const day = group === 'Group 2' ? 19 : 12;
-          const targetDate = new Date(year, monthIndex, day);
-          const diffDays = Math.max(0, Math.ceil((targetDate - new Date()) / (1000 * 60 * 60 * 24)));
-          setDaysToExam(diffDays);
-        });
-    }
+        }
+      })
+      .catch(() => {
+        setDaysToExam(null);
+      });
   }, [profile?.attempt, profile?.ca_group, profile?.ca_stage]);
 
   // Client-side strict group filter safeguard for subjects
@@ -473,11 +471,16 @@ export default function Dashboard({ onOpenTutor }) {
             </p>
           </div>
 
-                    <div className="flex flex-col md:flex-row items-center gap-4">
-            {daysToExam !== null && (
-              <div className="flex flex-col items-center bg-indigo-950/40 border border-indigo-500/30 rounded-xl px-4 py-2 backdrop-blur-sm">
-                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-0.5">Days to {profile?.attempt || 'Exam'}</span>
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            {officialExamMeta?.isOfficial && daysToExam !== null ? (
+              <div className="flex flex-col items-center bg-emerald-950/40 border border-emerald-500/30 rounded-xl px-4 py-2 backdrop-blur-sm">
+                <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-0.5">Days to {profile?.attempt || 'Exam'}</span>
                 <div className="text-2xl font-black text-white leading-none tracking-tight">{daysToExam}</div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center bg-amber-950/40 border border-amber-500/30 rounded-xl px-4 py-2 backdrop-blur-sm">
+                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider mb-0.5">{profile?.attempt || 'Target Attempt'}</span>
+                <div className="text-xs font-bold text-amber-200 mt-0.5">Tentative ICAI</div>
               </div>
             )}
             <div className="flex items-center gap-3">
@@ -524,7 +527,17 @@ export default function Dashboard({ onOpenTutor }) {
         </div>
       </div>
 
-      {!isFocusMode && <ExamCountdown profile={profile} />}
+      {/* Official Exam Dates Announcement Popup Modal */}
+      <OfficialDatesAnnouncementModal 
+        currentAttempt={profile?.attempt || 'January 2027'} 
+      />
+
+      {!isFocusMode && (
+        <ExamCountdown 
+          profile={profile} 
+          onAttemptChange={(newAttempt) => setProfile(prev => ({ ...prev, attempt: newAttempt }))}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
