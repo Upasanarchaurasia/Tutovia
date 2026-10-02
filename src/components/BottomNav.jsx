@@ -17,7 +17,7 @@ import {
   Brain,
   Sparkles,
   Shield,
-  BookOpen
+  Volume2
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -53,6 +53,7 @@ export default function BottomNav({ onOpenTutor }) {
       icon: Shield,
       color: 'text-amber-400 bg-amber-500/10'
     }] : []),
+    { path: '/gemini-voices', label: 'Gemini TTS Voices Studio', desc: 'Test all 8 prebuilt sample voices in free tier', icon: Sparkles, color: 'text-purple-400 bg-purple-500/10' },
     { path: '/flashcards', label: 'Flashcards & Spaced Repetition', desc: 'Retain key CA formulas, provisions & AS rules', icon: Layers, color: 'text-indigo-400 bg-indigo-500/10' },
     { path: '/news', label: 'ICAI News & Exam Alerts', desc: 'Official notifications & exam date updates', icon: Newspaper, color: 'text-amber-400 bg-amber-500/10' },
     { path: '/profile', label: 'Study Goals & Group Profile', desc: 'Switch Group 1, Group 2 or target dates', icon: User, color: 'text-purple-400 bg-purple-500/10' },

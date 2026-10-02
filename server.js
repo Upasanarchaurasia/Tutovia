@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import axios from 'axios';
 
 import { icaiMaterialsDB, chaptersDB } from './icaiData.js';
 import { 
@@ -14,6 +15,7 @@ import { examsDB } from './examsData.js';
 import { flashcardsDB } from './flashcardsData.js';
 import { group2Flashcards } from './group2Flashcards.js';
 import { SYLLABUS_BY_STAGE } from './src/data/syllabusData.js';
+import examCycleEngine, { ICAI_CONFIG } from './examCycleEngine.js';
 
 const combinedFlashcardsDB = [
   ...flashcardsDB,
@@ -42,7 +44,9 @@ const requireAuth = async (req, res, next) => {
     '/api/counselor/chat',
     '/api/auth/login', 
     '/api/auth/register',
-    '/api/contact'
+    '/api/contact',
+    '/api/google-tts/synthesize',
+    '/api/gemini-tts/synthesize'
   ];
   if (publicRoutes.includes(req.path) || req.path.startsWith('/api/admin/') || req.method === 'OPTIONS') {
     return next();
@@ -248,105 +252,10 @@ function get12HourInfo() {
   return { hours: now.getHours(), minutes, formattedTime12 };
 }
 
-// --- API ROUTES ---
-
-// --- OFFICIAL ICAI EXAM SCHEDULE (AUTHORITATIVE MASTER DATABASE) ---
-const OFFICIAL_ICAI_EXAM_SCHEDULE = {
-  "September 2026": {
-    declared: true,
-    isOfficial: true,
-    intermediate: {
-      group1: {
-        startDate: "2026-09-12",
-        dates: "September 12, 14, 17, 2026",
-        papers: ["Paper 1 (Adv Accounting): Sept 12", "Paper 2 (Corp Laws): Sept 14", "Paper 3 (Taxation): Sept 17"]
-      },
-      group2: {
-        startDate: "2026-09-19",
-        dates: "September 19, 21, 23, 2026",
-        papers: ["Paper 4 (Costing): Sept 19", "Paper 5 (Audit): Sept 21", "Paper 6 (FM & SM): Sept 23"]
-      }
-    },
-    foundation: {
-      startDate: "2026-09-13",
-      dates: "September 13, 15, 18, 20, 2026"
-    },
-    final: {
-      group1: { startDate: "2026-11-01", dates: "November 1, 3, 5, 2026" },
-      group2: { startDate: "2026-11-07", dates: "November 7, 9, 11, 2026" }
-    },
-    officialNotificationUrl: "https://www.icai.org/category/examination",
-    title: "ICAI Exam Schedule — September 2026"
-  },
-  "January 2027": {
-    declared: true,
-    isOfficial: true,
-    intermediate: {
-      group1: {
-        startDate: "2027-01-11",
-        dates: "January 11, 13, 15, 2027",
-        papers: ["Paper 1 (Adv Accounting): Jan 11", "Paper 2 (Corp Laws): Jan 13", "Paper 3 (Taxation): Jan 15"]
-      },
-      group2: {
-        startDate: "2027-01-17",
-        dates: "January 17, 19, 21, 2027",
-        papers: ["Paper 4 (Costing): Jan 17", "Paper 5 (Audit): Jan 19", "Paper 6 (FM & SM): Jan 21"]
-      }
-    },
-    foundation: {
-      startDate: "2027-01-12",
-      dates: "January 12, 14, 16, 18, 2027"
-    },
-    officialNotificationUrl: "https://www.icai.org/category/examination",
-    title: "ICAI Exam Schedule — January 2027"
-  },
-  "May 2027": {
-    declared: true,
-    isOfficial: true,
-    intermediate: {
-      group1: {
-        startDate: "2027-05-03",
-        dates: "May 3, 5, 7, 2027",
-        papers: ["Paper 1 (Adv Accounting): May 3", "Paper 2 (Corp Laws): May 5", "Paper 3 (Taxation): May 7"]
-      },
-      group2: {
-        startDate: "2027-05-09",
-        dates: "May 9, 11, 13, 2027",
-        papers: ["Paper 4 (Costing): May 9", "Paper 5 (Audit): May 11", "Paper 6 (FM & SM): May 13"]
-      }
-    },
-    final: {
-      group1: { startDate: "2027-05-02", dates: "May 2, 4, 6, 2027" },
-      group2: { startDate: "2027-05-08", dates: "May 8, 10, 12, 2027" }
-    },
-    foundation: {
-      startDate: "2027-06-20",
-      dates: "June 20, 22, 24, 26, 2027"
-    },
-    officialNotificationUrl: "https://www.icai.org/category/examination",
-    title: "ICAI Exam Schedule — May 2027"
-  },
-  "September 2027": {
-    declared: true,
-    isOfficial: true,
-    intermediate: {
-      group1: {
-        startDate: "2027-09-11",
-        dates: "September 11, 13, 16, 2027"
-      },
-      group2: {
-        startDate: "2027-09-18",
-        dates: "September 18, 20, 22, 2027"
-      }
-    },
-    foundation: {
-      startDate: "2027-09-12",
-      dates: "September 12, 14, 17, 19, 2027"
-    },
-    officialNotificationUrl: "https://www.icai.org/category/examination",
-    title: "ICAI Exam Schedule — September 2027"
-  }
-};
+// --- DYNAMIC CA INTERMEDIATE EXAM SCHEDULE (MANAGED VIA examCycleEngine) ---
+// Note: Hardcoded dates have been replaced by the dynamic examCycleEngine.
+// The engine dynamically calculates upcoming trimester cycles, persists to database.json,
+// verifies ICAI official notices, manages tentative estimations, and dispatches updates.
 
 // Daily Streak helpers (in IST UTC+5:30)
 function getTodayIST() {
@@ -380,97 +289,97 @@ function updateStreakForUser(uid) {
   }
 }
 
-// ICAI Official AI Powered API
-let examDatesCache = {};
+// --- DYNAMIC CA INTERMEDIATE EXAM ATTEMPTS & ICAI DATES API ---
 
-app.get('/api/icai-exam-dates', async (req, res) => {
-  const attempt = req.query.attempt || "September 2026";
-  const group = req.query.group || "Both Groups";
-  const stage = req.query.stage || "intermediate";
-
-  if (attempt === "Not set") {
-    return res.json({ declared: false, isOfficial: false, dates: "Not set", message: "Please select an attempt." });
+// 1. Get ONLY Upcoming Attempts (Excludes past cycles like Sept 2026, May 2026)
+app.get('/api/exam-attempts/upcoming', (req, res) => {
+  try {
+    const upcoming = examCycleEngine.getUpcomingAttempts();
+    res.json(upcoming);
+  } catch (err) {
+    console.error('[API] Error fetching upcoming attempts:', err);
+    res.status(500).json({ error: 'Failed to fetch upcoming attempts' });
   }
+});
 
-  // Check known authoritative schedule
-  const entry = OFFICIAL_ICAI_EXAM_SCHEDULE[attempt];
-  if (entry) {
-    let targetDate = null;
-    let datesText = "";
-    let papersList = [];
+// 2. High-Precision Exam Dates & Group Countdown Resolver
+app.get('/api/icai-exam-dates', (req, res) => {
+  try {
+    const attempt = req.query.attempt || "January 2027";
+    const group = req.query.group || "Both Groups";
+    const stage = req.query.stage || "intermediate";
 
-    if (stage === "foundation") {
-      targetDate = entry.foundation?.startDate || "2026-09-13";
-      datesText = entry.foundation?.dates || "Exam dates announced";
-    } else if (stage === "final") {
-      if (group === "Group 2") {
-        targetDate = entry.final?.group2?.startDate || entry.intermediate?.group2?.startDate;
-        datesText = entry.final?.group2?.dates || entry.intermediate?.group2?.dates;
-      } else {
-        targetDate = entry.final?.group1?.startDate || entry.intermediate?.group1?.startDate;
-        datesText = entry.final?.group1?.dates || entry.intermediate?.group1?.dates;
-      }
-    } else {
-      // CA Intermediate
-      if (group === "Group 2") {
-        targetDate = entry.intermediate?.group2?.startDate;
-        datesText = entry.intermediate?.group2?.dates;
-        papersList = entry.intermediate?.group2?.papers || [];
-      } else {
-        targetDate = entry.intermediate?.group1?.startDate;
-        datesText = entry.intermediate?.group1?.dates;
-        papersList = entry.intermediate?.group1?.papers || [];
+    if (attempt === "Not set") {
+      return res.json({ 
+        declared: false, 
+        isOfficial: false, 
+        isTentative: true, 
+        dates: "Not set", 
+        message: "Please select an attempt." 
+      });
+    }
+
+    const details = examCycleEngine.getAttemptDetails(attempt, group, stage);
+    res.json(details);
+  } catch (err) {
+    console.error('[API] Error resolving exam dates:', err);
+    res.status(500).json({ error: 'Failed to resolve exam dates' });
+  }
+});
+
+// 3. User Attempt Preference: Update target attempt across local DB & Supabase Cloud
+app.post('/api/user/attempt-preference', async (req, res) => {
+  try {
+    const { attempt, userId } = req.body;
+    if (!attempt) return res.status(400).json({ error: 'Attempt is required' });
+
+    const uid = userId || 'u1';
+    if (!userProfileDB[uid]) userProfileDB[uid] = {};
+    userProfileDB[uid].attempt = attempt;
+
+    const details = examCycleEngine.getAttemptDetails(attempt, userProfileDB[uid].ca_group || 'Both Groups');
+    if (details.targetDate) {
+      userProfileDB[uid].exam_date = details.targetDate;
+    }
+
+    // Mirror to Supabase profiles table
+    if (supabase && uid && !uid.startsWith('guest_') && !uid.startsWith('u1')) {
+      try {
+        await supabase.from('profiles').update({
+          attempt: attempt,
+          exam_date: details.targetDate || null
+        }).eq('id', uid);
+      } catch (sbErr) {
+        console.warn('[Sync] Supabase profile attempt sync:', sbErr.message);
       }
     }
 
-    if (!targetDate) targetDate = "2026-09-12";
-
-    // Calculate days left in IST
-    const nowMs = Date.now() + (5.5 * 3600000);
-    const targetMs = new Date(targetDate + "T00:00:00+05:30").getTime();
-    const diffTime = targetMs - nowMs;
-    const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-
-    return res.json({
-      declared: true,
-      isOfficial: true,
-      attempt,
-      targetGroup: group,
-      stage,
-      targetDate,
-      daysLeft,
-      datesText,
-      papers: papersList,
-      group1StartDate: entry.intermediate?.group1?.startDate,
-      group2StartDate: entry.intermediate?.group2?.startDate,
-      group1Dates: entry.intermediate?.group1?.dates,
-      group2Dates: entry.intermediate?.group2?.dates,
-      officialNotificationUrl: entry.officialNotificationUrl,
-      message: "Official ICAI Schedule Confirmed"
-    });
+    res.json({ success: true, attempt, details, profile: userProfileDB[uid] });
+  } catch (err) {
+    console.error('[API] Error updating attempt preference:', err);
+    res.status(500).json({ error: 'Failed to update attempt preference' });
   }
+});
 
-  // Fallback for custom attempt
-  const [mStr, yStr] = attempt.split(' ');
-  const year = parseInt(yStr, 10) || 2027;
-  const monthMap = { 'January': 0, 'Jan': 0, 'May': 4, 'September': 8, 'Sep': 8, 'November': 10, 'Nov': 10 };
-  const mIdx = monthMap[mStr] !== undefined ? monthMap[mStr] : 4;
-  const day = (group === "Group 2") ? 9 : 3;
-  const fallbackTarget = new Date(year, mIdx, day);
-  const diffDays = Math.max(0, Math.ceil((fallbackTarget - new Date()) / (1000 * 60 * 60 * 24)));
+// 4. Student Notifications: Alert when official exam dates are announced
+app.get('/api/user/notifications', (req, res) => {
+  try {
+    const userId = req.query.userId || req.headers['x-user-id'] || 'all';
+    const attempt = req.query.attempt || null;
+    const notifs = examCycleEngine.getUserNotifications(userId, attempt);
+    res.json(notifs);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
 
-  res.json({
-    declared: false,
-    isOfficial: false,
-    attempt,
-    targetGroup: group,
-    stage,
-    targetDate: fallbackTarget.toISOString().slice(0, 10),
-    daysLeft: diffDays,
-    datesText: `Projected ${attempt}`,
-    officialNotificationUrl: "https://www.icai.org/category/examination",
-    message: "Awaiting final official ICAI notification"
-  });
+app.post('/api/user/notifications/:id/read', (req, res) => {
+  try {
+    const success = examCycleEngine.markNotificationAsRead(req.params.id);
+    res.json({ success });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
 });
 
 // Auth API
@@ -2990,6 +2899,61 @@ app.post('/api/admin/questions', requireAdmin, (req, res) => {
   }
 });
 
+// Admin Dynamic Exam Cycles & ICAI Verification Monitor
+app.get('/api/admin/exam-attempts', requireAdmin, (req, res) => {
+  try {
+    examCycleEngine.recalculateAttemptStatuses();
+    res.json({
+      attempts: examCycleEngine.examAttempts,
+      auditHistory: examCycleEngine.getAuditHistory(),
+      lastChecked: examCycleEngine.lastCheckedTimestamp
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch exam attempts' });
+  }
+});
+
+app.post('/api/admin/exam-attempts/verify-now', requireAdmin, async (req, res) => {
+  try {
+    const result = await examCycleEngine.runOfficialIcaICheck();
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ error: 'Verification run failed: ' + err.message });
+  }
+});
+
+app.put('/api/admin/exam-attempts/:id', requireAdmin, (req, res) => {
+  try {
+    const attemptId = req.params.id;
+    const existing = examCycleEngine.examAttempts.find(a => a.id === attemptId);
+    if (!existing) return res.status(404).json({ error: 'Attempt not found' });
+
+    const updates = req.body;
+    if (updates.status === 'official' && existing.status !== 'official') {
+      examCycleEngine.recordOfficialAnnouncement({
+        attemptCode: existing.attempt_code,
+        officialStartDate: updates.official_start_date || existing.official_start_date,
+        officialEndDate: updates.official_end_date || existing.official_end_date,
+        officialDatesText: updates.official_dates_text || existing.official_dates_text,
+        group1: updates.group1 || existing.group1,
+        group2: updates.group2 || existing.group2,
+        officialNoticeTitle: updates.official_notice_title || "Official ICAI Examination Notice",
+        officialNoticeUrl: updates.official_notice_url || ICAI_CONFIG.EXAM_CATEGORY_URL,
+        officialNoticeDate: updates.official_notice_date || new Date().toISOString().slice(0, 10),
+        sourceName: updates.source_name || ICAI_CONFIG.SOURCE_NAME
+      });
+    } else {
+      Object.assign(existing, updates);
+      existing.last_updated_at = new Date().toISOString();
+      examCycleEngine.saveState();
+    }
+
+    res.json({ success: true, attempt: existing });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============================================================================
 // ICAI STUDY MATERIAL INDEXING & DELIVERY APIS
 // Official BoS Study Material PDFs with 1-click access & CDN redirects
@@ -3119,6 +3083,106 @@ app.post('/api/scraper/trigger', async (req, res) => {
     res.status(500).json({ error: 'Scraper trigger failed', details: err.message });
   }
 });
+
+// 6. POST /api/google-tts/synthesize — Direct proxy endpoint to Google Cloud Text-to-Speech REST API
+app.post('/api/google-tts/synthesize', async (req, res) => {
+  try {
+    const { text, voiceName, languageCode, ssmlGender, speakingRate, pitch, apiKey: clientApiKey } = req.body || {};
+    const apiKey = clientApiKey || process.env.GOOGLE_CLOUD_API_KEY || process.env.GOOGLE_TTS_API_KEY;
+
+    if (!apiKey) {
+      return res.status(400).json({
+        error: 'Google Cloud API Key is required for direct REST API synthesis. You can enter your API Key in the UI settings panel or use native browser speech.'
+      });
+    }
+
+    const googleRes = await axios.post(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
+      input: { text: text || 'Tutovia Google Cloud Voice Test' },
+      voice: {
+        languageCode: languageCode || 'en-US',
+        name: voiceName || 'en-US-Standard-A',
+        ssmlGender: ssmlGender || 'FEMALE'
+      },
+      audioConfig: {
+        audioEncoding: 'MP3',
+        speakingRate: parseFloat(speakingRate || 1.0),
+        pitch: parseFloat(pitch || 0.0)
+      }
+    });
+
+    if (googleRes.data && googleRes.data.audioContent) {
+      return res.json({ success: true, audioContent: googleRes.data.audioContent });
+    } else {
+      return res.status(500).json({ error: 'No audio content received from Google Cloud API' });
+    }
+  } catch (err) {
+    console.error('Google Cloud TTS Error:', err.response?.data || err.message);
+    const details = err.response?.data?.error?.message || err.message;
+    return res.status(500).json({ error: 'Google Cloud TTS synthesis failed', details });
+  }
+});
+
+// 7. POST /api/gemini-tts/synthesize — Direct proxy endpoint to Gemini 2.0 Flash Audio TTS REST API
+app.post('/api/gemini-tts/synthesize', async (req, res) => {
+  try {
+    const { text, voiceName, apiKey: clientApiKey } = req.body || {};
+    const apiKey = clientApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(400).json({
+        error: 'Gemini API Key is required for direct Gemini REST API synthesis. You can enter your key in the settings panel or use native browser speech synth.'
+      });
+    }
+
+    const geminiRes = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                text: text || 'Tutovia Gemini Voice Test'
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voiceName || 'Puck'
+              }
+            }
+          }
+        }
+      }
+    );
+
+    const candidates = geminiRes.data?.candidates;
+    const parts = candidates?.[0]?.content?.parts;
+    const audioPart = parts?.find(p => p.inlineData && p.inlineData.mimeType?.startsWith('audio/'));
+
+    if (audioPart && audioPart.inlineData?.data) {
+      return res.json({ success: true, audioContent: audioPart.inlineData.data });
+    } else {
+      return res.status(500).json({ error: 'No inline audio data received from Gemini API' });
+    }
+  } catch (err) {
+    console.error('Gemini TTS Error:', err.response?.data || err.message);
+    const details = err.response?.data?.error?.message || err.message;
+    return res.status(500).json({ error: 'Gemini TTS synthesis failed', details });
+  }
+});
+
+// Schedule periodic automated ICAI verification check every 12 hours
+const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+setTimeout(() => {
+  examCycleEngine.runOfficialIcaICheck().catch(e => console.warn('[ICAI Initial Check Error]', e.message));
+}, 10000);
+setInterval(() => {
+  examCycleEngine.runOfficialIcaICheck().catch(e => console.warn('[ICAI Periodic Check Error]', e.message));
+}, TWELVE_HOURS_MS);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

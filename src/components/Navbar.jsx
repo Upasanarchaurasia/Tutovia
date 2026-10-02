@@ -91,6 +91,7 @@ export function Navbar({ onOpenTutor }) {
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/pyq', label: 'PYQ Bank', icon: BookMarked },
     { path: '/study-material', label: 'BoS Material', icon: FileText },
+    { path: '/gemini-voices', label: 'Gemini Voices', icon: Sparkles },
     { path: '/news', label: 'News', icon: Newspaper },
   ];
 
