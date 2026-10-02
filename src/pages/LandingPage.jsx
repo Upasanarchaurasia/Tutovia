@@ -162,6 +162,10 @@ export default function LandingPage() {
               <Bot size={14} />
               <span>AI Tutor</span>
             </Link>
+            <Link to="/gemini-voices" className="text-purple-400 hover:text-purple-300 font-bold transition-colors flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 hover:scale-105 transition-all">
+              <Sparkles size={14} className="text-amber-300" />
+              <span>Gemini Voices</span>
+            </Link>
           </div>
 
           {/* Right: Time-of-Day Switcher & Auth */}
