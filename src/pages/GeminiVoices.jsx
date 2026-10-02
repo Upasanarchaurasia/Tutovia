@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   Cpu,
   Globe,
-  Flame
+  Flame,
+  Star
 } from 'lucide-react';
 import { 
   GEMINI_FREE_TIER_INFO, 
@@ -39,12 +40,12 @@ import axios from '../api.js';
 export default function GeminiVoices() {
   const { addToast } = useToast();
 
-  // Search & Filter States
+  // Search & Filter States — DEFAULT TO HINGLISH SO IT IS IMMEDIATELY VISIBLE
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('ALL'); // 'ALL', 'HINGLISH', 'GEMINI_OFFICIAL'
+  const [selectedCategory, setSelectedCategory] = useState('HINGLISH'); // 'HINGLISH', 'ALL', 'GEMINI_OFFICIAL'
   const [selectedGender, setSelectedGender] = useState('ALL');
 
-  // Selected Voice & Controls
+  // Selected Voice & Controls — DEFAULT TO HINGLISH PUCK & HINGLISH PROMPT 1
   const [selectedVoice, setSelectedVoice] = useState(GEMINI_SAMPLE_VOICES[0]);
   const [sampleText, setSampleText] = useState(GEMINI_SAMPLE_PROMPTS[0].text);
   const [speakingRate, setSpeakingRate] = useState(1.0);
@@ -290,9 +291,9 @@ export default function GeminiVoices() {
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-amber-300" />
-                🇮🇳 Hinglish + English Voices
+              <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                <Globe className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                🇮🇳 Hinglish Suitable Voices Active
               </span>
               <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
@@ -321,7 +322,60 @@ export default function GeminiVoices() {
         </div>
       </div>
 
-      {/* 2. ACTIVE VOICE TESTER & AUDIO STUDIO PANEL */}
+      {/* 2. PROMINENT HINGLISH VOICE FILTER BAR */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-indigo-500/15 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 font-bold shrink-0">
+            🇮🇳
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              Hinglish Audio Studio Mode
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-extrabold border border-amber-500/40">Active</span>
+            </h3>
+            <p className="text-xs text-slate-300">Switch categories or filter voices specifically tuned for Hinglish study recaps.</p>
+          </div>
+        </div>
+
+        {/* Big Prominent Category Filter Buttons */}
+        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar py-1">
+          <button
+            onClick={() => setSelectedCategory('HINGLISH')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shadow-md ${
+              selectedCategory === 'HINGLISH'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-extrabold ring-2 ring-amber-400/50 scale-105'
+                : 'bg-surface-card hover:bg-surface text-amber-300 border border-amber-500/40'
+            }`}
+          >
+            <Star className="w-3.5 h-3.5 fill-current" />
+            <span>🇮🇳 Hinglish Suitable Voices ({GEMINI_SAMPLE_VOICES.filter(v => v.isHinglish).length})</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedCategory('ALL')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              selectedCategory === 'ALL'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'bg-surface-card hover:bg-surface text-slate-300 border border-surface-border'
+            }`}
+          >
+            All Voices ({GEMINI_SAMPLE_VOICES.length})
+          </button>
+
+          <button
+            onClick={() => setSelectedCategory('GEMINI_OFFICIAL')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              selectedCategory === 'GEMINI_OFFICIAL'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'bg-surface-card hover:bg-surface text-slate-300 border border-surface-border'
+            }`}
+          >
+            Gemini Official ({GEMINI_SAMPLE_VOICES.filter(v => !v.isHinglish).length})
+          </button>
+        </div>
+      </div>
+
+      {/* 3. ACTIVE VOICE TESTER & AUDIO STUDIO PANEL */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column: Interactive Controls & Speech Studio (7 cols) */}
@@ -418,6 +472,7 @@ export default function GeminiVoices() {
                 <span className="text-[11px] font-bold text-amber-300">Phrases:</span>
                 <select
                   onChange={(e) => setSampleText(e.target.value)}
+                  value={sampleText}
                   className="bg-surface-card border border-surface-border text-xs text-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-500 font-medium"
                 >
                   {GEMINI_SAMPLE_PROMPTS.map((p, idx) => (
@@ -699,7 +754,7 @@ export default function GeminiVoices() {
 
       </div>
 
-      {/* 3. VOICE CATALOG GRID SECTION */}
+      {/* 4. VOICE CATALOG GRID SECTION */}
       <div className="glass-panel rounded-3xl p-6 border border-surface-border space-y-6 shadow-xl">
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-surface-border">
@@ -715,25 +770,27 @@ export default function GeminiVoices() {
             {/* Category Filter Tabs */}
             <div className="flex items-center gap-1 bg-surface-card border border-surface-border p-1 rounded-xl text-xs font-bold">
               <button
+                onClick={() => setSelectedCategory('HINGLISH')}
+                className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  selectedCategory === 'HINGLISH'
+                    ? 'bg-amber-500 text-slate-950 font-extrabold shadow'
+                    : 'text-amber-400 hover:text-amber-300'
+                }`}
+              >
+                <span>🇮🇳 Hinglish Suitable</span>
+              </button>
+              <button
                 onClick={() => setSelectedCategory('ALL')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
+                className={`px-3.5 py-1.5 rounded-lg transition-all ${
                   selectedCategory === 'ALL' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 All Voices
               </button>
               <button
-                onClick={() => setSelectedCategory('HINGLISH')}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
-                  selectedCategory === 'HINGLISH' ? 'bg-amber-600 text-white shadow' : 'text-amber-400 hover:text-amber-300'
-                }`}
-              >
-                <span>🇮🇳 Hinglish Suitable</span>
-              </button>
-              <button
                 onClick={() => setSelectedCategory('GEMINI_OFFICIAL')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  selectedCategory === 'GEMINI_OFFICIAL' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                className={`px-3.5 py-1.5 rounded-lg transition-all ${
+                  selectedCategory === 'GEMINI_OFFICIAL' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 Gemini Official
@@ -843,7 +900,7 @@ export default function GeminiVoices() {
 
       </div>
 
-      {/* 4. GEMINI API KEY MODAL */}
+      {/* 5. GEMINI API KEY MODAL */}
       {showApiModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in">
           <div className="glass-panel rounded-3xl p-6 border border-surface-border max-w-lg w-full space-y-4 shadow-2xl relative">
