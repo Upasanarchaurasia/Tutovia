@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User as UserIcon, Settings, Target, Flame, Trophy, Clock, BookOpen, ChevronRight, LogOut, Shield, Edit2, Check, Loader2, Moon, Sun, AlertTriangle, Cloud, Smartphone, Laptop, RefreshCw, Sparkles } from 'lucide-react';
+import { User as UserIcon, Settings, Target, Flame, Trophy, Clock, BookOpen, ChevronRight, LogOut, Shield, Edit2, Check, Loader2, Moon, Sun, AlertTriangle, Cloud, Smartphone, Laptop, RefreshCw, Sparkles, FileText, ExternalLink, Download } from 'lucide-react';
 import axios from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -393,8 +393,23 @@ export default function User() {
                     {profile?.attempt && profile.attempt !== 'Not set' && (
                       <div className="mt-1.5 space-y-1">
                         {icaiDates?.isOfficial ? (
-                          <div className="text-xs text-emerald-300 font-medium">
-                            <span>Dates: {icaiDates.displayDate || 'Jan 2 – Jan 12, 2027'} (2:00 PM – 5:00 PM IST)</span>
+                          <div className="text-xs text-emerald-300 font-medium space-y-1">
+                            <div>Dates: {icaiDates.displayDate || 'Jan 2 – Jan 12, 2027'} (2:00 PM – 5:00 PM IST)</div>
+                            {(icaiDates.officialNoticePdfUrl || icaiDates.officialNotificationUrl) && (
+                              <div className="pt-0.5">
+                                <a
+                                  href={icaiDates.officialNoticePdfUrl || icaiDates.officialNotificationUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold hover:underline"
+                                  title="Open official ICAI notification PDF directly"
+                                >
+                                  <FileText size={11} className="text-emerald-400" />
+                                  <span>Open Official Notice PDF</span>
+                                  <ExternalLink size={9} />
+                                </a>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="text-[11px] text-amber-300/90 font-medium">

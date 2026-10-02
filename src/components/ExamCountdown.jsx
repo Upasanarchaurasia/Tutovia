@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, AlertTriangle, ExternalLink, CheckCircle2, ShieldCheck, ChevronDown, Sparkles, RefreshCw, X, Info } from 'lucide-react';
+import { Calendar, Clock, AlertTriangle, ExternalLink, CheckCircle2, ShieldCheck, ChevronDown, Sparkles, RefreshCw, X, Info, FileText, Download, Eye, Copy, Check } from 'lucide-react';
 import axios from '../api.js';
+import PdfViewerModal from './PdfViewerModal.jsx';
 
 export default function ExamCountdown({ profile, onAttemptChange }) {
   const [examInfo, setExamInfo] = useState(null);
@@ -13,6 +14,8 @@ export default function ExamCountdown({ profile, onAttemptChange }) {
   const [loadingUpcoming, setLoadingUpcoming] = useState(false);
   const [switchingAttempt, setSwitchingAttempt] = useState(false);
   const [showPapers, setShowPapers] = useState(false);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [copiedNotice, setCopiedNotice] = useState(false);
 
   // Active attempt defaults to student profile or January 2027
   const currentAttempt = profile?.attempt && profile.attempt !== 'Not set' && !profile.attempt.includes('2024') && !profile.attempt.includes('2025') && !profile.attempt.includes('September 2026')
@@ -86,6 +89,7 @@ export default function ExamCountdown({ profile, onAttemptChange }) {
 
   const isOfficial = examInfo?.isOfficial;
   const isTentative = examInfo?.isTentative || !isOfficial;
+  const noticePdfUrl = examInfo?.officialNoticePdfUrl || examInfo?.officialNotificationUrl;
 
   const targetDateFormatted = examInfo?.targetDate 
     ? new Date(examInfo.targetDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -146,22 +150,50 @@ export default function ExamCountdown({ profile, onAttemptChange }) {
             </div>
 
             {/* Target description & disclaimer */}
-            <div className="text-xs text-slate-300 flex flex-wrap items-center gap-2 mt-1">
+            <div className="text-xs text-slate-300 flex flex-wrap items-center gap-2 mt-1.5">
               {isOfficial ? (
                 <>
                   <span>Examination Commencing: <strong className="text-emerald-300">{targetDateFormatted}</strong></span>
                   <span className="text-slate-500 hidden sm:inline">•</span>
                   <span className="text-slate-300">{group}</span>
-                  {examInfo?.officialNotificationUrl && (
-                    <a
-                      href={examInfo.officialNotificationUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-0.5 hover:underline ml-1"
-                    >
-                      <span>View Official Notice</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
+                  {noticePdfUrl && (
+                    <div className="inline-flex items-center gap-1.5 flex-wrap ml-1">
+                      {/* 1-Click In-App Viewer Modal */}
+                      <button
+                        onClick={() => setShowPdfViewer(true)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/35 border border-indigo-500/40 text-indigo-300 text-[11px] font-semibold transition-all shadow-sm"
+                        title="Read Official Notice in Tutovia"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>View Notice</span>
+                      </button>
+
+                      {/* Direct 1-Click Open PDF in New Tab */}
+                      <a
+                        href={noticePdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold transition-all shadow-sm"
+                        title="Open official ICAI notification PDF directly in new tab"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Open Notice PDF</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+
+                      {/* Copy Link Button */}
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(noticePdfUrl);
+                          setCopiedNotice(true);
+                          setTimeout(() => setCopiedNotice(false), 2000);
+                        }}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent hover:border-surface-border transition-all text-[11px]"
+                        title="Copy direct ICAI PDF link"
+                      >
+                        {copiedNotice ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   )}
                 </>
               ) : (
@@ -317,6 +349,17 @@ export default function ExamCountdown({ profile, onAttemptChange }) {
           </div>
         </div>
       )}
+
+      {/* In-App Official Notice PDF Viewer Modal */}
+      <PdfViewerModal
+        isOpen={showPdfViewer}
+        onClose={() => setShowPdfViewer(false)}
+        pdfUrl={noticePdfUrl}
+        title={examInfo?.officialNoticeTitle || `ICAI Examination Notification — ${currentAttempt}`}
+        subtitle={`CA Intermediate • ${currentAttempt} • Official ICAI Notification`}
+        portalSourceUrl="https://www.icai.org/category/student-examination"
+        isOfficial={true}
+      />
     </div>
   );
 }

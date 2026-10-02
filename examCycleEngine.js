@@ -71,7 +71,8 @@ const INITIAL_EXAM_ATTEMPTS = [
       ]
     },
     official_notice_title: "Important Announcement — September 2026 CA Intermediate Examination",
-    official_notice_url: "https://www.icai.org/category/student-examination",
+    official_notice_url: "https://resource.cdn.icai.org/93054exam-aps5675-int-guide-sep2026.pdf",
+    official_notice_pdf_url: "https://resource.cdn.icai.org/93054exam-aps5675-int-guide-sep2026.pdf",
     official_notice_date: "2026-05-18",
     source_name: "ICAI Official Portal (icai.org)",
     source_verified: true,
@@ -113,7 +114,8 @@ const INITIAL_EXAM_ATTEMPTS = [
       ]
     },
     official_notice_title: "Important Announcement — January 2027 CA Intermediate Examination Schedule",
-    official_notice_url: "https://www.icai.org/category/student-examination",
+    official_notice_url: "https://resource.cdn.icai.org/94423exam290926.pdf",
+    official_notice_pdf_url: "https://resource.cdn.icai.org/94423exam290926.pdf",
     official_notice_date: "2026-09-28",
     source_name: "ICAI Official Portal (icai.org)",
     source_verified: true,
@@ -238,7 +240,8 @@ const INITIAL_EXAM_DATE_UPDATES = [
     previous_dates: "Estimated Period: January 2027 (Expected Jan 5–18, 2027)",
     new_dates: "Group 1: January 2, 4, 6 | Group 2: January 8, 10, 12, 2027",
     official_notice_title: "Important Announcement — January 2027 CA Intermediate Examination Schedule",
-    official_notice_url: "https://www.icai.org/category/student-examination",
+    official_notice_url: "https://resource.cdn.icai.org/94423exam290926.pdf",
+    official_notice_pdf_url: "https://resource.cdn.icai.org/94423exam290926.pdf",
     official_notice_date: "2026-09-28",
     verified_source: "ICAI Official Portal (icai.org)",
     updated_at: "2026-09-28T14:00:00.000Z",
@@ -281,6 +284,37 @@ export class ExamCycleEngine {
       this.examAttempts = [...INITIAL_EXAM_ATTEMPTS];
       this.examDateUpdates = [...INITIAL_EXAM_DATE_UPDATES];
       this.userNotifications = [];
+    }
+
+    // Auto-migration: Ensure official notices point directly to the authoritative PDF file
+    const jan2027 = this.examAttempts.find(a => a.id === 'ca-inter-jan-2027' || a.attempt_code === 'January 2027');
+    if (jan2027) {
+      if (!jan2027.official_notice_url || !jan2027.official_notice_url.toLowerCase().endsWith('.pdf')) {
+        jan2027.official_notice_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
+      }
+      jan2027.official_notice_pdf_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
+    }
+
+    const sep2026 = this.examAttempts.find(a => a.id === 'ca-inter-sep-2026' || a.attempt_code === 'September 2026');
+    if (sep2026) {
+      if (!sep2026.official_notice_url || !sep2026.official_notice_url.toLowerCase().endsWith('.pdf')) {
+        sep2026.official_notice_url = "https://resource.cdn.icai.org/93054exam-aps5675-int-guide-sep2026.pdf";
+      }
+      sep2026.official_notice_pdf_url = "https://resource.cdn.icai.org/93054exam-aps5675-int-guide-sep2026.pdf";
+    }
+
+    for (const upd of this.examDateUpdates) {
+      if (upd.attempt_code === 'January 2027' && (!upd.official_notice_url || !upd.official_notice_url.toLowerCase().endsWith('.pdf'))) {
+        upd.official_notice_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
+        upd.official_notice_pdf_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
+      }
+    }
+
+    for (const notif of this.userNotifications) {
+      if (notif.attempt_code === 'January 2027' && (!notif.official_notice_url || !notif.official_notice_url.toLowerCase().endsWith('.pdf'))) {
+        notif.official_notice_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
+        notif.official_notice_pdf_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
+      }
     }
 
     // Ensure state integrity and dynamically generate future trimesters
@@ -439,6 +473,7 @@ export class ExamCycleEngine {
         group2: a.group2,
         official_notice_title: a.official_notice_title,
         official_notice_url: a.official_notice_url,
+        official_notice_pdf_url: a.official_notice_pdf_url || a.official_notice_url,
         official_notice_date: a.official_notice_date,
         source_name: a.source_name,
         source_verified: a.source_verified,
@@ -529,6 +564,7 @@ export class ExamCycleEngine {
       group1Dates: entry.group1?.dates || entry.tentative_period_label,
       group2Dates: entry.group2?.dates || entry.tentative_period_label,
       officialNotificationUrl: entry.official_notice_url,
+      officialNoticePdfUrl: entry.official_notice_pdf_url || entry.official_notice_url,
       officialNoticeTitle: entry.official_notice_title,
       officialNoticeDate: entry.official_notice_date,
       sourceName: entry.source_name,
@@ -606,6 +642,7 @@ export class ExamCycleEngine {
     if (group2) entry.group2 = group2;
     entry.official_notice_title = officialNoticeTitle;
     entry.official_notice_url = officialNoticeUrl;
+    entry.official_notice_pdf_url = officialNoticePdfUrl || (officialNoticeUrl && officialNoticeUrl.toLowerCase().endsWith('.pdf') ? officialNoticeUrl : (officialNoticeUrl || "https://resource.cdn.icai.org/94423exam290926.pdf"));
     entry.official_notice_date = officialNoticeDate || new Date().toISOString().slice(0, 10);
     entry.source_name = sourceName;
     entry.source_verified = true;
@@ -624,6 +661,7 @@ export class ExamCycleEngine {
       new_dates: officialDatesText,
       official_notice_title: officialNoticeTitle,
       official_notice_url: officialNoticeUrl,
+      official_notice_pdf_url: entry.official_notice_pdf_url,
       official_notice_date: entry.official_notice_date,
       verified_source: sourceName,
       updated_at: new Date().toISOString(),

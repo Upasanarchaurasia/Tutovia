@@ -1615,15 +1615,19 @@ function ExamSchedulesTab() {
                               {att.official_notice_title || "ICAI Official Notification"}
                             </p>
                             {att.official_notice_url ? (
-                              <a
-                                href={att.official_notice_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1 text-[11px] mt-0.5 hover:underline"
-                              >
-                                <span>View Notice</span>
-                                <ExternalLink size={10} />
-                              </a>
+                              <div className="flex items-center gap-2 mt-1">
+                                <a
+                                  href={att.official_notice_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1 text-[11px] font-medium hover:underline"
+                                  title="Open official notice PDF file directly"
+                                >
+                                  <FileText size={11} className="text-emerald-400" />
+                                  <span>Open Notice PDF</span>
+                                  <ExternalLink size={9} />
+                                </a>
+                              </div>
                             ) : (
                               <span className="text-[11px] text-slate-500">Official Portal verified</span>
                             )}
@@ -1707,9 +1711,12 @@ function ExamSchedulesTab() {
                           href={entry.official_notice_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-indigo-400 hover:underline inline-flex items-center gap-1 text-[10px]"
+                          className="text-emerald-400 hover:underline inline-flex items-center gap-1 text-[10px] font-medium"
+                          title="Open official notice PDF file directly"
                         >
-                          Notice link <ExternalLink size={9} />
+                          <FileText size={10} className="text-emerald-400" />
+                          <span>Open Notice PDF</span>
+                          <ExternalLink size={9} />
                         </a>
                       )}
                     </td>
@@ -1804,12 +1811,12 @@ function ExamSchedulesTab() {
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1 text-[11px]">Official Notice URL (Must be icai.org)</label>
+                    <label className="block text-slate-300 font-semibold mb-1 text-[11px]">Official Notice PDF URL (Direct PDF on resource.cdn.icai.org)</label>
                     <input
                       type="url"
                       value={editForm.official_notice_url}
                       onChange={e => setEditForm({ ...editForm, official_notice_url: e.target.value })}
-                      placeholder="https://www.icai.org/category/student-examination"
+                      placeholder="https://resource.cdn.icai.org/94423exam290926.pdf"
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
                     />
                   </div>
