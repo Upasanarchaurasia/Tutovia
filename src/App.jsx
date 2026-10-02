@@ -109,6 +109,7 @@ export default function App() {
             <Route path="/news" element={<News />} />
             <Route path="/community" element={<Community />} />
             <Route path="/profile" element={<User />} />
+            <Route path="/user" element={<Navigate to="/profile" replace />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/pyq" element={<PYQ />} />
             <Route path="/tutor" element={<TutorPage />} />
