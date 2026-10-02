@@ -21,13 +21,18 @@ import {
   FileText,
   CheckCircle2,
   Cpu,
-  Bot
+  Globe,
+  Flame
 } from 'lucide-react';
 import { 
   GEMINI_FREE_TIER_INFO, 
   GEMINI_SAMPLE_PROMPTS, 
   GEMINI_SAMPLE_VOICES 
 } from '../data/geminiVoicesData.js';
+import { 
+  getDistinctBrowserVoice, 
+  getDistinctUtteranceParams 
+} from '../utils/geminiAudioSynth.js';
 import { useToast } from '../context/ToastContext.jsx';
 import axios from '../api.js';
 
@@ -36,6 +41,7 @@ export default function GeminiVoices() {
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('ALL'); // 'ALL', 'HINGLISH', 'GEMINI_OFFICIAL'
   const [selectedGender, setSelectedGender] = useState('ALL');
 
   // Selected Voice & Controls
@@ -84,8 +90,11 @@ export default function GeminiVoices() {
                           voice.tone.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           voice.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           voice.recommendedFor.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'ALL' ||
+                            (selectedCategory === 'HINGLISH' && voice.isHinglish) ||
+                            (selectedCategory === 'GEMINI_OFFICIAL' && !voice.isHinglish);
     const matchesGender = selectedGender === 'ALL' || voice.gender === selectedGender;
-    return matchesSearch && matchesGender;
+    return matchesSearch && matchesCategory && matchesGender;
   });
 
   // Save Gemini API Key
@@ -97,12 +106,12 @@ export default function GeminiVoices() {
       addToast('Gemini API Key saved successfully!', 'success');
     } else {
       setActiveEngine('native');
-      addToast('Switched to Web Audio & Speech Synth engine.', 'info');
+      addToast('Switched to Distinct Web Audio & Speech Synth engine.', 'info');
     }
     setShowApiModal(false);
   };
 
-  // Play Audio Synthesis
+  // Play Audio Synthesis with Distinct Vocal Profiles
   const handlePlayVoice = async (voiceToPlay = selectedVoice) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -124,7 +133,7 @@ export default function GeminiVoices() {
       try {
         const response = await axios.post('/api/gemini-tts/synthesize', {
           text: sampleText,
-          voiceName: voiceToPlay.id,
+          voiceName: voiceToPlay.id.replace('Hinglish-', ''), // Map Hinglish-Puck -> Puck for Gemini API
           speakingRate: speakingRate,
           pitch: pitch,
           apiKey: apiKey.trim()
@@ -155,45 +164,37 @@ export default function GeminiVoices() {
         }
       } catch (err) {
         console.error('Gemini TTS API Call failed:', err);
-        addToast('Gemini API call failed. Falling back to Browser Native engine.', 'error');
+        addToast('Gemini API call failed. Falling back to Distinct Voice Engine.', 'error');
         setActiveEngine('native');
       } finally {
         setLoadingAudio(false);
       }
     }
 
-    // MODE 2: Browser Speech Synthesis with Gemini Voice Profiles
+    // MODE 2: Browser Speech Synthesis with Distinct Pitch & Formant Profiles
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(sampleText);
-      utterance.rate = speakingRate * (voiceToPlay.sampleRate || 1.0);
-      
-      // Calculate pitch mapping for Gemini voice profile
-      const voicePitchOffset = voiceToPlay.samplePitch || 0.0;
-      const combinedPitch = pitch + voicePitchOffset;
-      utterance.pitch = Math.max(0.5, Math.min(1.5, 1.0 + (combinedPitch / 20)));
+
+      // Get distinct pitch and rate calculated specifically for this voice model
+      const { pitch: distinctPitch, rate: distinctRate } = getDistinctUtteranceParams(
+        voiceToPlay.id, 
+        pitch, 
+        speakingRate
+      );
+
+      utterance.pitch = distinctPitch;
+      utterance.rate = distinctRate;
       utterance.volume = volume;
 
-      const voices = window.speechSynthesis.getVoices();
-      let matchedVoice = null;
-
-      if (voiceToPlay.nativeBrowserMatch) {
-        matchedVoice = voices.find(v => 
-          voiceToPlay.nativeBrowserMatch.some(m => v.name.includes(m))
-        );
-      }
-      if (!matchedVoice) {
-        matchedVoice = voices.find(v => 
-          voiceToPlay.gender === 'FEMALE' ? (v.name.includes('Female') || v.name.includes('Zira') || v.name.includes('Google')) : (v.name.includes('Male') || v.name.includes('David'))
-        ) || voices[0];
-      }
-
+      // Select distinct browser voice (prioritizing Indian/Hinglish if voice is Hinglish)
+      const matchedVoice = getDistinctBrowserVoice(voiceToPlay.id, voiceToPlay.isHinglish);
       if (matchedVoice) {
         utterance.voice = matchedVoice;
       }
 
       utterance.onstart = () => {
         setIsPlaying(true);
-        const estimatedDurationSec = (sampleText.length / 14) / (speakingRate * (voiceToPlay.sampleRate || 1.0));
+        const estimatedDurationSec = (sampleText.length / 14) / distinctRate;
         let elapsed = 0;
         progressIntervalRef.current = setInterval(() => {
           elapsed += 0.1;
@@ -237,6 +238,7 @@ export default function GeminiVoices() {
 
   // Generate Gemini API JSON Request Body
   const generateGeminiJson = (voice, text) => {
+    const apiVoiceId = voice.id.replace('Hinglish-', '');
     return JSON.stringify({
       contents: [
         {
@@ -248,7 +250,7 @@ export default function GeminiVoices() {
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
-              voiceName: voice.id
+              voiceName: apiVoiceId
             }
           }
         }
@@ -277,9 +279,6 @@ export default function GeminiVoices() {
     }
   };
 
-  const charCount = sampleText.length;
-  const freeRequestsDaily = 1500;
-
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       
@@ -291,6 +290,10 @@ export default function GeminiVoices() {
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-amber-300" />
+                🇮🇳 Hinglish + English Voices
+              </span>
               <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                 Gemini 2.0 Flash Audio TTS
@@ -298,15 +301,12 @@ export default function GeminiVoices() {
               <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold">
                 1,500 Requests/Day FREE
               </span>
-              <span className="px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-xs font-bold">
-                8 Prebuilt Gemini Voices
-              </span>
             </div>
             <h1 className="text-2xl md:text-4xl font-extrabold text-white tracking-tight">
-              Gemini TTS Voice Testing Studio
+              Gemini & Hinglish TTS Voice Testing Studio
             </h1>
             <p className="text-slate-300 text-sm md:text-base max-w-3xl leading-relaxed">
-              Test all official sample voices provided in the free tier of Gemini API (Puck, Charon, Kore, Fenrir, Aoede, Leda, Orpheus, Callisto). Listen to expressive neural tones, compare speaking styles, and test custom CA study prompts.
+              Test all prebuilt Gemini 2.0 Flash sample voices alongside dedicated <strong>Hinglish suitable voices</strong> for CA aspirants. Listen to natural Hinglish tax rules, accounting standards, and distinct vocal pitch profiles.
             </p>
           </div>
 
@@ -336,6 +336,11 @@ export default function GeminiVoices() {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-bold text-white text-lg">{selectedVoice.name}</h3>
+                  {selectedVoice.isHinglish && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      🇮🇳 Hinglish Suitable
+                    </span>
+                  )}
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40">
                     {selectedVoice.tone}
                   </span>
@@ -371,10 +376,10 @@ export default function GeminiVoices() {
                 }`}
               >
                 <div className="flex items-center justify-between font-bold text-xs sm:text-sm">
-                  <span>Gemini Web Audio Synth</span>
+                  <span>Distinct Audio & Hinglish Engine</span>
                   {activeEngine === 'native' && <CheckCircle2 className="w-4 h-4 text-purple-400" />}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Uses Gemini voice profiles & Web Audio synthesis (Instant browser play)</p>
+                <p className="text-[11px] text-slate-400 mt-1">Uses distinct vocal pitch, rate offsets & Indian accents for instant play</p>
               </button>
 
               <button
@@ -402,16 +407,18 @@ export default function GeminiVoices() {
 
           {/* Prompt Selector & Text Input */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-purple-400" />
                 Sample Test Text ({sampleText.length} Chars)
               </label>
+
+              {/* Sample Selector with Hinglish Highlight */}
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-400">Quick Samples:</span>
+                <span className="text-[11px] font-bold text-amber-300">Phrases:</span>
                 <select
                   onChange={(e) => setSampleText(e.target.value)}
-                  className="bg-surface-card border border-surface-border text-xs text-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="bg-surface-card border border-surface-border text-xs text-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-500 font-medium"
                 >
                   {GEMINI_SAMPLE_PROMPTS.map((p, idx) => (
                     <option key={idx} value={p.text}>{p.title}</option>
@@ -424,8 +431,8 @@ export default function GeminiVoices() {
               rows={4}
               value={sampleText}
               onChange={(e) => setSampleText(e.target.value)}
-              className="w-full p-4 rounded-2xl bg-surface-card border border-surface-border text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 leading-relaxed placeholder:text-slate-500 transition-all"
-              placeholder="Type or paste any text to test Gemini TTS voices..."
+              className="w-full p-4 rounded-2xl bg-surface-card border border-surface-border text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 leading-relaxed placeholder:text-slate-500 transition-all font-sans"
+              placeholder="Type or paste any text or Hinglish phrase to test..."
             />
           </div>
 
@@ -462,10 +469,10 @@ export default function GeminiVoices() {
 
                 <div>
                   <h4 className="text-xs font-bold text-white">
-                    {isPlaying ? `Playing Gemini ${selectedVoice.name} Voice...` : loadingAudio ? 'Synthesizing Audio via Gemini 2.0 Flash...' : 'Ready to Test Gemini Voice'}
+                    {isPlaying ? `Playing ${selectedVoice.name}...` : loadingAudio ? 'Synthesizing Audio via Gemini 2.0 Flash...' : 'Ready to Test Distinct Voice'}
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Engine: <span className="text-purple-300 font-semibold">{activeEngine === 'gemini_api' ? 'Official Gemini 2.0 Flash REST API' : 'Gemini Web Synth Engine'}</span>
+                    Engine: <span className="text-purple-300 font-semibold">{activeEngine === 'gemini_api' ? 'Official Gemini 2.0 Flash REST API' : 'Distinct Voice Synthesis Engine'}</span>
                   </p>
                 </div>
               </div>
@@ -487,7 +494,7 @@ export default function GeminiVoices() {
             {/* Progress Bar */}
             <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-100" 
+                className="h-full bg-gradient-to-r from-purple-500 to-amber-500 transition-all duration-100" 
                 style={{ width: `${playbackProgress}%` }}
               />
             </div>
@@ -661,7 +668,10 @@ export default function GeminiVoices() {
                 {compareList.map(voice => (
                   <div key={voice.id} className="p-3 rounded-2xl bg-surface-card border border-surface-border flex items-center justify-between">
                     <div>
-                      <h4 className="text-xs font-bold text-white">{voice.name}</h4>
+                      <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                        {voice.name}
+                        {voice.isHinglish && <span className="text-[10px] text-amber-400">🇮🇳 Hinglish</span>}
+                      </h4>
                       <p className="text-[10px] text-slate-400">{voice.tone} • {voice.gender}</p>
                     </div>
 
@@ -696,18 +706,46 @@ export default function GeminiVoices() {
           <div>
             <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
               <Volume2 className="w-5 h-5 text-purple-400" />
-              All 8 Official Gemini Prebuilt Sample Voices ({filteredVoices.length} Voices Available)
+              Voice Catalog ({filteredVoices.length} Voices Available)
             </h2>
-            <p className="text-xs text-slate-400 mt-1">Browse, filter, and test all prebuilt voice models available in Gemini 2.0 Flash.</p>
+            <p className="text-xs text-slate-400 mt-1">Browse, filter, and test all prebuilt Gemini voices and Indian Hinglish suitable voices.</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Category Filter Tabs */}
+            <div className="flex items-center gap-1 bg-surface-card border border-surface-border p-1 rounded-xl text-xs font-bold">
+              <button
+                onClick={() => setSelectedCategory('ALL')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  selectedCategory === 'ALL' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                All Voices
+              </button>
+              <button
+                onClick={() => setSelectedCategory('HINGLISH')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                  selectedCategory === 'HINGLISH' ? 'bg-amber-600 text-white shadow' : 'text-amber-400 hover:text-amber-300'
+                }`}
+              >
+                <span>🇮🇳 Hinglish Suitable</span>
+              </button>
+              <button
+                onClick={() => setSelectedCategory('GEMINI_OFFICIAL')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  selectedCategory === 'GEMINI_OFFICIAL' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Gemini Official
+              </button>
+            </div>
+
             {/* Search Box */}
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full sm:w-56">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search Puck, Kore, Fenrir..."
+                placeholder="Search Puck, Kore, Hinglish..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-xl bg-surface-card border border-surface-border text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
@@ -745,9 +783,16 @@ export default function GeminiVoices() {
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
-                      <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider mb-1 bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                        {voice.tone}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          {voice.tone}
+                        </span>
+                        {voice.isHinglish && (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                            🇮🇳 Hinglish
+                          </span>
+                        )}
+                      </div>
                       <h4 className="font-bold text-white text-lg leading-snug group-hover:text-purple-300 transition-colors">
                         {voice.name}
                       </h4>
