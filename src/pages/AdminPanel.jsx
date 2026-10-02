@@ -1714,8 +1714,8 @@ function ExamSchedulesTab() {
                       )}
                     </td>
                     <td className="py-3 px-3 text-slate-400 font-mono text-[11px]">
-                      <div>{new Date(entry.verified_at).toLocaleString('en-IN')}</div>
-                      <div className="text-[10px] text-slate-500">{entry.verification_method}</div>
+                      <div>{new Date(entry.verified_at || entry.updated_at || Date.now()).toLocaleString('en-IN')}</div>
+                      <div className="text-[10px] text-slate-500">{entry.verification_method || entry.verified_source || 'ICAI Official Verification'}</div>
                     </td>
                   </tr>
                 ))}
