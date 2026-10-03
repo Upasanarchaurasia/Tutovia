@@ -13,9 +13,11 @@ frontend-err.log
 
 # Build Outputs
 build/
+dist_v2/
 Payload/
 *.ipa
 *.ps1
+*.tar.gz
 DerivedData/
 
 # Large local runtime zips and directories
