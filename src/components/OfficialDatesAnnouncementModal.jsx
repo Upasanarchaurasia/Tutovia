@@ -34,9 +34,9 @@ export default function OfficialDatesAnnouncementModal({ currentAttempt, onAckno
             attempt_code: 'January 2027',
             message: 'ICAI has officially announced the CA Intermediate examination dates for your selected attempt: January 2027. Your estimated examination schedule has now been replaced with the official ICAI schedule.',
             official_dates: 'January 2, 4, 6 (Group 1) & January 8, 10, 12, 2027 (Group 2)',
-            official_notice_url: 'https://resource.cdn.icai.org/94423exam290926.pdf',
-            official_notice_pdf_url: 'https://resource.cdn.icai.org/94423exam290926.pdf',
-            official_notice_title: 'Important Announcement — January 2027 CA Intermediate Examination Schedule',
+            official_notice_url: 'https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf',
+            official_notice_pdf_url: 'https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf',
+            official_notice_title: 'Schedule of Intermediate & Foundation Examinations, January 2027',
             source_name: 'ICAI Official Portal (icai.org)'
           });
           setVisible(true);
@@ -50,9 +50,9 @@ export default function OfficialDatesAnnouncementModal({ currentAttempt, onAckno
             attempt_code: 'January 2027',
             message: 'ICAI has officially announced the CA Intermediate examination dates for your selected attempt: January 2027. Your estimated examination schedule has now been replaced with the official ICAI schedule.',
             official_dates: 'January 2, 4, 6 (Group 1) & January 8, 10, 12, 2027 (Group 2)',
-            official_notice_url: 'https://resource.cdn.icai.org/94423exam290926.pdf',
-            official_notice_pdf_url: 'https://resource.cdn.icai.org/94423exam290926.pdf',
-            official_notice_title: 'Important Announcement — January 2027 CA Intermediate Examination Schedule',
+            official_notice_url: 'https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf',
+            official_notice_pdf_url: 'https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf',
+            official_notice_title: 'Schedule of Intermediate & Foundation Examinations, January 2027',
             source_name: 'ICAI Official Portal (icai.org)'
           });
           setVisible(true);
@@ -84,7 +84,7 @@ export default function OfficialDatesAnnouncementModal({ currentAttempt, onAckno
 
   if (!visible || !notification) return null;
 
-  const pdfUrl = notification.official_notice_pdf_url || notification.official_notice_url || "https://resource.cdn.icai.org/94423exam290926.pdf";
+  const pdfUrl = notification.official_notice_pdf_url || notification.official_notice_url || "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf";
 
   return (
     <>

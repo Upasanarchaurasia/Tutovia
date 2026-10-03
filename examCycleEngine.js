@@ -113,10 +113,10 @@ const INITIAL_EXAM_ATTEMPTS = [
         "Paper 6: Financial Management and Strategic Management — Jan 12, 2027 (2:00 PM - 5:00 PM)"
       ]
     },
-    official_notice_title: "Important Announcement — January 2027 CA Intermediate Examination Schedule",
-    official_notice_url: "https://resource.cdn.icai.org/94423exam290926.pdf",
-    official_notice_pdf_url: "https://resource.cdn.icai.org/94423exam290926.pdf",
-    official_notice_date: "2026-09-28",
+    official_notice_title: "Schedule of Intermediate & Foundation Examinations, January 2027",
+    official_notice_url: "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf",
+    official_notice_pdf_url: "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf",
+    official_notice_date: "2026-09-23",
     source_name: "ICAI Official Portal (icai.org)",
     source_verified: true,
     last_checked_at: "2026-10-02T10:00:00.000Z",
@@ -239,10 +239,10 @@ const INITIAL_EXAM_DATE_UPDATES = [
     new_status: "official",
     previous_dates: "Estimated Period: January 2027 (Expected Jan 5–18, 2027)",
     new_dates: "Group 1: January 2, 4, 6 | Group 2: January 8, 10, 12, 2027",
-    official_notice_title: "Important Announcement — January 2027 CA Intermediate Examination Schedule",
-    official_notice_url: "https://resource.cdn.icai.org/94423exam290926.pdf",
-    official_notice_pdf_url: "https://resource.cdn.icai.org/94423exam290926.pdf",
-    official_notice_date: "2026-09-28",
+    official_notice_title: "Schedule of Intermediate & Foundation Examinations, January 2027",
+    official_notice_url: "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf",
+    official_notice_pdf_url: "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf",
+    official_notice_date: "2026-09-23",
     verified_source: "ICAI Official Portal (icai.org)",
     updated_at: "2026-09-28T14:00:00.000Z",
     notes: "Official ICAI examination dates verified and confirmed. System automatically updated tentative estimation to official schedule and notified enrolled students."
@@ -289,10 +289,12 @@ export class ExamCycleEngine {
     // Auto-migration: Ensure official notices point directly to the authoritative PDF file
     const jan2027 = this.examAttempts.find(a => a.id === 'ca-inter-jan-2027' || a.attempt_code === 'January 2027');
     if (jan2027) {
-      if (!jan2027.official_notice_url || !jan2027.official_notice_url.toLowerCase().endsWith('.pdf')) {
-        jan2027.official_notice_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
+      if (!jan2027.official_notice_url || !jan2027.official_notice_url.toLowerCase().endsWith('.pdf') || jan2027.official_notice_url.includes('94423')) {
+        jan2027.official_notice_url = "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf";
       }
-      jan2027.official_notice_pdf_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
+      jan2027.official_notice_pdf_url = "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf";
+      jan2027.official_notice_title = "Schedule of Intermediate & Foundation Examinations, January 2027";
+      jan2027.official_notice_date = "2026-09-23";
     }
 
     const sep2026 = this.examAttempts.find(a => a.id === 'ca-inter-sep-2026' || a.attempt_code === 'September 2026');
@@ -304,21 +306,29 @@ export class ExamCycleEngine {
     }
 
     for (const upd of this.examDateUpdates) {
-      if (upd.attempt_code === 'January 2027' && (!upd.official_notice_url || !upd.official_notice_url.toLowerCase().endsWith('.pdf'))) {
-        upd.official_notice_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
-        upd.official_notice_pdf_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
+      if (upd.attempt_code === 'January 2027') {
+        if (!upd.official_notice_url || !upd.official_notice_url.toLowerCase().endsWith('.pdf') || upd.official_notice_url.includes('94423')) {
+          upd.official_notice_url = "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf";
+          upd.official_notice_pdf_url = "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf";
+          upd.official_notice_title = "Schedule of Intermediate & Foundation Examinations, January 2027";
+          upd.official_notice_date = "2026-09-23";
+        }
       }
     }
 
     for (const notif of this.userNotifications) {
-      if (notif.attempt_code === 'January 2027' && (!notif.official_notice_url || !notif.official_notice_url.toLowerCase().endsWith('.pdf'))) {
-        notif.official_notice_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
-        notif.official_notice_pdf_url = "https://resource.cdn.icai.org/94423exam290926.pdf";
+      if (notif.attempt_code === 'January 2027') {
+        if (!notif.official_notice_url || !notif.official_notice_url.toLowerCase().endsWith('.pdf') || notif.official_notice_url.includes('94423')) {
+          notif.official_notice_url = "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf";
+          notif.official_notice_pdf_url = "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf";
+          notif.official_notice_title = "Schedule of Intermediate & Foundation Examinations, January 2027";
+        }
       }
     }
 
     // Ensure state integrity and dynamically generate future trimesters
     this.ensureTrimesterCycles();
+    this.saveState();
   }
 
   // Persist state to database.json
@@ -642,7 +652,7 @@ export class ExamCycleEngine {
     if (group2) entry.group2 = group2;
     entry.official_notice_title = officialNoticeTitle;
     entry.official_notice_url = officialNoticeUrl;
-    entry.official_notice_pdf_url = officialNoticePdfUrl || (officialNoticeUrl && officialNoticeUrl.toLowerCase().endsWith('.pdf') ? officialNoticeUrl : (officialNoticeUrl || "https://resource.cdn.icai.org/94423exam290926.pdf"));
+    entry.official_notice_pdf_url = officialNoticePdfUrl || (officialNoticeUrl && officialNoticeUrl.toLowerCase().endsWith('.pdf') ? officialNoticeUrl : (officialNoticeUrl || "https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf"));
     entry.official_notice_date = officialNoticeDate || new Date().toISOString().slice(0, 10);
     entry.source_name = sourceName;
     entry.source_verified = true;

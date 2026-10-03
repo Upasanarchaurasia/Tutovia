@@ -1816,7 +1816,7 @@ function ExamSchedulesTab() {
                       type="url"
                       value={editForm.official_notice_url}
                       onChange={e => setEditForm({ ...editForm, official_notice_url: e.target.value })}
-                      placeholder="https://resource.cdn.icai.org/94423exam290926.pdf"
+                      placeholder="https://resource.cdn.icai.org/94359exam-aps6372-stu-iff-jan2027.pdf"
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
                     />
                   </div>
