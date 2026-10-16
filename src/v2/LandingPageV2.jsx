@@ -55,7 +55,7 @@ function TypewriterText({ text }) {
 }
 
 // Global V2 Revision Version Identifier
-export const TUTOVIA_V2_VERSION = 'v2.15.0';
+export const TUTOVIA_V2_VERSION = 'v2.16.0';
 
 /**
  * Isolated Reading Progress Bar

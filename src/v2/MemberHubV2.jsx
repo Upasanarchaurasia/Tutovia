@@ -5,8 +5,7 @@ import {
   GraduationCap, Bot, Compass, TrendingUp, 
   ArrowRight, LogOut, User, Settings, ChevronDown, 
   Sunrise, Sun, Sunset, Moon, Sparkles, CheckCircle2,
-  X, Play, Pause, RotateCcw, Send, Check, ShieldCheck,
-  Flame, Clock, BookOpen, Sparkle
+  X, Check, Send, Sparkle, Target, Calendar, Clock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from './ThemeContextV2.jsx';
@@ -23,31 +22,24 @@ export default function MemberHubV2() {
   // Dropdown & Modal states
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
-  const [studySpaceOpen, setStudySpaceOpen] = useState(false);
-  const [activeStudyTab, setActiveStudyTab] = useState('tutor'); // 'tutor' | 'plan' | 'progress'
+  
+  // V2 Flow & Preview Modals
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [selectedLevel, setSelectedLevel] = useState('CA Intermediate (Both Groups)');
+  const [selectedPace, setSelectedPace] = useState('Post-Articleship Evening (8 PM - 11 PM)');
+  const [directionCompleted, setDirectionCompleted] = useState(false);
+
+  // Capability Preview Modals
+  const [previewModal, setPreviewModal] = useState(null); // 'tutor' | 'direction' | 'progress' | null
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
-  // Focus Timer state for Study Space
-  const [timerSeconds, setTimerSeconds] = useState(25 * 60);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-
-  // AI Tutor interactive questions in V2
-  const [tutorQuery, setTutorQuery] = useState('');
-  const [chatMessages, setChatMessages] = useState([
-    {
-      sender: 'ai',
-      text: 'Welcome to your V2 study space! Ask me any CA concept, section provision, or practical case law scenario without hesitation.'
-    }
-  ]);
-  const [isAiTyping, setIsAiTyping] = useState(false);
-
-  // Study tasks completed tracker
-  const [tasks, setTasks] = useState([
-    { id: 1, title: 'Corporate Law: Review Sec 135 CSR expenditure thresholds', done: true },
-    { id: 2, title: 'Taxation: Capital Gains indexation formula practice', done: false },
-    { id: 3, title: 'Auditing: SA 500 audit evidence documentation', done: false }
-  ]);
+  // Interactive query demo inside AI Tutor Preview
+  const [previewQuery, setPreviewQuery] = useState('');
+  const [previewAnswer, setPreviewAnswer] = useState(
+    'Section 135 (Corporate Social Responsibility):\n\n• Applicability: Net worth ≥ ₹500 Cr, OR Turnover ≥ ₹1,000 Cr, OR Net Profit ≥ ₹5 Cr during the immediately preceding financial year.\n• Expenditure: Minimum 2≥ of average net profits of 3 preceding financial years.\n• Exam Tip: Always check if the profit threshold applies to the immediately preceding FY rather than an average.'
+  );
 
   const accountMenuRef = useRef(null);
   const themeMenuRef = useRef(null);
@@ -66,19 +58,6 @@ export default function MemberHubV2() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Timer countdown
-  useEffect(() => {
-    let interval = null;
-    if (isTimerRunning && timerSeconds > 0) {
-      interval = setInterval(() => {
-        setTimerSeconds((prev) => prev - 1);
-      }, 1000);
-    } else if (timerSeconds === 0) {
-      setIsTimerRunning(false);
-    }
-    return () => clearInterval(interval);
-  }, [isTimerRunning, timerSeconds]);
-
   // Auth Protection: If not authenticated and not loading, redirect to V2 login
   useEffect(() => {
     if (!loading && !user) {
@@ -96,19 +75,13 @@ export default function MemberHubV2() {
   };
 
   const studentName = 
-    user?.user_metadata?.name || 
-    user?.name || 
-    user?.fullName || 
-    profile?.full_name || 
-    (user?.email ? user.email.split('@')[0] : 'CA Aspirant');
+    user•.user_metadata•.name || 
+    user•.name || 
+    user•.fullName || 
+    profile•.full_name || 
+    (user•.email • user.email.split('@')[0] : 'CA Aspirant');
 
-  const formattedName = studentName ? (studentName.charAt(0).toUpperCase() + studentName.slice(1)) : 'CA Aspirant';
-
-  const handleOpenStudySpace = (tab = 'tutor') => {
-    setActiveStudyTab(tab);
-    setStudySpaceOpen(true);
-    setAccountMenuOpen(false);
-  };
+  const formattedName = studentName • (studentName.charAt(0).toUpperCase() + studentName.slice(1)) : 'CA Aspirant';
 
   const handleSignOut = async () => {
     try {
@@ -118,37 +91,23 @@ export default function MemberHubV2() {
     }
   };
 
-  const handleSendQuestion = (e) => {
-    e?.preventDefault();
-    if (!tutorQuery.trim()) return;
+  const handleAskPreview = (q) => {
+    const query = q || previewQuery;
+    if (!query.trim()) return;
 
-    const userText = tutorQuery.trim();
-    setChatMessages((prev) => [...prev, { sender: 'user', text: userText }]);
-    setTutorQuery('');
-    setIsAiTyping(true);
-
-    setTimeout(() => {
-      let aiResponse = `Here is a clear first-principles breakdown for "${userText}":\n\n• Key Provision: Focus on the legislative intent and statutory thresholds.\n• Practical Application: In ICAI examination questions, state the section reference first, followed by facts analysis and conclusion.\n• Exam Tip: Avoid rote memorization; structure your working notes methodically.`;
-
-      if (userText.toLowerCase().includes('csr') || userText.includes('135')) {
-        aiResponse = `Section 135 (Corporate Social Responsibility):\n\n1. Applicability: Net worth ≥ ₹500 Cr, OR Turnover ≥ ₹1,000 Cr, OR Net Profit ≥ ₹5 Cr during the immediately preceding financial year.\n2. Spend Requirement: At least 2% of average net profits made during the 3 immediately preceding financial years.\n3. Committee: Required if CSR liability exceeds ₹50 Lakhs (3 or more directors, at least 1 independent).`;
-      } else if (userText.toLowerCase().includes('tax') || userText.toLowerCase().includes('capital gains')) {
-        aiResponse = `Capital Gains Summary:\n\n• Short-term vs Long-term is determined by holding period (12 / 24 / 36 months depending on asset class).\n• Section 48 sets the computation mechanism: Full value of consideration minus expenditure incurred wholly and exclusively in transfer, cost of acquisition, and improvement.`;
-      }
-
-      setChatMessages((prev) => [...prev, { sender: 'ai', text: aiResponse }]);
-      setIsAiTyping(false);
-    }, 700);
-  };
-
-  const formatTimer = (secs) => {
-    const mins = Math.floor(secs / 60);
-    const remainder = secs % 60;
-    return `${mins.toString().padStart(2, '0')}:${remainder.toString().padStart(2, '0')}`;
-  };
-
-  const toggleTask = (id) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+    if (query.toLowerCase().includes('tax') || query.toLowerCase().includes('capital gains')) {
+      setPreviewAnswer(
+        'Section 48 (Computation of Capital Gains):\n\n• Mode of Computation: Full value of consideration received or accruing as a result of the transfer.\n• Deductions: (i) Expenditure incurred wholly and exclusively in connection with such transfer, (ii) Cost of acquisition, (iii) Cost of any improvement.\n• Exam Insight: Remember that securities transaction tax (STT) paid is NOT deductible under Section 48.'
+      );
+    } else if (query.toLowerCase().includes('ind as') || query.toLowerCase().includes('revenue')) {
+      setPreviewAnswer(
+        'Ind AS 115 (Revenue from Contracts with Customers):\n\n• 5-Step Model: (1) Identify the contract, (2) Identify performance obligations, (3) Determine transaction price, (4) Allocate transaction price, (5) Recognize revenue when/as obligation is satisfied.\n• Analogy: Think of a mobile phone sold with a 12-month data plan â€” revenue for the phone is recognized on delivery, while service revenue is recognized over the 12 months.'
+      );
+    } else {
+      setPreviewAnswer(
+        `First-Principles Breakdown for "${query}":\n\n• Core Legislative Intent: Evaluates the statutory purpose before delving into technical arithmetic.\n• Practical Application: In ICAI problem questions, begin with the governing section and provision criteria, analyze the scenario facts, and end with an unambiguous conclusion.\n• Exam Technique: Allocate specific working notes for statutory deductions and exclusions.`
+      );
+    }
   };
 
   if (loading) {
@@ -158,7 +117,7 @@ export default function MemberHubV2() {
           <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg animate-pulse">
             <GraduationCap size={24} />
           </div>
-          <p className="text-xs font-semibold tracking-wider uppercase text-slate-500">Preparing study space...</p>
+          <p className="text-xs font-semibold tracking-wider uppercase text-slate-500">Preparing member homeâ€¦</p>
         </div>
       </div>
     );
@@ -169,12 +128,12 @@ export default function MemberHubV2() {
       className={`min-h-screen flex flex-col font-sans relative overflow-x-hidden transition-colors duration-500 ${currentTheme.pageBg}`}
       style={{ backgroundImage: currentTheme.pageGradient }}
     >
-      {/* Ambient Glow Backdrop (Soft, non-distracting) */}
+      {/* Ambient Glow Backdrop (Theme-adaptive, soft) */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
         <motion.div 
           animate={
             shouldReduceMotion
-              ? { scale: 1, opacity: 0.3 }
+              • { scale: 1, opacity: 0.3 }
               : { 
                   x: [0, 20, -15, 0],
                   y: [0, -15, 12, 0],
@@ -183,13 +142,13 @@ export default function MemberHubV2() {
                 }
           } 
           transition={{ duration: 24, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute top-[-5%] left-[10%] w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none"
+          className="absolute top-[-5≥] left-[10≥] w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none"
           style={{ background: currentTheme.ambient1 }}
         />
         <motion.div 
           animate={
             shouldReduceMotion
-              ? { scale: 1, opacity: 0.25 }
+              • { scale: 1, opacity: 0.25 }
               : { 
                   x: [0, -16, 14, 0],
                   y: [0, 16, -10, 0],
@@ -198,7 +157,7 @@ export default function MemberHubV2() {
                 }
           } 
           transition={{ duration: 26, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-          className="absolute bottom-[-5%] right-[10%] w-[680px] h-[680px] rounded-full blur-[150px] pointer-events-none"
+          className="absolute bottom-[-5≥] right-[10≥] w-[680px] h-[680px] rounded-full blur-[150px] pointer-events-none"
           style={{ background: currentTheme.ambient2 }}
         />
       </div>
@@ -222,18 +181,18 @@ export default function MemberHubV2() {
               </span>
             </Link>
             <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-indigo-500/20 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400">
-              <Sparkles size={11} /> App Gateway
+              <Sparkles size={11} /> Member Home
             </span>
           </div>
 
           {/* Right Header Navigation Elements */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            {/* Quick Launch Button */}
+            {/* Primary Action Button */}
             <button
-              onClick={() => handleOpenStudySpace('tutor')}
+              onClick={() => { setOnboardingStep(1); setOnboardingOpen(true); }}
               className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white focus-visible:ring-2 focus-visible:ring-indigo-400"
             >
-              <span>Open My App</span>
+              <span>Set Up Direction</span>
               <ArrowRight size={13} />
             </button>
 
@@ -246,20 +205,20 @@ export default function MemberHubV2() {
                 title={`Theme: ${currentPhaseInfo.name}`}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 focus-visible:ring-2 focus-visible:ring-indigo-400 shadow-sm cursor-pointer whitespace-nowrap ${
                   isDarkTheme 
-                    ? 'bg-[#0F172A] text-white border-slate-700 hover:bg-[#1E293B]' 
+                    • 'bg-[#0F172A] text-white border-slate-700 hover:bg-[#1E293B]' 
                     : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                {isAuto ? (
+                {isAuto • (
                   <Sparkles size={12} className="text-amber-500 shrink-0" />
                 ) : (
-                  activePhase === 'aurora' ? <Sunrise size={12} className="text-amber-500 shrink-0" /> :
-                  activePhase === 'lumen' ? <Sun size={12} className="text-blue-500 shrink-0" /> :
-                  activePhase === 'twilight' ? <Sunset size={12} className="text-amber-500 shrink-0" /> :
+                  activePhase === 'aurora' • <Sunrise size={12} className="text-amber-500 shrink-0" /> :
+                  activePhase === 'lumen' • <Sun size={12} className="text-blue-500 shrink-0" /> :
+                  activePhase === 'twilight' • <Sunset size={12} className="text-amber-500 shrink-0" /> :
                   <Moon size={12} className="text-indigo-400 shrink-0" />
                 )}
                 <span className="hidden sm:inline capitalize">{currentPhaseInfo.name}</span>
-                <ChevronDown size={11} className={`transition-transform duration-200 ${themeMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={11} className={`transition-transform duration-200 ${themeMenuOpen • 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
@@ -271,7 +230,7 @@ export default function MemberHubV2() {
                     transition={{ duration: 0.15 }}
                     className={`absolute right-0 mt-2 w-48 rounded-2xl shadow-2xl border p-2 z-50 backdrop-blur-xl ${
                       isDarkTheme 
-                        ? 'bg-[#0B1120]/95 border-slate-700 text-slate-100' 
+                        • 'bg-[#0B1120]/95 border-slate-700 text-slate-100' 
                         : 'bg-white/95 border-slate-200 text-slate-800'
                     }`}
                   >
@@ -295,8 +254,8 @@ export default function MemberHubV2() {
                           }}
                           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
                             isSelected 
-                              ? (isDarkTheme ? 'bg-slate-800 text-white font-bold' : 'bg-slate-100 text-slate-900 font-bold') 
-                              : (isDarkTheme ? 'hover:bg-slate-800/60 text-slate-300' : 'hover:bg-slate-50 text-slate-700')
+                              • (isDarkTheme • 'bg-slate-800 text-white font-bold' : 'bg-slate-100 text-slate-900 font-bold') 
+                              : (isDarkTheme • 'hover:bg-slate-800/60 text-slate-300' : 'hover:bg-slate-50 text-slate-700')
                           }`}
                         >
                           <div className="flex items-center gap-2">
@@ -315,8 +274,8 @@ export default function MemberHubV2() {
                         }}
                         className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
                           isAuto 
-                            ? (isDarkTheme ? 'bg-slate-800 text-white font-bold' : 'bg-slate-100 text-slate-900 font-bold') 
-                            : (isDarkTheme ? 'hover:bg-slate-800/60 text-slate-300' : 'hover:bg-slate-50 text-slate-700')
+                            • (isDarkTheme • 'bg-slate-800 text-white font-bold' : 'bg-slate-100 text-slate-900 font-bold') 
+                            : (isDarkTheme • 'hover:bg-slate-800/60 text-slate-300' : 'hover:bg-slate-50 text-slate-700')
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -331,7 +290,7 @@ export default function MemberHubV2() {
               </AnimatePresence>
             </div>
 
-            {/* Profile & Account Menu */}
+            {/* Profile & Settings Menu */}
             <div className="relative shrink-0" ref={accountMenuRef}>
               <button
                 onClick={() => setAccountMenuOpen(!accountMenuOpen)}
@@ -339,7 +298,7 @@ export default function MemberHubV2() {
                 aria-label="Account menu"
                 className={`flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-full border transition-all duration-200 focus-visible:ring-2 focus-visible:ring-indigo-400 shadow-sm cursor-pointer ${
                   isDarkTheme 
-                    ? 'bg-[#0F172A] text-white border-slate-700 hover:bg-[#1E293B]' 
+                    • 'bg-[#0F172A] text-white border-slate-700 hover:bg-[#1E293B]' 
                     : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-50'
                 }`}
               >
@@ -349,7 +308,7 @@ export default function MemberHubV2() {
                 <span className="hidden md:inline text-xs font-semibold max-w-[120px] truncate">
                   {formattedName}
                 </span>
-                <ChevronDown size={12} className={`text-slate-400 transition-transform duration-200 ${accountMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={12} className={`text-slate-400 transition-transform duration-200 ${accountMenuOpen • 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
@@ -361,19 +320,19 @@ export default function MemberHubV2() {
                     transition={{ duration: 0.15 }}
                     className={`absolute right-0 mt-2 w-56 rounded-2xl shadow-2xl border p-2 z-50 backdrop-blur-xl ${
                       isDarkTheme 
-                        ? 'bg-[#0B1120]/95 border-slate-700 text-slate-100' 
+                        • 'bg-[#0B1120]/95 border-slate-700 text-slate-100' 
                         : 'bg-white/95 border-slate-200 text-slate-800'
                     }`}
                   >
                     <div className="px-3 py-2 border-b border-slate-500/20 mb-1">
                       <div className="text-xs font-bold truncate">{formattedName}</div>
-                      <div className="text-[11px] text-slate-400 truncate">{user?.email}</div>
+                      <div className="text-[11px] text-slate-400 truncate">{user•.email}</div>
                     </div>
 
                     <button
                       onClick={() => { setProfileModalOpen(true); setAccountMenuOpen(false); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                        isDarkTheme ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-700'
+                        isDarkTheme • 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-700'
                       }`}
                     >
                       <User size={14} className="text-indigo-400" />
@@ -383,7 +342,7 @@ export default function MemberHubV2() {
                     <button
                       onClick={() => { setSettingsModalOpen(true); setAccountMenuOpen(false); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                        isDarkTheme ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-700'
+                        isDarkTheme • 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-700'
                       }`}
                     >
                       <Settings size={14} className="text-indigo-400" />
@@ -394,7 +353,7 @@ export default function MemberHubV2() {
                       <button
                         onClick={handleSignOut}
                         className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer text-rose-500 ${
-                          isDarkTheme ? 'hover:bg-rose-950/30' : 'hover:bg-rose-50'
+                          isDarkTheme • 'hover:bg-rose-950/30' : 'hover:bg-rose-50'
                         }`}
                       >
                         <LogOut size={14} />
@@ -414,7 +373,7 @@ export default function MemberHubV2() {
         
         {/* 1. Welcome Panel (Hero) */}
         <motion.div 
-          initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 14 }}
+          initial={shouldReduceMotion • { opacity: 0 } : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
           className="text-center flex flex-col items-center mb-10 sm:mb-12"
@@ -422,7 +381,7 @@ export default function MemberHubV2() {
           {/* Account Status Badge */}
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wide border mb-5 bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-sm">
             <CheckCircle2 size={13} className="shrink-0" />
-            <span>Account Ready • Closed Beta Access</span>
+            <span>Account Ready • Closed Beta Member</span>
           </div>
 
           {/* Time-Aware Supportive Greeting */}
@@ -436,45 +395,45 @@ export default function MemberHubV2() {
           </p>
 
           <p className={`text-xs sm:text-sm leading-relaxed max-w-lg mb-8 ${currentTheme.bodyText}`}>
-            Your study space is primed for focused, calm CA preparation. Jump in whenever you're ready to start your daily session.
+            Your study space is primed for focused, calm CA preparation. Calibrate your daily syllabus milestones to begin.
           </p>
 
-          {/* 2. One Primary Action (Main Visual Focus) */}
+          {/* 2. One Primary Action (V2-Only Action) */}
           <div className="w-full max-w-md flex flex-col items-center gap-3">
             <button
-              onClick={() => handleOpenStudySpace('tutor')}
+              onClick={() => { setOnboardingStep(1); setOnboardingOpen(true); }}
               className="w-full py-4 sm:py-4.5 px-8 rounded-2xl font-bold text-base sm:text-lg text-white shadow-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center justify-center gap-3 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/25 border border-orange-400/30 focus-visible:ring-4 focus-visible:ring-orange-400/50"
             >
-              <span>Open My Tutovia App</span>
+              <span>Set Up My Study Direction</span>
               <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
             </button>
 
             <p className="text-[11px] sm:text-xs text-slate-400 font-medium text-center">
-              Interactive study space in this browser • Ready with your study plan
+              Calibrate your daily CA syllabus block and exam timeline in under 2 minutes
             </p>
           </div>
         </motion.div>
 
-        {/* 3. Small "What you can do in the app" Preview (Exactly 3 cards) */}
+        {/* 3. Three Compact Capability Cards */}
         <motion.div
-          initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+          initial={shouldReduceMotion • { opacity: 0 } : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.1, ease: 'easeOut' }}
           className="w-full"
         >
           <div className="text-center mb-5">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              What you can do in your study space
+              Core Capabilities in Closed Beta
             </h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
             {/* Card 1: AI Tutor */}
             <div 
-              onClick={() => handleOpenStudySpace('tutor')}
+              onClick={() => setPreviewModal('tutor')}
               className={`group p-5 rounded-2xl border transition-all duration-300 backdrop-blur-xl cursor-pointer hover:shadow-xl hover:-translate-y-0.5 flex flex-col justify-between ${
                 isDarkTheme 
-                  ? 'bg-slate-900/60 border-slate-700/60 hover:border-indigo-500/50 hover:bg-slate-900/80' 
+                  • 'bg-slate-900/60 border-slate-700/60 hover:border-indigo-500/50 hover:bg-slate-900/80' 
                   : 'bg-white/80 border-slate-200/90 hover:border-indigo-400 hover:bg-white shadow-sm'
               }`}
             >
@@ -494,17 +453,17 @@ export default function MemberHubV2() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-500/15 flex items-center justify-between text-xs font-semibold text-indigo-500 group-hover:text-indigo-400">
-                <span>Launch Tutor</span>
+                <span>Preview AI Tutor</span>
                 <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" />
               </div>
             </div>
 
-            {/* Card 2: Personalized Study Plan */}
+            {/* Card 2: Personalized Study Direction */}
             <div 
-              onClick={() => handleOpenStudySpace('plan')}
+              onClick={() => setPreviewModal('direction')}
               className={`group p-5 rounded-2xl border transition-all duration-300 backdrop-blur-xl cursor-pointer hover:shadow-xl hover:-translate-y-0.5 flex flex-col justify-between ${
                 isDarkTheme 
-                  ? 'bg-slate-900/60 border-slate-700/60 hover:border-amber-500/50 hover:bg-slate-900/80' 
+                  • 'bg-slate-900/60 border-slate-700/60 hover:border-amber-500/50 hover:bg-slate-900/80' 
                   : 'bg-white/80 border-slate-200/90 hover:border-amber-400 hover:bg-white shadow-sm'
               }`}
             >
@@ -513,7 +472,7 @@ export default function MemberHubV2() {
                   <Compass size={20} />
                 </div>
                 <h3 className={`text-base font-bold font-heading mb-1.5 ${currentTheme.h2}`}>
-                  Personalized Study Plan
+                  Personalized Study Direction
                 </h3>
                 <p className="text-xs font-semibold text-amber-500 dark:text-amber-400 mb-2">
                   Know exactly what to focus on next.
@@ -524,17 +483,17 @@ export default function MemberHubV2() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-500/15 flex items-center justify-between text-xs font-semibold text-amber-500 group-hover:text-amber-400">
-                <span>View Study Plan</span>
+                <span>View Direction</span>
                 <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" />
               </div>
             </div>
 
-            {/* Card 3: Progress & Revision */}
+            {/* Card 3: Revision & Progress */}
             <div 
-              onClick={() => handleOpenStudySpace('progress')}
+              onClick={() => setPreviewModal('progress')}
               className={`group p-5 rounded-2xl border transition-all duration-300 backdrop-blur-xl cursor-pointer hover:shadow-xl hover:-translate-y-0.5 flex flex-col justify-between ${
                 isDarkTheme 
-                  ? 'bg-slate-900/60 border-slate-700/60 hover:border-emerald-500/50 hover:bg-slate-900/80' 
+                  • 'bg-slate-900/60 border-slate-700/60 hover:border-emerald-500/50 hover:bg-slate-900/80' 
                   : 'bg-white/80 border-slate-200/90 hover:border-emerald-400 hover:bg-white shadow-sm'
               }`}
             >
@@ -543,7 +502,7 @@ export default function MemberHubV2() {
                   <TrendingUp size={20} />
                 </div>
                 <h3 className={`text-base font-bold font-heading mb-1.5 ${currentTheme.h2}`}>
-                  Progress & Revision
+                  Revision & Progress
                 </h3>
                 <p className="text-xs font-semibold text-emerald-500 dark:text-emerald-400 mb-2">
                   Stay consistent and revise at the right time.
@@ -554,7 +513,7 @@ export default function MemberHubV2() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-500/15 flex items-center justify-between text-xs font-semibold text-emerald-500 group-hover:text-emerald-400">
-                <span>Check Progress</span>
+                <span>Explore System</span>
                 <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" />
               </div>
             </div>
@@ -562,208 +521,352 @@ export default function MemberHubV2() {
         </motion.div>
       </main>
 
-      {/* Interactive Tutovia V2 Study Space (Self-contained in V2) */}
+      {/* V2 Study Direction Onboarding Flow (3-Step Setup) */}
       <AnimatePresence>
-        {studySpaceOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-md">
+        {onboardingOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              transition={{ duration: 0.25 }}
-              className={`w-full max-w-3xl rounded-3xl border shadow-2xl flex flex-col max-h-[90vh] overflow-hidden ${
-                isDarkTheme ? 'bg-[#0B1120] border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className={`w-full max-w-lg rounded-3xl border p-6 shadow-2xl relative ${
+                isDarkTheme • 'bg-[#0B1120] border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
               }`}
             >
-              {/* Study Space Modal Header */}
-              <div className="px-5 py-4 border-b border-slate-500/20 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-                    <GraduationCap size={18} />
+              <div className="flex items-center justify-between pb-3 border-b border-slate-500/20 mb-5">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+                    {onboardingStep}
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold font-heading">Tutovia Study Space</h2>
-                    <p className="text-[11px] text-slate-400">Your calm, personalized CA learning cockpit</p>
+                    <h3 className="font-bold text-sm font-heading">
+                      {onboardingStep === 1 && 'Select Your CA Exam Level'}
+                      {onboardingStep === 2 && 'Set Your Daily Study Rhythm'}
+                      {onboardingStep === 3 && 'Study Direction Calibrated'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">Step {onboardingStep} of 3 • Tutovia V2 Setup</p>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setStudySpaceOpen(false)}
-                    className="p-1.5 rounded-full hover:bg-slate-500/20 text-slate-400 hover:text-slate-100 transition-colors"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
+                <button onClick={() => setOnboardingOpen(false)} className="text-slate-400 hover:text-slate-100">
+                  <X size={18} />
+                </button>
               </div>
 
-              {/* Study Space Tabs */}
-              <div className="px-5 pt-3 border-b border-slate-500/20 flex items-center gap-2 shrink-0">
-                {[
-                  { id: 'tutor', label: 'AI Tutor', icon: Bot },
-                  { id: 'plan', label: 'Study Plan', icon: Compass },
-                  { id: 'progress', label: 'Focus & Progress', icon: TrendingUp }
-                ].map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeStudyTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveStudyTab(tab.id)}
-                      className={`flex items-center gap-2 px-3.5 py-2 rounded-t-xl text-xs font-bold border-b-2 transition-all cursor-pointer ${
-                        isActive 
-                          ? 'border-indigo-500 text-indigo-500 bg-indigo-500/10' 
-                          : 'border-transparent text-slate-400 hover:text-slate-200'
+              {/* Step 1: Select Exam Level */}
+              {onboardingStep === 1 && (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-400 mb-2">
+                    Tutovia adapts its high-yield daily curriculum to your specific examination scope:
+                  </p>
+                  {[
+                    'CA Foundation',
+                    'CA Intermediate (Group 1)',
+                    'CA Intermediate (Group 2)',
+                    'CA Intermediate (Both Groups)',
+                    'CA Final (Both Groups)'
+                  ].map((lvl) => (
+                    <div
+                      key={lvl}
+                      onClick={() => setSelectedLevel(lvl)}
+                      className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                        selectedLevel === lvl
+                          • 'border-indigo-500 bg-indigo-500/10 text-indigo-400 font-bold'
+                          : (isDarkTheme • 'border-slate-700 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 hover:bg-white')
                       }`}
                     >
-                      <Icon size={14} />
-                      <span>{tab.label}</span>
+                      <span className="text-xs">{lvl}</span>
+                      {selectedLevel === lvl && <CheckCircle2 size={16} className="text-indigo-400 shrink-0" />}
+                    </div>
+                  ))}
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      onClick={() => setOnboardingStep(2)}
+                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
+                    >
+                      <span>Continue</span>
+                      <ArrowRight size={13} />
                     </button>
-                  );
-                })}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Set Daily Routine */}
+              {onboardingStep === 2 && (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-400 mb-2">
+                    Select the schedule that best accommodates your daily articleship or college routine:
+                  </p>
+                  {[
+                    { title: 'Early Morning Focus (6:00 AM - 8:30 AM)', desc: 'Ideal before office commute; high retention focus block.' },
+                    { title: 'Post-Articleship Evening (8:00 PM - 11:00 PM)', desc: 'Optimized with low-stress gradual ramp-up and zero overtime penalties.' },
+                    { title: 'Split Schedule (Morning 1.5h + Evening 2h)', desc: 'Balanced distribution with active recall in between.' }
+                  ].map((pace) => (
+                    <div
+                      key={pace.title}
+                      onClick={() => setSelectedPace(pace.title)}
+                      className={`p-3.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all ${
+                        selectedPace === pace.title
+                          • 'border-amber-500 bg-amber-500/10 text-amber-400 font-bold'
+                          : (isDarkTheme • 'border-slate-700 bg-slate-800/50 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 hover:bg-white')
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">{pace.title}</span>
+                        {selectedPace === pace.title && <CheckCircle2 size={16} className="text-amber-400 shrink-0" />}
+                      </div>
+                      <span className="text-[11px] font-normal text-slate-400">{pace.desc}</span>
+                    </div>
+                  ))}
+                  <div className="pt-4 flex items-center justify-between">
+                    <button
+                      onClick={() => setOnboardingStep(1)}
+                      className="text-xs text-slate-400 hover:text-slate-200"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={() => { setOnboardingStep(3); setDirectionCompleted(true); }}
+                      className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
+                    >
+                      <span>Lock Direction</span>
+                      <Check size={13} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Direction Confirmed */}
+              {onboardingStep === 3 && (
+                <div className="space-y-4 text-center py-2">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold font-heading mb-1">Your Study Direction is Locked!</h4>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                      Tutovia has aligned your high-yield milestones for <strong className="text-slate-200">{selectedLevel}</strong> on a <strong className="text-slate-200">{selectedPace}</strong> routine.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl border border-slate-500/20 bg-slate-500/5 text-left text-xs space-y-1.5">
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Daily High-Yield Target:</span>
+                      <span className="font-semibold text-slate-200">1 Core Topic + 3 Questions</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Backlog Recovery Policy:</span>
+                      <span className="font-semibold text-emerald-400">Zero Guilt • Automatic Shift</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 flex justify-center">
+                    <button
+                      onClick={() => setOnboardingOpen(false)}
+                      className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors"
+                    >
+                      Done & Return to Member Home
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* AI Tutor Capability Preview Modal */}
+      <AnimatePresence>
+        {previewModal === 'tutor' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className={`w-full max-w-xl rounded-3xl border p-6 shadow-2xl flex flex-col ${
+                isDarkTheme • 'bg-[#0B1120] border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+              }`}
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-500/20 mb-4 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
+                    <Bot size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm font-heading">AI Tutor • Capability Preview</h3>
+                    <p className="text-[11px] text-slate-400">First-principles conversational explanations</p>
+                  </div>
+                </div>
+                <button onClick={() => setPreviewModal(null)} className="text-slate-400 hover:text-slate-100">
+                  <X size={18} />
+                </button>
               </div>
 
-              {/* Tab Content Body */}
-              <div className="flex-1 overflow-y-auto p-5">
-                {activeStudyTab === 'tutor' && (
-                  <div className="flex flex-col h-[400px]">
-                    <div className="flex-1 overflow-y-auto space-y-3 pr-1 mb-3">
-                      {chatMessages.map((msg, i) => (
-                        <div 
-                          key={i} 
-                          className={`flex gap-2.5 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          {msg.sender === 'ai' && (
-                            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
-                              AI
-                            </div>
-                          )}
-                          <div 
-                            className={`p-3 rounded-2xl text-xs max-w-[80%] whitespace-pre-line leading-relaxed ${
-                              msg.sender === 'user'
-                                ? 'bg-indigo-600 text-white rounded-tr-sm'
-                                : (isDarkTheme ? 'bg-slate-800/90 text-slate-200 rounded-tl-sm border border-slate-700' : 'bg-slate-100 text-slate-800 rounded-tl-sm')
-                            }`}
-                          >
-                            {msg.text}
-                          </div>
-                        </div>
-                      ))}
-                      {isAiTyping && (
-                        <div className="flex items-center gap-2 text-xs text-slate-400">
-                          <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                          <span>Tutovia AI is reasoning from first principles...</span>
-                        </div>
-                      )}
-                    </div>
+              {/* Interactive Demo Content */}
+              <div className="space-y-3 flex-1 overflow-y-auto">
+                <p className="text-xs text-slate-400">
+                  Tutovia AI breaks down statutory jargon into conversational, real-world mental models. Try asking:
+                </p>
 
-                    {/* Quick Topic Chips */}
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {['Sec 135 CSR thresholds', 'Capital Gains Sec 48', 'Ind AS 115 revenue model'].map((chip) => (
-                        <button
-                          key={chip}
-                          onClick={() => { setTutorQuery(chip); }}
-                          className="px-2 py-1 rounded-lg text-[11px] font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors"
-                        >
-                          {chip}
-                        </button>
-                      ))}
-                    </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'Sec 135 CSR thresholds',
+                    'Capital Gains Sec 48 deductions',
+                    'Ind AS 115 revenue model'
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      onClick={() => handleAskPreview(chip)}
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
 
-                    {/* Query Input */}
-                    <form onSubmit={handleSendQuestion} className="flex gap-2 shrink-0">
-                      <input
-                        type="text"
-                        value={tutorQuery}
-                        onChange={(e) => setTutorQuery(e.target.value)}
-                        placeholder="Type any CA doubt or topic to understand clearly..."
-                        className={`flex-1 px-4 py-2.5 rounded-xl text-xs border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                          isDarkTheme ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                        }`}
-                      />
-                      <button
-                        type="submit"
-                        className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
-                      >
-                        <Send size={13} />
-                        <span>Ask</span>
-                      </button>
-                    </form>
+                <div className="p-4 rounded-2xl border border-slate-500/20 bg-slate-500/5 text-xs whitespace-pre-line leading-relaxed max-h-[220px] overflow-y-auto font-sans">
+                  {previewAnswer}
+                </div>
+
+                <div className="p-3 rounded-xl border border-indigo-500/20 bg-indigo-500/5 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Full interactive chat is included with your Tutovia account.</span>
+                  <span className="font-bold text-indigo-400">Beta Ready</span>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-500/20 flex justify-end shrink-0">
+                <button
+                  onClick={() => setPreviewModal(null)}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs"
+                >
+                  Close Preview
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Personalized Study Direction Capability Preview Modal */}
+      <AnimatePresence>
+        {previewModal === 'direction' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className={`w-full max-w-lg rounded-3xl border p-6 shadow-2xl ${
+                isDarkTheme • 'bg-[#0B1120] border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+              }`}
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-500/20 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center">
+                    <Compass size={18} />
                   </div>
-                )}
-
-                {activeStudyTab === 'plan' && (
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-2xl border border-indigo-500/20 bg-indigo-500/5">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">Current Phase Target</span>
-                        <span className="text-xs font-bold text-emerald-500">Day 14 of 60</span>
-                      </div>
-                      <h4 className="text-sm font-bold font-heading mb-1">Corporate & Other Laws + Taxation Core Module</h4>
-                      <p className="text-xs text-slate-400">Paced for CA Intermediate May / Nov Exam Cycle with automatic articleship evening recovery.</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's High-Yield Checklist</h4>
-                      {tasks.map((task) => (
-                        <div
-                          key={task.id}
-                          onClick={() => toggleTask(task.id)}
-                          className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                            task.done 
-                              ? (isDarkTheme ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300 line-through' : 'bg-emerald-50 border-emerald-300 text-emerald-800 line-through')
-                              : (isDarkTheme ? 'bg-slate-800/60 border-slate-700 text-slate-200 hover:border-slate-600' : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-white')
-                          }`}
-                        >
-                          <span className="text-xs font-medium">{task.title}</span>
-                          <div className={`w-5 h-5 rounded-md flex items-center justify-center border ${task.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-500'}`}>
-                            {task.done && <Check size={13} />}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <div>
+                    <h3 className="font-bold text-sm font-heading">Personalized Study Direction • Preview</h3>
+                    <p className="text-[11px] text-slate-400">High-yield blocks mapped against your exam attempt</p>
                   </div>
-                )}
+                </div>
+                <button onClick={() => setPreviewModal(null)} className="text-slate-400 hover:text-slate-100">
+                  <X size={18} />
+                </button>
+              </div>
 
-                {activeStudyTab === 'progress' && (
-                  <div className="space-y-5">
-                    {/* Pomodoro Timer */}
-                    <div className="p-5 rounded-2xl border text-center flex flex-col items-center border-slate-500/20 bg-slate-500/5">
-                      <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Calm Focus Session</div>
-                      <div className="text-4xl font-black font-heading tracking-tight mb-3">
-                        {formatTimer(timerSeconds)}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setIsTimerRunning(!isTimerRunning)}
-                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
-                        >
-                          {isTimerRunning ? <Pause size={14} /> : <Play size={14} />}
-                          <span>{isTimerRunning ? 'Pause' : 'Start Focus'}</span>
-                        </button>
-                        <button
-                          onClick={() => { setIsTimerRunning(false); setTimerSeconds(25 * 60); }}
-                          className="p-2 rounded-xl border border-slate-500/30 text-slate-400 hover:text-slate-100 transition-colors"
-                          title="Reset Timer"
-                        >
-                          <RotateCcw size={14} />
-                        </button>
-                      </div>
-                    </div>
+              <div className="space-y-3 text-xs leading-relaxed">
+                <div className="p-3.5 rounded-2xl border border-amber-500/20 bg-amber-500/5">
+                  <div className="font-bold text-amber-400 mb-1">How Study Direction Works</div>
+                  <p className="text-slate-400">
+                    Instead of overwhelming you with the entire 800-page ICAI study material at once, Tutovia serves one high-yield study block each morning based on your remaining preparation days.
+                  </p>
+                </div>
 
-                    {/* Consistency Metrics */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3.5 rounded-xl border border-slate-500/20 text-center">
-                        <div className="text-2xl font-black font-heading text-amber-500">5 Days 🔥</div>
-                        <div className="text-[11px] text-slate-400 font-medium">Study Streak</div>
-                      </div>
-                      <div className="p-3.5 rounded-xl border border-slate-500/20 text-center">
-                        <div className="text-2xl font-black font-heading text-emerald-500">0 Stress</div>
-                        <div className="text-[11px] text-slate-400 font-medium">Backlog Recalibration</div>
-                      </div>
-                    </div>
+                <div className="space-y-2">
+                  <div className="font-bold text-slate-300">Sample Daily Block (Corporate Law):</div>
+                  <div className="p-2.5 rounded-xl border border-slate-700 bg-slate-800/40 flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                    <span>Statutory Thresholds: Sec 135 CSR & Sec 149 Independent Directors</span>
                   </div>
-                )}
+                  <div className="p-2.5 rounded-xl border border-slate-700 bg-slate-800/40 flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                    <span>Past 3 RTP Questions: Practice Board Report Disclosures</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-slate-500/20 flex items-center justify-between">
+                <button
+                  onClick={() => { setPreviewModal(null); setOnboardingOpen(true); }}
+                  className="text-xs text-amber-400 hover:underline font-semibold"
+                >
+                  Calibrate My Study Direction â†’
+                </button>
+                <button
+                  onClick={() => setPreviewModal(null)}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Revision & Progress Capability Preview Modal */}
+      <AnimatePresence>
+        {previewModal === 'progress' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className={`w-full max-w-lg rounded-3xl border p-6 shadow-2xl ${
+                isDarkTheme • 'bg-[#0B1120] border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+              }`}
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-500/20 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center">
+                    <TrendingUp size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm font-heading">Revision & Progress • Preview</h3>
+                    <p className="text-[11px] text-slate-400">Zero-guilt adaptive scheduling & active recall</p>
+                  </div>
+                </div>
+                <button onClick={() => setPreviewModal(null)} className="text-slate-400 hover:text-slate-100">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs leading-relaxed">
+                <div className="p-3.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5">
+                  <div className="font-bold text-emerald-400 mb-1">The Articleship Reality Principle</div>
+                  <p className="text-slate-400">
+                    Traditional timetable tools generate massive backlog guilt when office audit assignments run late. Tutovia recalculates remaining syllabus blocks without penalty or unachievable weekend cramming.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="p-3 rounded-xl border border-slate-700 text-center">
+                    <div className="text-lg font-black text-emerald-400">Spaced Intervals</div>
+                    <div className="text-[11px] text-slate-400">1-day, 7-day, 21-day revision triggers</div>
+                  </div>
+                  <div className="p-3 rounded-xl border border-slate-700 text-center">
+                    <div className="text-lg font-black text-amber-400">Adaptive Shift</div>
+                    <div className="text-[11px] text-slate-400">Recalibrates quietly without shame</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-slate-500/20 flex justify-end">
+                <button
+                  onClick={() => setPreviewModal(null)}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs"
+                >
+                  Close
+                </button>
               </div>
             </motion.div>
           </div>
@@ -779,7 +882,7 @@ export default function MemberHubV2() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               className={`w-full max-w-md rounded-3xl border p-6 shadow-2xl ${
-                isDarkTheme ? 'bg-[#0B1120] border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+                isDarkTheme • 'bg-[#0B1120] border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
               }`}
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-500/20 mb-4">
@@ -796,11 +899,11 @@ export default function MemberHubV2() {
                 </div>
                 <div>
                   <span className="text-slate-400 block mb-0.5 font-medium">Email Address</span>
-                  <div className="p-2.5 rounded-xl border border-slate-500/20">{user?.email || 'student@icai.org'}</div>
+                  <div className="p-2.5 rounded-xl border border-slate-500/20">{user•.email || 'student@icai.org'}</div>
                 </div>
                 <div>
-                  <span className="text-slate-400 block mb-0.5 font-medium">Exam Level</span>
-                  <div className="p-2.5 rounded-xl border border-slate-500/20">CA Intermediate / Final Cohort</div>
+                  <span className="text-slate-400 block mb-0.5 font-medium">Exam Scope</span>
+                  <div className="p-2.5 rounded-xl border border-slate-500/20">{selectedLevel}</div>
                 </div>
                 <div>
                   <span className="text-slate-400 block mb-0.5 font-medium">Account Access</span>
@@ -833,7 +936,7 @@ export default function MemberHubV2() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               className={`w-full max-w-md rounded-3xl border p-6 shadow-2xl ${
-                isDarkTheme ? 'bg-[#0B1120] border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+                isDarkTheme • 'bg-[#0B1120] border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
               }`}
             >
               <div className="flex items-center justify-between pb-3 border-b border-slate-500/20 mb-4">
@@ -885,10 +988,7 @@ export default function MemberHubV2() {
       {/* Minimal Footer */}
       <footer className="w-full py-4 px-4 text-center border-t border-slate-500/15 text-[11px] text-slate-400 z-10">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span>Tutovia • Built for focused, judgment-free CA preparation</span>
-            <span className="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-slate-500/15 border border-slate-500/20 text-slate-400">v2.15.0</span>
-          </div>
+          <span>Tutovia V2 • Built for focused, judgment-free CA preparation</span>
           <div className="flex items-center gap-4">
             <Link to="/" className="hover:text-slate-200 transition-colors">
               Public Website
