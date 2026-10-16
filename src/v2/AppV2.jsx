@@ -6,6 +6,7 @@ import LandingPageV2 from './LandingPageV2.jsx';
 import AuthContainerV2 from './auth/AuthContainerV2.jsx';
 import LoginV2 from './LoginV2.jsx';
 import SignUpV2 from './SignUpV2.jsx';
+import MemberHubV2 from './MemberHubV2.jsx';
 
 export default function AppV2() {
   const routerBase = import.meta.env.BASE_URL 
@@ -24,6 +25,11 @@ export default function AppV2() {
               <Route path="/login" element={<LoginV2 />} />
               <Route path="/signup" element={<SignUpV2 />} />
             </Route>
+
+            {/* Lightweight Post-Login Member Welcome Hub & App Gateway */}
+            <Route path="/hub" element={<MemberHubV2 />} />
+            <Route path="/welcome" element={<Navigate to="/hub" replace />} />
+            <Route path="/app" element={<Navigate to="/hub" replace />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

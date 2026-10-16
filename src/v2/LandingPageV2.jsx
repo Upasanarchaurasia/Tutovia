@@ -10,7 +10,8 @@ import {
   Sparkle, CheckCircle2, HelpCircle, X, Menu,
   MessageSquare, Shield, Smile, Lightbulb, TrendingUp,
   Activity, CheckCheck, RefreshCw, Star, ArrowUpRight,
-  Mail, User, Lock, Download, FileText, LogOut
+  Mail, User, Lock, Download, FileText, LogOut,
+  Layers, Users
 } from 'lucide-react';
 import { useTheme } from './ThemeContextV2.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -19,6 +20,14 @@ import heroPhotoAurora from '../assets/tutovia_hero_aurora.jpg';
 import heroPhotoLumen from '../assets/tutovia_hero_lumen.jpg';
 import heroPhotoTwilight from '../assets/tutovia_hero_twilight.jpg';
 import heroPhotoEclipse from '../assets/tutovia_hero_eclipse.jpg';
+
+// Multi-Stage Academic Tracks & V2 Growth Modals ("For Students, By Students")
+import AcademicTrackSelector from './components/AcademicTrackSelector.jsx';
+import UnifiedSubjectHubModal from './components/UnifiedSubjectHubModal.jsx';
+import PeerStudyRoomModal from './components/PeerStudyRoomModal.jsx';
+import FlashcardsEngineModal from './components/FlashcardsEngineModal.jsx';
+import EmpathyOnboardingModal from './components/EmpathyOnboardingModal.jsx';
+import { ACADEMIC_TRACKS, TRACK_LIST, getActiveTrack, getSavedTrackId, saveTrackId } from './academicTracks.js';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 10 },
@@ -46,7 +55,52 @@ function TypewriterText({ text }) {
 }
 
 // Global V2 Revision Version Identifier
-export const TUTOVIA_V2_VERSION = 'v2.13.0';
+export const TUTOVIA_V2_VERSION = 'v2.15.0';
+
+/**
+ * Isolated Reading Progress Bar
+ * Uses direct DOM manipulation via requestAnimationFrame to avoid triggering
+ * full-page React re-renders on every scroll pixel.
+ */
+function ReadingProgressBar({ color }) {
+  const barRef = useRef(null);
+
+  useEffect(() => {
+    let ticking = false;
+
+    const updateProgress = () => {
+      const scrollY = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (docHeight > 0 && barRef.current) {
+        const progress = Math.min(100, Math.max(0, (scrollY / docHeight) * 100));
+        barRef.current.style.width = `${progress}%`;
+      }
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateProgress);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    updateProgress();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <div 
+      ref={barRef}
+      className="absolute bottom-0 left-0 h-[2px] pointer-events-none will-change-[width]" 
+      style={{ 
+        width: '0%', 
+        backgroundColor: color 
+      }} 
+    />
+  );
+}
 
 export default function LandingPageV2() {
   const navigate = useNavigate();
@@ -58,6 +112,15 @@ export default function LandingPageV2() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const themeMenuRef = useRef(null);
+
+  // Multi-Stage Academic Track State ("For Students, By Students")
+  const [activeTrackId, setActiveTrackId] = useState(() => getSavedTrackId());
+  
+  // Growth & Community Modals
+  const [subjectHubOpen, setSubjectHubOpen] = useState(false);
+  const [peerStudyRoomOpen, setPeerStudyRoomOpen] = useState(false);
+  const [flashcardsOpen, setFlashcardsOpen] = useState(false);
+  const [empathyOnboardingOpen, setEmpathyOnboardingOpen] = useState(false);
 
   // Hero interactive card view mode ('dialogue' | 'companion')
   const [heroCardMode, setHeroCardMode] = useState('dialogue');
@@ -73,21 +136,34 @@ export default function LandingPageV2() {
   const [sandboxAiQuery, setSandboxAiQuery] = useState(null);
   const [simMarks, setSimMarks] = useState({ p1: 68, p2: 52, p3: 45 });
 
-  // Scroll dynamics & reading progress states
+  // Scroll dynamics states (throttled to avoid frame drops)
   const [isScrolled, setIsScrolled] = useState(false);
-  const [scrollProgress, setScrollProgress] = useState(0);
   const [activeSection, setActiveSection] = useState('');
 
+  // Defer preloading of inactive theme hero photos until after initial page load & idle
+  const [preloadAllHeroPhotos, setPreloadAllHeroPhotos] = useState(false);
+
   useEffect(() => {
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const handle = window.requestIdleCallback(() => setPreloadAllHeroPhotos(true), { timeout: 3500 });
+      return () => window.cancelIdleCallback(handle);
+    } else {
+      const timer = setTimeout(() => setPreloadAllHeroPhotos(true), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  useEffect(() => {
+    let ticking = false;
+    let lastScrolled = false;
+    let lastSection = '';
+
     const handleScroll = () => {
       const scrollY = window.scrollY;
-      setIsScrolled(scrollY > 20);
-
-      // Calculate scroll progress percentage (0 - 100)
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (docHeight > 0) {
-        const progress = Math.min(100, Math.max(0, (scrollY / docHeight) * 100));
-        setScrollProgress(progress);
+      const scrolled = scrollY > 20;
+      if (scrolled !== lastScrolled) {
+        lastScrolled = scrolled;
+        setIsScrolled(scrolled);
       }
 
       // Scrollspy detection across reorganized product sections
@@ -106,12 +182,23 @@ export default function LandingPageV2() {
           }
         }
       }
-      setActiveSection(current);
+      if (current !== lastSection) {
+        lastSection = current;
+        setActiveSection(current);
+      }
+      ticking = false;
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(handleScroll);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
     handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   // Close theme menu when clicking outside
@@ -459,46 +546,41 @@ export default function LandingPageV2() {
 
   const currentTheme = theme[activePhase] || theme.eclipse;
 
-  // Interactive sample actions in Hero Chat Mockup (Merged with Try Demo)
+  const currentTrackConfig = getActiveTrack(activeTrackId);
+  const trackPrompts = currentTrackConfig.tutorDoubtPrompts || [];
+
+  // Interactive sample actions in Hero Chat Mockup (Dynamic per Academic Track, preserving universal actions)
   const heroActions = [
-    {
-      id: 'beginner',
-      icon: '💡',
-      label: 'Explain like a beginner',
-      scenario: 'Accounting Standard 10 • Component Accounting',
-      studentMsg: "Can you explain AS 10 (Component Accounting) in simple English like I'm a beginner?",
-      tutorReplies: [
-        "Think of an airplane: The fuselage lasts 25 years, but the jet engine needs an overhaul every 5 years.",
-        "Component accounting simply means: don't depreciate the whole airplane as one giant asset. Split the engine and fuselage so your balance sheet reflects real economic wear and tear!",
-        "Want to see how ICAI tests this in a practical 8-mark question?"
-      ]
-    },
+    ...(trackPrompts.length > 0 ? [
+      {
+        id: trackPrompts[0].id,
+        icon: '💡',
+        label: trackPrompts[0].label,
+        scenario: `${currentTrackConfig.shortName} • Concept Foundation`,
+        studentMsg: trackPrompts[0].query,
+        tutorReplies: trackPrompts[0].answer.split('\n\n').filter(Boolean)
+      },
+      ...(trackPrompts[1] ? [{
+        id: trackPrompts[1].id,
+        icon: '🎯',
+        label: trackPrompts[1].label,
+        scenario: `${currentTrackConfig.shortName} • Practical Application`,
+        studentMsg: trackPrompts[1].query,
+        tutorReplies: trackPrompts[1].answer.split('\n\n').filter(Boolean)
+      }] : [])
+    ] : []),
     {
       id: 'hours',
       icon: '⏰',
       label: 'Only 2 hours tonight',
-      scenario: 'Articleship Exhaustion & Time Management',
-      studentMsg: "I'm exhausted from articleship/classes and only have 2 hours tonight. What should I study?",
+      scenario: 'Daily Pressure & Time Management',
+      studentMsg: "I'm exhausted from classes / coaching / office and only have 2 hours tonight. What should I study?",
       tutorReplies: [
         "Let's protect your energy and avoid heavy, unmanageable theory tonight.",
         "• Block 1 (40 min): 3 practical computational problems from your strongest chapter to build easy momentum.",
         "• Break (10 min): Step away from the screen, grab water, no social media.",
-        "• Block 2 (50 min): 15 spaced repetition flashcards on recent statutory amendments.",
+        "• Block 2 (50 min): 15 spaced repetition flashcards on essential formulas or section definitions.",
         "You'll sleep knowing you kept your study streak unbroken without crashing!"
-      ]
-    },
-    {
-      id: 'quiz',
-      icon: '🎯',
-      label: 'Quiz me on Section 54',
-      scenario: 'Active Recall Challenge • Capital Gains',
-      studentMsg: "Quiz me on Section 54 (Capital Gains on Residential Property).",
-      tutorReplies: [
-        "Ready! Here is your quick recall challenge:",
-        "1. Who is eligible for exemption under Section 54? (Individual, HUF, or any person?)",
-        "2. What is the time limit for purchasing a new house before and after the transfer?",
-        "3. What happens if the new residential house is sold within 3 years?",
-        "Take a moment and answer mentally. Let's test real exam recall!"
       ]
     },
     {
@@ -508,26 +590,33 @@ export default function LandingPageV2() {
       scenario: 'Mindset & Exam Anxiety Support',
       studentMsg: "Everyone else seems so prepared. I feel like I'm hopelessly behind and scared I'll fail.",
       tutorReplies: [
-        "Take a deep breath. What you are feeling is completely normal—almost every CA aspirant experiences it.",
+        "Take a deep breath. What you are feeling is completely normal—almost every commerce & professional student experiences it.",
         "Exam preparation is not a sprint against others; it is a quiet, compounding daily habit. You don't need to master 100% of everything tonight—you only need to win the next 30 minutes.",
-        "Let's pick just ONE topic you feel okay about and master it right now. I'm right here with you."
+        "Let's pick just ONE high-yield concept you feel okay about and master it right now. I'm right here with you."
       ]
     },
     {
       id: 'plan',
       icon: '🗓️',
-      label: '75-day revision plan',
+      label: 'Adaptive revision plan',
       scenario: 'Syllabus Architecture & Phasing',
-      studentMsg: "I have 75 days left for 4 subjects. How do I divide my revision rounds?",
+      studentMsg: "How should I structure my revision rounds before my exam attempt?",
       tutorReplies: [
         "Here is the proven 3-Tier Revision Architecture:",
-        "• Round 1 (Days 1–45): Core concept completion + ICAI illustrative problems (60% time).",
-        "• Round 2 (Days 46–65): Past Year Questions (PYQs) + Revision Test Papers (RTPs) + active recall (25% time).",
-        "• Round 3 (Days 66–75): Mock Exam Papers under strict 3-hour exam conditions (15% time).",
-        "Tutovia adapts these dates automatically if you ever need an off-day!"
+        "• Round 1 (60% time): Core concept completion + illustrative textbook/ICAI numericals.",
+        "• Round 2 (25% time): Past Year Questions (PYQs) + Revision Test Papers (RTPs) + active recall.",
+        "• Round 3 (15% time): Full 3-hour Mock Exam Papers under strict timed conditions.",
+        "Tutovia adapts these dates automatically if classes run late or you ever need an off-day!"
       ]
     }
   ];
+
+  // Auto-align active hero action when track changes
+  useEffect(() => {
+    if (heroActions.length > 0) {
+      setHeroActiveAction(heroActions[0].id);
+    }
+  }, [activeTrackId]);
 
   const handleHeroActionClick = (actionId) => {
     if (heroActiveAction === actionId) return;
@@ -997,23 +1086,28 @@ export default function LandingPageV2() {
                   : 'opacity-80 hover:opacity-100 hover:bg-slate-500/5'
               }`}
             >
-              How It Works
-            </button>
-            <button 
-              onClick={() => scrollToSection('modes')} 
-              className={`px-2.5 xl:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                activeSection === 'modes' 
-                  ? `${currentTheme.accentText} bg-slate-500/10 shadow-sm font-bold` 
-                  : 'opacity-80 hover:opacity-100 hover:bg-slate-500/5'
-              }`}
-            >
               Study Modes
             </button>
             <button 
-              onClick={() => { setSandboxTab('ai'); scrollToSection('sandbox'); }} 
-              className={`px-2.5 xl:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap opacity-80 hover:opacity-100 hover:bg-slate-500/5`}
+              onClick={() => setSubjectHubOpen(true)}
+              className="px-2.5 xl:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap opacity-80 hover:opacity-100 hover:bg-slate-500/5 flex items-center gap-1.5"
             >
-              AI Tutor
+              <BookOpen size={14} className="text-indigo-500" />
+              <span>Subject Hub</span>
+            </button>
+            <button 
+              onClick={() => setPeerStudyRoomOpen(true)}
+              className="px-2.5 xl:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap opacity-80 hover:opacity-100 hover:bg-slate-500/5 flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Peer Library</span>
+            </button>
+            <button 
+              onClick={() => setFlashcardsOpen(true)}
+              className="px-2.5 xl:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap opacity-80 hover:opacity-100 hover:bg-slate-500/5 flex items-center gap-1.5"
+            >
+              <Layers size={14} className="text-amber-500" />
+              <span>Flashcards</span>
             </button>
             <button 
               onClick={() => scrollToSection('engines')} 
@@ -1200,7 +1294,7 @@ export default function LandingPageV2() {
             
             {/* Primary Nav CTA: Try Tutovia Free */}
             <button 
-              onClick={() => navigate(user ? '/login' : '/signup')}
+              onClick={() => navigate(user ? '/hub' : '/signup')}
               className={`text-xs xl:text-sm font-bold px-3.5 xl:px-4 py-1.5 xl:py-2 rounded-xl transition-all duration-200 flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-indigo-400 shrink-0 whitespace-nowrap shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] ${currentTheme.primaryBtn}`}
             >
               <span>{user ? 'My Account' : 'Try Tutovia Free'}</span>
@@ -1211,7 +1305,7 @@ export default function LandingPageV2() {
           {/* Mobile Menu Button */}
           <div className="flex sm:hidden items-center gap-2 shrink-0">
             <button 
-              onClick={() => navigate('/login')}
+              onClick={() => navigate(user ? '/hub' : '/login')}
               className={`text-xs font-bold px-3 py-1.5 rounded-full border-2 whitespace-nowrap shadow-sm ${
                 isDarkTheme 
                   ? 'bg-[#0F172A] text-white border-slate-700 hover:bg-[#1E293B]' 
@@ -1235,14 +1329,8 @@ export default function LandingPageV2() {
           </div>
         </div>
 
-        {/* Scroll / Reading Progress Indicator */}
-        <div 
-          className="absolute bottom-0 left-0 h-[2px] transition-[width] duration-150 ease-out" 
-          style={{ 
-            width: `${scrollProgress}%`, 
-            backgroundColor: currentPhaseInfo.primary 
-          }} 
-        />
+        {/* Scroll / Reading Progress Indicator (Isolated RAF DOM updates, 0 parent re-renders) */}
+        <ReadingProgressBar color={currentPhaseInfo.primary} />
 
         {/* Mobile Navigation Drawer */}
         <AnimatePresence>
@@ -1256,12 +1344,40 @@ export default function LandingPageV2() {
               }`}
             >
               <div className="flex flex-col gap-1.5 font-medium">
+                <button
+                  onClick={() => { setMobileMenuOpen(false); setSubjectHubOpen(true); }}
+                  className="text-left py-2 px-3 rounded-lg text-sm font-semibold transition-all border flex items-center justify-between bg-indigo-500/10 border-indigo-500/30 text-indigo-400"
+                >
+                  <span className="flex items-center gap-2">
+                    <BookOpen size={16} />
+                    <span>Unified Subject Hub</span>
+                  </span>
+                  <span className="text-[10px] font-bold uppercase">Open</span>
+                </button>
+                <button
+                  onClick={() => { setMobileMenuOpen(false); setPeerStudyRoomOpen(true); }}
+                  className="text-left py-2 px-3 rounded-lg text-sm font-semibold transition-all border flex items-center justify-between bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                >
+                  <span className="flex items-center gap-2">
+                    <Users size={16} />
+                    <span>Peer Study Room (Live)</span>
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </button>
+                <button
+                  onClick={() => { setMobileMenuOpen(false); setFlashcardsOpen(true); }}
+                  className="text-left py-2 px-3 rounded-lg text-sm font-semibold transition-all border flex items-center justify-between bg-amber-500/10 border-amber-500/30 text-amber-400"
+                >
+                  <span className="flex items-center gap-2">
+                    <Layers size={16} />
+                    <span>Spaced Flashcards</span>
+                  </span>
+                  <span className="text-[10px] font-bold uppercase">Recall</span>
+                </button>
                 {[
-                  { id: 'modes', label: 'How Tutovia Works' },
                   { id: 'modes', label: 'Study Modes' },
-                  { id: 'sandbox', label: 'AI Tutor Demo', tab: 'ai' },
                   { id: 'engines', label: 'Preparation Engines' },
-                  { id: 'sandbox', label: 'Live Sandbox' },
+                  { id: 'sandbox', label: 'Live Sandbox & AI Demo' },
                   { id: 'story', label: 'Founder Story' },
                   { id: 'about', label: 'Trust & Ethics' },
                 ].map((item, idx) => (
@@ -1342,7 +1458,7 @@ export default function LandingPageV2() {
               {/* Mobile CTA */}
               <div className="pt-2 flex flex-col gap-2">
                 <button
-                  onClick={() => { setMobileMenuOpen(false); navigate(user ? '/login' : '/signup'); }}
+                  onClick={() => { setMobileMenuOpen(false); navigate(user ? '/hub' : '/signup'); }}
                   className={`w-full font-bold py-3 rounded-xl flex items-center justify-center gap-2 ${currentTheme.primaryBtn}`}
                 >
                   <span>{user ? 'My Account' : 'Try Tutovia Free'}</span>
@@ -1377,16 +1493,23 @@ export default function LandingPageV2() {
               { id: 'lumen', src: heroPhotoLumen, alt: 'Tutovia study desk at midday (Lumen)' },
               { id: 'twilight', src: heroPhotoTwilight, alt: 'Tutovia study desk at sunset (Twilight)' },
               { id: 'eclipse', src: heroPhotoEclipse, alt: 'Tutovia study desk at night (Eclipse)' }
-            ].map(photo => (
-              <img 
-                key={photo.id}
-                src={photo.src} 
-                alt={photo.alt} 
-                className={`absolute inset-0 w-full h-full object-cover object-[center_62%] filter saturate-[1.05] transition-opacity duration-1000 ${
-                  activePhase === photo.id ? 'opacity-100 z-0' : 'opacity-0 -z-10 pointer-events-none'
-                }`}
-              />
-            ))}
+            ].map(photo => {
+              const isActive = activePhase === photo.id;
+              if (!isActive && !preloadAllHeroPhotos) return null;
+              return (
+                <img 
+                  key={photo.id}
+                  src={photo.src} 
+                  alt={photo.alt} 
+                  loading={isActive ? "eager" : "lazy"}
+                  decoding={isActive ? "sync" : "async"}
+                  fetchPriority={isActive ? "high" : "low"}
+                  className={`absolute inset-0 w-full h-full object-cover object-[center_62%] filter saturate-[1.05] transition-opacity duration-1000 ${
+                    isActive ? 'opacity-100 z-0' : 'opacity-0 -z-10 pointer-events-none'
+                  }`}
+                />
+              );
+            })}
             {/* 2. Theme-Adaptive Sophisticated Gradient Overlay */}
             <div 
               className="absolute inset-0 transition-all duration-700 pointer-events-none z-10" 
@@ -1405,27 +1528,43 @@ export default function LandingPageV2() {
             <motion.div initial="hidden" animate="visible" variants={staggerContainer} className="lg:col-span-7 text-center lg:text-left">
               
               {/* Contextual Badge */}
-              <motion.div variants={fadeIn} className="flex justify-center lg:justify-start mb-4">
+              <motion.div variants={fadeIn} className="flex justify-center lg:justify-start mb-3">
                 <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-semibold shadow-sm ${currentTheme.audienceBadge}`}>
                   <GraduationCap size={15} />
-                  <span>Built for CA Foundation, Intermediate & Final Aspirants</span>
+                  <span>For Students, By Students • Commerce & CA Professional Journey</span>
                 </span>
               </motion.div>
 
               {/* Main Headline */}
-              <motion.h1 variants={fadeIn} className={`text-4xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight mb-5 leading-[1.12] ${currentTheme.heroHeadline}`}>
-                You don't have to<br className="hidden sm:inline" /> study alone.
+              <motion.h1 variants={fadeIn} className={`text-4xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight mb-4 leading-[1.12] ${currentTheme.heroHeadline}`}>
+                For Students,<br className="hidden sm:inline" /> By Students.
               </motion.h1>
 
-              {/* Concise Value Proposition */}
-              <motion.p variants={fadeIn} className={`text-lg sm:text-xl md:text-2xl mb-4 leading-relaxed font-semibold ${currentTheme.heroSubtitle}`}>
-                Your AI tutor combining intelligent planning, 24/7 doubt-solving, exam practice, and consistency support.
+              {/* Concise Value Proposition & Mission */}
+              <motion.p variants={fadeIn} className={`text-lg sm:text-xl md:text-2xl mb-3 leading-relaxed font-bold ${currentTheme.heroSubtitle}`}>
+                Built by students who have walked the path — the empathetic AI study partner that grows with learners across their entire Commerce & Professional journey.
               </motion.p>
 
               {/* Supporting Line */}
-              <motion.p variants={fadeIn} className={`text-sm sm:text-base mb-8 max-w-2xl leading-relaxed ${currentTheme.heroSupporting}`}>
-                Learn at your pace. Ask without hesitation. Stay on track with a living study environment calibrated to your natural daily energy.
+              <motion.p variants={fadeIn} className={`text-sm sm:text-base mb-5 max-w-2xl leading-relaxed ${currentTheme.heroSupporting}`}>
+                From Class 11 & 12 fundamentals to CA Foundation, Intermediate, and Final mastery. Peer-to-peer, realistic, and calibrated to actual student pressure and daily routines.
               </motion.p>
+
+              {/* Multi-Stage Academic Track / Stage Selector */}
+              <motion.div variants={fadeIn} className="mb-6 flex flex-col items-center lg:items-start w-full">
+                <div className="text-[11px] font-black uppercase tracking-wider opacity-60 mb-1.5 flex items-center gap-1.5">
+                  <Sparkles size={12} className="text-indigo-500" />
+                  <span>Select Academic Track (Adaptive AI & Schedule Preview):</span>
+                </div>
+                <AcademicTrackSelector 
+                  activeTrackId={activeTrackId}
+                  onSelectTrack={(id) => {
+                    setActiveTrackId(id);
+                    saveTrackId(id);
+                  }}
+                  isDarkTheme={isDarkTheme}
+                />
+              </motion.div>
 
               {/* Primary & Secondary CTAs */}
               <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5 mb-7">
@@ -2105,6 +2244,100 @@ export default function LandingPageV2() {
               </button>
             </div>
 
+          </div>
+        </section>
+
+        {/* ======================================================== */}
+        {/* NEW SECTION: "FOR STUDENTS, BY STUDENTS" GROWTH ECOSYSTEM */}
+        {/* Multi-Stage Curriculum, Virtual Peer Room & Spaced Recall */}
+        {/* ======================================================== */}
+        <section id="ecosystem" className="py-20 px-4 relative scroll-mt-20">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center max-w-3xl mx-auto mb-14">
+              <span className={`text-xs font-bold uppercase tracking-wider px-3.5 py-1 rounded-full border mb-3 inline-block ${currentTheme.sectionBadge}`}>
+                "For Students, By Students"
+              </span>
+              <h2 className={`text-3xl sm:text-4xl md:text-5xl font-heading font-black tracking-tight mt-2 mb-4 ${currentTheme.h2}`}>
+                The Complete Commerce & CA Growth Journey
+              </h2>
+              <p className={`text-sm sm:text-base leading-relaxed ${currentTheme.sectionDesc}`}>
+                Built by students who walked the path. Discover curriculum roadmaps, join live distraction-free study rooms, and master legal sections with spaced repetition.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Card 1: Unified Subject Hub */}
+              <div className={`p-6 rounded-3xl border-2 transition-all flex flex-col justify-between ${currentTheme.card}`}>
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 flex items-center justify-center mb-4">
+                    <BookOpen size={24} />
+                  </div>
+                  <h3 className={`text-xl font-heading font-bold mb-2 ${currentTheme.h3}`}>
+                    Unified Subject Hub
+                  </h3>
+                  <p className={`text-xs sm:text-sm leading-relaxed mb-4 ${currentTheme.bodyText}`}>
+                    Explore your active stage — Class 11, Class 12, CA Foundation, or CA Inter/Final — and preview the next bridge in your journey with high-yield syllabus roadmaps.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSubjectHubOpen(true)}
+                  className={`w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm ${currentTheme.primaryBtn}`}
+                >
+                  <BookOpen size={14} />
+                  <span>Explore Subject Hub & Bridges</span>
+                </button>
+              </div>
+
+              {/* Card 2: Peer Study Room (Virtual Library) */}
+              <div className={`p-6 rounded-3xl border-2 transition-all flex flex-col justify-between relative overflow-hidden ${currentTheme.card}`}>
+                <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-[11px] font-black uppercase">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>1,480+ Live</span>
+                </div>
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center mb-4">
+                    <Users size={24} />
+                  </div>
+                  <h3 className={`text-xl font-heading font-bold mb-2 ${currentTheme.h3}`}>
+                    Virtual Peer Library
+                  </h3>
+                  <p className={`text-xs sm:text-sm leading-relaxed mb-4 ${currentTheme.bodyText}`}>
+                    Study alongside commerce aspirants worldwide. Zero distractions, procedural Web Audio (binaural alpha waves, rain, brown noise), and focus timers.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setPeerStudyRoomOpen(true)}
+                  className="w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 transition-all"
+                >
+                  <Users size={14} />
+                  <span>Enter Peer Study Room (Live)</span>
+                </button>
+              </div>
+
+              {/* Card 3: Spaced Repetition Flashcards */}
+              <div className={`p-6 rounded-3xl border-2 transition-all flex flex-col justify-between ${currentTheme.card}`}>
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mb-4">
+                    <Layers size={24} />
+                  </div>
+                  <h3 className={`text-xl font-heading font-bold mb-2 ${currentTheme.h3}`}>
+                    Practice & Flashcards Engine
+                  </h3>
+                  <p className={`text-xs sm:text-sm leading-relaxed mb-4 ${currentTheme.bodyText}`}>
+                    Formula sheets, golden rules, company shares forfeiture, Contract Act clauses, AS 10 & CARO 2020 with active recall and spaced repetition drills.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setFlashcardsOpen(true)}
+                  className={`w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border ${
+                    isDarkTheme ? 'border-slate-700 hover:bg-slate-800 text-white' : 'border-slate-300 hover:bg-slate-100 text-slate-900'
+                  }`}
+                >
+                  <Layers size={14} className="text-amber-500" />
+                  <span>Practice Flashcards</span>
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -3161,6 +3394,49 @@ export default function LandingPageV2() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* ======================================================== */}
+      {/* V2 GROWTH & EMPOWERMENT MODALS ("For Students, By Students") */}
+      {/* ======================================================== */}
+      
+      {/* 1. Unified Subject Hub Modal */}
+      <UnifiedSubjectHubModal 
+        isOpen={subjectHubOpen} 
+        onClose={() => setSubjectHubOpen(false)}
+        currentTrackId={activeTrackId}
+        onSwitchTrack={(id) => {
+          setActiveTrackId(id);
+          saveTrackId(id);
+        }}
+        isDarkTheme={isDarkTheme}
+      />
+
+      {/* 2. Peer Study Room / Virtual Library Modal */}
+      <PeerStudyRoomModal 
+        isOpen={peerStudyRoomOpen}
+        onClose={() => setPeerStudyRoomOpen(false)}
+        isDarkTheme={isDarkTheme}
+        activeSubject={currentTrackConfig.shortName}
+      />
+
+      {/* 3. Spaced Repetition Flashcards Modal */}
+      <FlashcardsEngineModal 
+        isOpen={flashcardsOpen}
+        onClose={() => setFlashcardsOpen(false)}
+        currentTrackId={activeTrackId}
+        isDarkTheme={isDarkTheme}
+      />
+
+      {/* 4. Empathy Onboarding Modal */}
+      <EmpathyOnboardingModal 
+        isOpen={empathyOnboardingOpen}
+        onClose={() => setEmpathyOnboardingOpen(false)}
+        onComplete={(data) => {
+          setActiveTrackId(data.academic_track);
+          navigate('/signup');
+        }}
+        isDarkTheme={isDarkTheme}
+      />
 
     </div>
   );

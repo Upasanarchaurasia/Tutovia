@@ -43,7 +43,7 @@ export default function SignUpV2() {
   const isSafeRedirect = (url) => {
     return url && typeof url === 'string' && url.startsWith('/') && !url.startsWith('//');
   };
-  const destination = isSafeRedirect(location.state?.from) ? location.state.from : '/';
+  const destination = isSafeRedirect(location.state?.from) ? location.state.from : '/hub';
 
   // If user is already authenticated, redirect them away to destination
   useEffect(() => {
