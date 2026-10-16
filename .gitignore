@@ -14,11 +14,18 @@ frontend-err.log
 # Build Outputs
 build/
 dist_v2/
+dist_v3/
 Payload/
 *.ipa
 *.ps1
 *.tar.gz
 DerivedData/
+
+# Scratch & Temporary Verification Scripts
+scratch/
+verify_*.js
+diagnose_*.js
+*.bak
 
 # Large local runtime zips and directories
 jdk17/

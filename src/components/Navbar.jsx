@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -11,8 +12,12 @@ import {
   Bell,
   Sun,
   Moon, 
+  Sunrise,
+  Sunset,
   Clock,
   Sparkles,
+  ChevronDown,
+  Check,
   X,
   Layers,
   BarChart3,
@@ -39,6 +44,20 @@ export function Navbar({ onOpenTutor }) {
   const { addToast } = useToast();
   const { activePhase, selectPhase, currentPhaseInfo, isAuto } = useTheme();
   const [notifications, setNotifications] = useState([]);
+
+  // Theme dropdown state
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const themeMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target)) {
+        setThemeMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Only show admin portal for the owner account (Upasana / u1)
   const isAdmin = user && (
@@ -167,22 +186,105 @@ export function Navbar({ onOpenTutor }) {
               <span className="font-bold">{streak} <span className="hidden sm:inline">Day Streak</span><span className="sm:hidden">d</span></span>
             </div>
 
-            {/* Journey Phase Indicator & Atmosphere Toggle */}
-            <button
-              onClick={() => {
-                const nextPhase = activePhase === 'morning' ? 'day' : activePhase === 'day' ? 'evening' : activePhase === 'evening' ? 'night' : 'morning';
-                selectPhase(nextPhase);
-                addToast(`Atmosphere switched to ${nextPhase.charAt(0).toUpperCase() + nextPhase.slice(1)} Mode`, 'info');
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-card hover:bg-surface text-slate-300 transition-colors border border-surface-border text-xs font-semibold relative"
-              title={`Tutovia Atmosphere: ${currentPhaseInfo.name} (${currentPhaseInfo.timeLabel || currentPhaseInfo.label}). ${isAuto ? 'Automatic local-time mode active.' : 'Manual override mode.'} Click to cycle atmospheres.`}
-            >
-              <span className="text-sm">{currentPhaseInfo.icon}</span>
-              <span className="hidden xl:inline">{currentPhaseInfo.name}</span>
-              {isAuto && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" title="Automatic Local Time Sync Active" />
-              )}
-            </button>
+            {/* Single Compact Theme Control with Dropdown */}
+            <div className="relative shrink-0" ref={themeMenuRef}>
+              <button
+                onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+                aria-expanded={themeMenuOpen}
+                aria-label="Theme selector"
+                title={`Current theme: ${currentPhaseInfo.name}${isAuto ? ' (Auto time-based)' : ' (Manual)'}`}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold bg-surface-card hover:bg-surface text-slate-200 transition-all border border-surface-border cursor-pointer whitespace-nowrap"
+              >
+                {isAuto ? (
+                  <Sparkles size={13} className="text-amber-400 shrink-0" />
+                ) : (
+                  activePhase === 'aurora' || activePhase === 'morning' ? <Sunrise size={13} className="text-amber-400 shrink-0" /> :
+                  activePhase === 'lumen' || activePhase === 'day' ? <Sun size={13} className="text-blue-400 shrink-0" /> :
+                  activePhase === 'twilight' || activePhase === 'evening' ? <Sunset size={13} className="text-orange-400 shrink-0" /> :
+                  <Moon size={13} className="text-indigo-400 shrink-0" />
+                )}
+                <span className="font-semibold whitespace-nowrap hidden sm:inline">
+                  {isAuto ? `${currentPhaseInfo.name} · Auto` : currentPhaseInfo.name}
+                </span>
+                <span className="font-semibold whitespace-nowrap sm:hidden">
+                  {currentPhaseInfo.name}
+                </span>
+                <ChevronDown size={12} className={`opacity-60 transition-transform duration-200 shrink-0 ${themeMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Compact Dropdown Menu */}
+              <AnimatePresence>
+                {themeMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-60 rounded-2xl border border-slate-700/80 bg-[#141A29] p-2.5 shadow-2xl shadow-black/70 z-50 backdrop-blur-2xl text-slate-100 ring-1 ring-white/10"
+                  >
+                    <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Atmosphere Mode
+                    </div>
+
+                    {/* Auto Option */}
+                    <button
+                      onClick={() => { selectPhase('auto'); setThemeMenuOpen(false); addToast('Switched to Auto Time Mode', 'info'); }}
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all mb-1 ${
+                        isAuto ? 'bg-indigo-600 text-white shadow-sm' : 'hover:bg-slate-800 text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={14} className={isAuto ? 'text-white' : 'text-amber-400'} />
+                        <div className="text-left">
+                          <div className="font-bold flex items-center gap-1.5">
+                            <span>Auto</span>
+                            <span className="text-[10px] opacity-75 font-normal">(Local Time)</span>
+                          </div>
+                          <div className="text-[10px] opacity-70">Detects device clock</div>
+                        </div>
+                      </div>
+                      {isAuto && <Check size={14} className="shrink-0" />}
+                    </button>
+
+                    <div className="my-1 border-t border-slate-800" />
+
+                    {/* 4 Named Modes */}
+                    {[
+                      { id: 'aurora', name: 'Aurora', time: '05:00 AM – 11:59 AM', icon: Sunrise, color: 'text-amber-400' },
+                      { id: 'lumen', name: 'Lumen', time: '12:00 PM – 04:59 PM', icon: Sun, color: 'text-blue-400' },
+                      { id: 'twilight', name: 'Twilight', time: '05:00 PM – 08:59 PM', icon: Sunset, color: 'text-orange-400' },
+                      { id: 'eclipse', name: 'Eclipse', time: '09:00 PM – 04:59 AM', icon: Moon, color: 'text-indigo-400' }
+                    ].map(item => {
+                      const isSelected = !isAuto && (activePhase === item.id || (item.id === 'aurora' && activePhase === 'morning') || (item.id === 'lumen' && activePhase === 'day') || (item.id === 'twilight' && activePhase === 'evening') || (item.id === 'eclipse' && activePhase === 'night'));
+                      const isCurrentlyActiveInAuto = isAuto && (activePhase === item.id || (item.id === 'aurora' && activePhase === 'morning') || (item.id === 'lumen' && activePhase === 'day') || (item.id === 'twilight' && activePhase === 'evening') || (item.id === 'eclipse' && activePhase === 'night'));
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => { selectPhase(item.id); setThemeMenuOpen(false); addToast(`Switched to ${item.name} Mode`, 'info'); }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all mb-0.5 ${
+                            isSelected ? 'bg-indigo-600 text-white shadow-sm' : 'hover:bg-slate-700/40 text-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <item.icon size={14} className={isSelected ? 'text-white' : item.color} />
+                            <div className="text-left">
+                              <div className="font-bold flex items-center gap-1">
+                                <span>{item.name}</span>
+                                {isCurrentlyActiveInAuto && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-slate-700/80 text-amber-300 font-normal">Active</span>
+                                )}
+                              </div>
+                              <div className="text-[10px] opacity-65">{item.time}</div>
+                            </div>
+                          </div>
+                          {isSelected && <Check size={14} className="shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             {/* Notification Bell */}
             <div className="relative">

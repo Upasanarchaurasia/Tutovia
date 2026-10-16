@@ -8,7 +8,15 @@
     "dev:frontend": "vite",
     "dev:backend": "node server.js",
     "build": "vite build",
-    "preview": "vite preview"
+    "build:v1": "vite build",
+    "build:v2": "vite build --config vite.v2.config.js",
+    "build:v3": "vite build --config vite.v3.config.js",
+    "build:all": "npm run build:v1 && npm run build:v2 && npm run build:v3",
+    "preview": "vite preview",
+    "version:list": "node scripts/version-manager.mjs list",
+    "version:save": "node scripts/version-manager.mjs save",
+    "version:checkout": "node scripts/version-manager.mjs checkout",
+    "version:sync": "node scripts/version-manager.mjs sync"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
