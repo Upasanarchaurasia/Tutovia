@@ -41,11 +41,12 @@ function resolveGitBinary() {
 const GIT = resolveGitBinary();
 
 function runGit(args, options = {}) {
-  return execFileSync(GIT, args, {
+  const out = execFileSync(GIT, args, {
     encoding: 'utf8',
     stdio: options.stdio || 'pipe',
     cwd: process.cwd()
-  }).trim();
+  });
+  return typeof out === 'string' ? out.trim() : '';
 }
 
 const [, , command = 'list', rawVersion, ...msgParts] = process.argv;
