@@ -65,7 +65,7 @@ export function Navbar({ onOpenTutor }) {
     ADMIN_EMAILS.includes((user.email || '').toLowerCase())
   );
   const [showNotifs, setShowNotifs] = useState(false);
-  const [studyHours, setStudyHours] = useState('0.00');
+  const [studyHours, setStudyHours] = useState(null);
   const [streak, setStreak] = useState(0);
 
   const getInitials = (name) => {
@@ -82,12 +82,12 @@ export function Navbar({ onOpenTutor }) {
       if (uid) {
         axios.get(`/api/progress?userId=${uid}`).then(res => {
           if (res?.data) {
-            setStudyHours(res.data.study_hours_today || '0.00');
+            setStudyHours(Number.isFinite(res.data.total_study_minutes) ? (res.data.total_study_minutes / 60).toFixed(2) : null);
             setStreak(res.data.current_streak || 0);
           }
         }).catch(() => {});
       } else {
-        setStudyHours('0.00');
+        setStudyHours(null);
         setStreak(0);
       }
     };
@@ -99,7 +99,7 @@ export function Navbar({ onOpenTutor }) {
 
   const VALID_SUBJECT_IDS = ['advanced-accounting', 'corporate-laws', 'taxation', 'cost-management', 'auditing-ethics', 'fm-sm'];
   const defaultSubjectId = profile?.ca_group === 'Group 2' ? 'cost-management' : 'advanced-accounting';
-  const rawSubId = localStorage.getItem('tutovia_last_subject_id');
+  const rawSubId = localStorage.getItem(`tutovia_v3_${user.id}_last_subject_id`);
   const targetSubjectId = (rawSubId && VALID_SUBJECT_IDS.includes(rawSubId)) ? rawSubId : defaultSubjectId;
 
   const navItems = [
@@ -177,7 +177,7 @@ export function Navbar({ onOpenTutor }) {
 
             {/* Daily Study Hours Badge */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-semibold">
-              <span>{studyHours} hrs Today</span>
+              <span>{studyHours === null ? 'Focus total unavailable' : `${studyHours} hrs total`}</span>
             </div>
 
             {/* Streak Counter */}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../context/AuthContext.jsx';
 import {
   CheckCircle2, Circle, Flag, Layers, Award, Sparkles,
   ArrowRight, ShieldCheck, Clock, BookOpen, FileText, Zap
@@ -6,8 +7,8 @@ import {
 
 const DEFAULT_MILESTONES = {
   phase1: [
-    { id: 'p1_1', text: 'Finish 100% ICAI Study Material Illustrations & Exercise', done: true },
-    { id: 'p1_2', text: 'Prepare handwritten formula sheets & section digests', done: true },
+    { id: 'p1_1', text: 'Finish 100% ICAI Study Material Illustrations & Exercise', done: false },
+    { id: 'p1_2', text: 'Prepare handwritten formula sheets & section digests', done: false },
     { id: 'p1_3', text: 'Mark LDR (Last Day Revision) tricky questions', done: false },
     { id: 'p1_4', text: 'First conceptual revision of Accounting Standards & Laws', done: false }
   ],
@@ -26,8 +27,9 @@ const DEFAULT_MILESTONES = {
 };
 
 export default function StudyMilestoneTimeline() {
+  const { user } = useAuth();
   const [milestones, setMilestones] = useState(() => {
-    const saved = localStorage.getItem('tutovia_study_milestones');
+    const saved = localStorage.getItem(`tutovia_v3_${user.id}_study_milestones`);
     if (saved) {
       try { return JSON.parse(saved); } catch {}
     }
@@ -35,7 +37,7 @@ export default function StudyMilestoneTimeline() {
   });
 
   useEffect(() => {
-    localStorage.setItem('tutovia_study_milestones', JSON.stringify(milestones));
+    localStorage.setItem(`tutovia_v3_${user.id}_study_milestones`, JSON.stringify(milestones));
   }, [milestones]);
 
   const toggleTask = (phase, id) => {

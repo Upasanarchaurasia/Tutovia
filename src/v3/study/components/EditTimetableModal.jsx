@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Save, Calendar, Clock, BookOpen, Sparkles } from 'luci
 
 export default function EditTimetableModal({ isOpen, onClose, schedule, onSave }) {
   const [sessions, setSessions] = useState([]);
+  const [saving, setSaving] = useState(false), [error, setError] = useState('');
 
   useEffect(() => {
     if (schedule) {
@@ -37,9 +38,12 @@ export default function EditTimetableModal({ isOpen, onClose, schedule, onSave }
     setSessions(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
-    onSave(sessions);
-    onClose();
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true); setError('');
+    try { await onSave(sessions); onClose(); }
+    catch (failure) { setError(failure.message || 'Timetable could not be saved. Your edits are kept here.'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -160,6 +164,7 @@ export default function EditTimetableModal({ isOpen, onClose, schedule, onSave }
           </button>
         </div>
 
+        {error && <p role="alert" className="px-6 py-3 daily-error text-sm">{error}</p>}
         {/* Footer */}
         <div className="p-6 border-t border-surface-border bg-surface-card flex justify-between items-center">
           <span className="text-xs text-slate-400">
@@ -176,6 +181,7 @@ export default function EditTimetableModal({ isOpen, onClose, schedule, onSave }
             <button
               type="button"
               onClick={handleSave}
+              disabled={saving}
               className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-indigo-500/20"
             >
               <Save className="w-4 h-4" /> Save Timetable

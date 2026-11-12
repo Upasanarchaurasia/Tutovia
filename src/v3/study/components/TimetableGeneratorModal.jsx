@@ -3,6 +3,7 @@ import { X, Clock, Calendar, Info, AlertTriangle } from 'lucide-react';
 
 export default function TimetableGeneratorModal({ isOpen, onClose, onGenerate, defaultHours }) {
   const [step, setStep] = useState(1);
+  const [saving, setSaving] = useState(false), [error, setError] = useState('');
   const [studyHours, setStudyHours] = useState(defaultHours || 8);
   const [customHours, setCustomHours] = useState('');
   const [availableHours, setAvailableHours] = useState('');
@@ -33,15 +34,18 @@ export default function TimetableGeneratorModal({ isOpen, onClose, onGenerate, d
     if (step < 3) setStep(step + 1);
   };
 
-  const handleGenerate = () => {
-    onGenerate({
+  const handleGenerate = async () => {
+    if (saving) return;
+    setSaving(true); setError('');
+    try { await onGenerate({
       studyHours: parseInt(studyHours, 10),
       availableHours: parseInt(availableHours, 10) || parseInt(studyHours, 10),
       wakeTime,
       sleepTime,
       commitmentsStr: commitments
-    });
-    onClose();
+    }); onClose(); }
+    catch { setError('Your plan could not be saved. Please retry; your settings are kept here.'); }
+    finally { setSaving(false); }
   };
 
   const studyOptions = [2, 4, 6, 8, 10, 12, 14];
@@ -164,6 +168,8 @@ export default function TimetableGeneratorModal({ isOpen, onClose, onGenerate, d
           )}
         </div>
 
+        <p className="px-6 pb-3 text-xs text-slate-300">Generating a plan replaces your saved timetable. Your temporary available-time choice does not change it.</p>
+        {error && <p role="alert" className="px-6 pb-3 daily-error text-sm">{error}</p>}
         <div className="p-6 border-t border-surface-border bg-surface-card flex justify-between items-center mt-auto">
           <div className="flex gap-1.5">
             {[1, 2, 3].map(i => (
@@ -191,6 +197,7 @@ export default function TimetableGeneratorModal({ isOpen, onClose, onGenerate, d
             ) : (
               <button
                 onClick={handleGenerate}
+                disabled={saving}
                 className="px-6 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-colors shadow-lg shadow-indigo-500/20 flex items-center gap-2"
               >
                 Generate Timetable

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../context/AuthContext.jsx';
 import {
   Calculator, Award, AlertCircle, CheckCircle2, ChevronRight,
   Sparkles, RotateCcw, TrendingUp, Star, ShieldCheck, Target,
@@ -42,7 +43,8 @@ const STRATEGY_PRESETS = [
   }
 ];
 
-export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
+export default function CaAggregateSimulator({ defaultGroup = 'Both Groups', onGenerate }) {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedGroup, setSelectedGroup] = useState(() => {
     if (defaultGroup === 'Group 1') return 'g1';
@@ -51,7 +53,7 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
   });
 
   const [marks, setMarks] = useState(() => {
-    const saved = localStorage.getItem('tutovia_sim_marks');
+    const saved = localStorage.getItem(`tutovia_v3_${user.id}_sim_marks`);
     if (saved) {
       try { return JSON.parse(saved); } catch {}
     }
@@ -86,7 +88,7 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
   };
 
   const handleSaveMarks = () => {
-    localStorage.setItem('tutovia_sim_marks', JSON.stringify(marks));
+    localStorage.setItem(`tutovia_v3_${user.id}_sim_marks`, JSON.stringify(marks));
     setSavedFeedback(true);
     setTimeout(() => setSavedFeedback(false), 2500);
   };
@@ -96,7 +98,7 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
   };
 
   const generateTimetable = async () => {
-    const userId = localStorage.getItem('tutovia_user_id') || 'u1';
+    const userId = user.id;
     const allPapers = [...INTER_PAPERS.g1, ...INTER_PAPERS.g2];
 
     // Build subject gaps and identify exemption targets (>= 60 marks)
@@ -119,6 +121,11 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
     setGenerating(true);
     setGenSuccess(false);
     try {
+      if (onGenerate) {
+        await onGenerate({ studyHours: 8, subjectGaps, exemptionTargets });
+        setGenSuccess(true);
+        return;
+      }
       const res = await fetch('/api/schedule/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
@@ -133,7 +140,7 @@ export default function CaAggregateSimulator({ defaultGroup = 'Both Groups' }) {
         setGenSuccess(true);
         setTimeout(() => {
           setGenSuccess(false);
-          navigate('/');
+          navigate('/dashboard');
         }, 1800);
       }
     } catch (e) {

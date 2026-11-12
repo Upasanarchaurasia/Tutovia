@@ -78,7 +78,7 @@ export default function Subject() {
 
   useEffect(() => {
     if (id && VALID_SUBJECT_IDS.includes(id)) {
-      localStorage.setItem('tutovia_last_subject_id', id);
+      localStorage.setItem(`tutovia_v3_${user.id}_last_subject_id`, id);
     }
     fetchSubject();
   }, [id, user?.id]);

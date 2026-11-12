@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import { useSearchParams } from 'react-router-dom';
 import axios from '../../../api.js';
 import { BookOpen, HelpCircle, Layers, CheckCircle2, Award, RotateCcw, ChevronLeft, ChevronRight, Upload, Loader2, Plus, X, Sparkles } from 'lucide-react';
 
 export default function Flashcards() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const [searchParams] = useSearchParams();
   const [flashcards, setFlashcards] = useState([]);
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -25,8 +27,8 @@ export default function Flashcards() {
 
   // Filters
   const [groupFilter, setGroupFilter] = useState('all'); // all, 'Group 1', 'Group 2'
-  const [subjectFilter, setSubjectFilter] = useState('all');
-  const [progressFilter, setProgressFilter] = useState('all'); // all, pending, reviewed, due, again, hard, good, mastered
+  const [subjectFilter, setSubjectFilter] = useState(searchParams.get('subject') || 'all');
+  const [progressFilter, setProgressFilter] = useState(searchParams.get('due') === '1' ? 'due' : 'all'); // all, pending, reviewed, due, again, hard, good, mastered
 
   useEffect(() => {
     fetchData();
@@ -43,7 +45,7 @@ export default function Flashcards() {
     try {
       const localData = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
       return cards.map(c => {
-        if (localData[c.id]) {
+        if (localData[c.id]?.confirmed === true) {
           return {
             ...c,
             status: localData[c.id].status || c.status,
@@ -120,7 +122,7 @@ export default function Flashcards() {
         if (fc.next_review_date) {
           return new Date(fc.next_review_date) <= now;
         }
-        return true;
+        return false;
       });
     } else if (progressFilter === 'again') {
       result = result.filter(fc => fc.status === 'again' || fc.status === 'learning');
@@ -136,6 +138,14 @@ export default function Flashcards() {
   }, [flashcards, groupFilter, subjectFilter, progressFilter]);
 
   const safeIndex = filteredCards.length > 0 ? Math.min(currentIndex, filteredCards.length - 1) : 0;
+  useEffect(() => {
+    if (profile?.ca_group && profile.ca_group !== 'Both Groups') setGroupFilter(profile.ca_group);
+  }, [profile?.ca_group]);
+  useEffect(() => {
+    const target = searchParams.get('card');
+    const index = target ? filteredCards.findIndex(card => String(card.id) === target) : -1;
+    if (index >= 0) setCurrentIndex(index);
+  }, [searchParams, flashcards.length]);
 
   const handleNext = () => {
     if (safeIndex < filteredCards.length - 1) {
@@ -171,7 +181,7 @@ export default function Flashcards() {
     try {
       const key = getStorageKey();
       const localData = JSON.parse(localStorage.getItem(key) || '{}');
-      localData[currentCard.id] = { status: optimisticStatus, next_review_date: optimisticNextReview, quality };
+      localData[currentCard.id] = { status: optimisticStatus, next_review_date: optimisticNextReview, quality, confirmed: false };
       localStorage.setItem(key, JSON.stringify(localData));
     } catch (e) {
       console.warn("Local storage write error:", e);
@@ -201,6 +211,12 @@ export default function Flashcards() {
       if (res.data?.progress) {
         const newStatus = res.data.progress.status;
         const nextReview = res.data.progress.next_review_date;
+        try {
+          const key = getStorageKey();
+          const localData = JSON.parse(localStorage.getItem(key) || '{}');
+          localData[currentCard.id] = { status: newStatus, next_review_date: nextReview, quality, confirmed: true, reviewed_at: new Date().toISOString() };
+          localStorage.setItem(key, JSON.stringify(localData));
+        } catch {}
 
         setFlashcards(prev => prev.map(fc =>
           fc.id === currentCard.id ? { ...fc, status: newStatus, next_review_date: nextReview } : fc

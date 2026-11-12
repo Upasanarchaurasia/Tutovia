@@ -9,9 +9,9 @@ export function DashboardRoute() {
 }
 
 export function SyllabusRoute() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const validIds = ['advanced-accounting', 'corporate-laws', 'taxation', 'cost-management', 'auditing-ethics', 'fm-sm'];
-  const saved = localStorage.getItem('tutovia_last_subject_id');
+  const saved = localStorage.getItem(`tutovia_v3_${user.id}_last_subject_id`);
   const id = validIds.includes(saved) ? saved : profile?.ca_group === 'Group 2' ? 'cost-management' : 'advanced-accounting';
   return <Navigate to={`/subject/${id}`} replace />;
 }

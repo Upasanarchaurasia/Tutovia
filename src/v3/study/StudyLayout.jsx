@@ -9,12 +9,24 @@ import { TutorChat } from './components/TutorChat.jsx';
 import OnboardingModal from './components/OnboardingModal.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import './study.css';
+import api from '../../api.js';
 
 function StudyShell() {
   const { needsOnboarding } = useAuth();
   const { activePhase, theme } = useTheme();
   const [tutorOpen, setTutorOpen] = useState(false);
   const location = useLocation();
+  useEffect(() => {
+    // The legacy server treats zero minutes as a 25-minute session and completes
+    // a task. Background cloud sync sends zero; a page visit must not count as work.
+    const guard = api.interceptors.request.use(config => {
+      if (config.url === '/api/progress/study-hours' && config.data?.minutesAdded === 0) {
+        return Promise.reject(new Error('Zero-duration sync does not record study activity.'));
+      }
+      return config;
+    });
+    return () => api.interceptors.request.eject(guard);
+  }, []);
   useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
 
   return (
@@ -48,5 +60,5 @@ export default function StudyLayout() {
   const location = useLocation();
   if (loading) return <div className="min-h-screen flex items-center justify-center" role="status">Opening your study space…</div>;
   if (!user) return <Navigate to="/login" state={{ from: `${location.pathname}${location.search}` }} replace />;
-  return <ThemeProvider><StudyShell /></ThemeProvider>;
+  return <ThemeProvider><StudyShell key={user.id} /></ThemeProvider>;
 }

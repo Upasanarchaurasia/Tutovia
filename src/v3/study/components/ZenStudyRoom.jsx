@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../../../context/AuthContext.jsx';
 import {
   Maximize2, Minimize2, Play, Pause, RotateCcw, Volume2,
   VolumeX, Moon, Sparkles, BookOpen, CheckSquare, Edit3,
@@ -15,8 +16,9 @@ const FOCUS_QUOTES = [
 ];
 
 export default function ZenStudyRoom({ isOpen, onClose, defaultSubject = 'CA Revision' }) {
+  const { user } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [studyTopic, setStudyTopic] = useState(() => localStorage.getItem('tutovia_zen_topic') || defaultSubject);
+  const [studyTopic, setStudyTopic] = useState(() => localStorage.getItem(`tutovia_v3_${user.id}_zen_topic`) || defaultSubject);
   const [isEditingTopic, setIsEditingTopic] = useState(false);
 
   // Timer state
@@ -25,7 +27,7 @@ export default function ZenStudyRoom({ isOpen, onClose, defaultSubject = 'CA Rev
   const [isRunning, setIsRunning] = useState(false);
   const [isBreak, setIsBreak] = useState(false);
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
-  const [sessionsCompleted, setSessionsCompleted] = useState(() => parseInt(localStorage.getItem('tutovia_zen_sessions') || '0', 10));
+  const [sessionsCompleted, setSessionsCompleted] = useState(() => parseInt(localStorage.getItem(`tutovia_v3_${user.id}_zen_sessions`) || '0', 10));
 
   // Audio state
   const [soundscape, setSoundscape] = useState('none'); // 'none' | 'brown' | 'rain' | 'alpha'
@@ -35,7 +37,7 @@ export default function ZenStudyRoom({ isOpen, onClose, defaultSubject = 'CA Rev
 
   // Scratchpad state
   const [showScratchpad, setShowScratchpad] = useState(false);
-  const [scratchpadText, setScratchpadText] = useState(() => localStorage.getItem('tutovia_zen_scratchpad') || '');
+  const [scratchpadText, setScratchpadText] = useState(() => localStorage.getItem(`tutovia_v3_${user.id}_zen_scratchpad`) || '');
   const [quoteIndex, setQuoteIndex] = useState(0);
 
   // Live time
@@ -56,17 +58,17 @@ export default function ZenStudyRoom({ isOpen, onClose, defaultSubject = 'CA Rev
 
   // Save topic
   useEffect(() => {
-    localStorage.setItem('tutovia_zen_topic', studyTopic);
+    localStorage.setItem(`tutovia_v3_${user.id}_zen_topic`, studyTopic);
   }, [studyTopic]);
 
   // Save scratchpad
   useEffect(() => {
-    localStorage.setItem('tutovia_zen_scratchpad', scratchpadText);
+    localStorage.setItem(`tutovia_v3_${user.id}_zen_scratchpad`, scratchpadText);
   }, [scratchpadText]);
 
   // Save completed sessions
   useEffect(() => {
-    localStorage.setItem('tutovia_zen_sessions', sessionsCompleted.toString());
+    localStorage.setItem(`tutovia_v3_${user.id}_zen_sessions`, sessionsCompleted.toString());
   }, [sessionsCompleted]);
 
   // Timer tick

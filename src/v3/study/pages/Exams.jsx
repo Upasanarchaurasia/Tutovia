@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { readUser, writeUser } from '../utils/dailyStudy.js';
 import {
   GraduationCap, Clock, HelpCircle, Play, CheckCircle2, XCircle,
   Award, ArrowLeft, RotateCcw, BookOpen, ChevronRight, Activity
@@ -32,6 +33,7 @@ export default function Exams() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [examResult, setExamResult] = useState(null);
   const [loading, setLoading] = useState(true);
+  const submitting = useRef(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const examIdParam = searchParams.get('examId');
@@ -93,9 +95,11 @@ export default function Exams() {
     try {
       const res = await axios.get(`/api/exams/${id}`);
       setActiveExam(res.data);
-      setCurrentQuestionIndex(0);
-      setUserAnswers({});
-      setTimeLeft(res.data.duration_sec || 300);
+      const saved = readUser(user.id, 'practiceResume', null);
+      const resume = saved?.userId === user.id && saved.examId === id && Object.keys(saved.answers || {}).length > 0 ? saved : null;
+      setCurrentQuestionIndex(resume?.questionIndex || 0);
+      setUserAnswers(resume?.answers || {});
+      setTimeLeft(resume?.timeLeft ?? res.data.duration_sec ?? 300);
       setIsSubmitted(false);
       setExamResult(null);
       setSearchParams({ examId: id });
@@ -110,10 +114,22 @@ export default function Exams() {
     setUserAnswers(prev => ({ ...prev, [qIndex]: optionIndex }));
   };
 
+  useEffect(() => {
+    if (!activeExam || isSubmitted || !Object.keys(userAnswers).length) return;
+    try { writeUser(user.id, 'practiceResume', {
+      kind: 'exam', userId: user.id, examId: activeExam.id, title: activeExam.title,
+      subjectId: activeExam.subject_id || caSubjects.find(subject => activeExam.id.includes(subject.id))?.id || null,
+      topic: activeExam.questions[currentQuestionIndex]?.topic || 'Saved mock practice',
+      answers: userAnswers, questionIndex: currentQuestionIndex, timeLeft, updatedAt: new Date().toISOString()
+    }); } catch { /* The exam remains usable when browser storage is unavailable. */ }
+  }, [user.id, activeExam, isSubmitted, userAnswers, currentQuestionIndex, timeLeft]);
+
   const handleSubmitExam = async () => {
-    if (!activeExam) return;
+    if (!activeExam || submitting.current) return;
+    submitting.current = true;
     try {
       const payload = {
+        userId: user.id,
         exam_id: activeExam.id,
         answers: userAnswers,
         time_taken_sec: activeExam.duration_sec - timeLeft
@@ -121,11 +137,14 @@ export default function Exams() {
       const res = await axios.post('/api/exams/submit', payload);
       setExamResult(res.data);
       setIsSubmitted(true);
+      writeUser(user.id, 'practiceResume', null);
       // Refresh attempts history
-      const progRes = await axios.get('/api/progress');
+      const progRes = await axios.get('/api/progress', { params: { userId: user.id } });
       setAttempts(progRes.data.attempts || []);
     } catch (err) {
       console.error('Failed to submit exam:', err);
+    } finally {
+      submitting.current = false;
     }
   };
 

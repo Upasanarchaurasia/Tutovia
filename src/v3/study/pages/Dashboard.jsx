@@ -1,1057 +1,510 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  TrendingUp, Award, Clock, AlertTriangle, CheckCircle2, Calendar,
-  Smile, ArrowRight, Play, Sparkles, Timer, Brain, BellRing,
-  AlertCircle, BookOpen, Target, ChevronRight, X, RotateCcw, Moon, Star
-} from 'lucide-react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Clock, Play, Brain, Moon, Target, RotateCcw, Calendar, ArrowRight, X, CheckCircle2, BookOpen, Sparkles } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import axios from '../../../api.js';
-import PomodoroTimer from '../components/PomodoroTimer.jsx';
-import { useToast } from '../context/ToastContext.jsx';
+import api from '../../../api.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import { useToast } from '../context/ToastContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
-import TimetableGeneratorModal from '../components/TimetableGeneratorModal.jsx';
-import EditTimetableModal from '../components/EditTimetableModal.jsx';
-import BadgeGallery from '../components/BadgeGallery.jsx';
+import { getPapersForStage, CA_STAGES } from '../../../data/syllabusData.js';
+import { exportTimetableToICS } from '../../../utils/calendarExport.js';
+import { useDashboardData } from '../hooks/useDashboardData.js';
+import { useDailySession } from '../hooks/useDailySession.js';
+import { dayIST, nextDayIST, minuteIST, readUser, writeUser, chooseTask, isComplete, isResumable, studyTask, taskDate, taskLabel, taskDuration, scheduleFingerprint, dueCards, focusToday, weekActivity } from '../utils/dailyStudy.js';
+import DailySessionTimer from '../components/DailySessionTimer.jsx';
+import DailySubjectCard from '../components/DailySubjectCard.jsx';
+import DailyDialog from '../components/DailyDialog.jsx';
+import DailyCollapsible from '../components/DailyCollapsible.jsx';
 import ExamCountdown from '../components/ExamCountdown.jsx';
-import OfficialDatesAnnouncementModal from '../components/OfficialDatesAnnouncementModal.jsx';
+import EditTimetableModal from '../components/EditTimetableModal.jsx';
+import TimetableGeneratorModal from '../components/TimetableGeneratorModal.jsx';
+import BadgeGallery from '../components/BadgeGallery.jsx';
 import ZenStudyRoom from '../components/ZenStudyRoom.jsx';
 import CaAggregateSimulator from '../components/CaAggregateSimulator.jsx';
 import StudyMilestoneTimeline from '../components/StudyMilestoneTimeline.jsx';
-import { exportTimetableToICS } from '../../../utils/calendarExport.js';
-import { supabase } from '../../../supabaseClient.js';
-import { SYLLABUS_BY_STAGE } from '../../../data/syllabusData.js';
-
-let initialNotificationsShown = false;
-let dashboardMemoryCache = {
-  data: null,
-  timestamp: 0,
-  userId: null
-};
-
-// --- Subject Card Component ---
-const colorMap = {
-  emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', progress: 'bg-emerald-500' },
-  blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400', progress: 'bg-blue-500' },
-  rose: { bg: 'bg-rose-500/10', border: 'border-rose-500/20', text: 'text-rose-400', progress: 'bg-rose-500' },
-  purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400', progress: 'bg-purple-500' },
-  amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', progress: 'bg-amber-500' },
-  indigo: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-400', progress: 'bg-indigo-500' }
-};
-
-const SubjectCard = ({ subject }) => {
-  const navigate = useNavigate();
-  const c = colorMap[subject.color] || colorMap.indigo;
-
-  let statusText = "In Progress";
-  let statusColor = "text-indigo-400";
-  let progressColor = c.progress;
-
-  if (subject.questionsAttempted === 0) {
-    statusText = "Not Started";
-    statusColor = "text-slate-400";
-    progressColor = "bg-slate-600";
-  } else if (subject.accuracy !== null && subject.accuracy < 60) {
-    statusText = "Needs Attention";
-    statusColor = "text-rose-400";
-    progressColor = "bg-rose-500";
-  } else if (subject.accuracy !== null && subject.accuracy >= 60) {
-    statusText = "Active / Strong";
-    statusColor = "text-emerald-400";
-    progressColor = "bg-emerald-500";
+import '../dailyDashboard.css';
+export default function Dashboard({
+  onOpenTutor
+}) {
+  const {
+    user
+  } = useAuth();
+  return user ? <DailyDashboard key={user.id} user={user} onOpenTutor={onOpenTutor} /> : null;
+}
+function DailyDashboard({
+  user,
+  onOpenTutor
+}) {
+  const {
+    profile: savedProfile
+  } = useAuth();
+  const {
+    addToast
+  } = useToast();
+  const {
+    currentPhaseInfo
+  } = useTheme();
+  const resource = useDashboardData(user.id);
+  const data = resource.data || {};
+  const profile = {
+    ...savedProfile,
+    ...data.profile,
+    id: user.id
+  };
+  const schedule = Array.isArray(data.schedule) ? data.schedule : [];
+  const progress = data.progress;
+  const analytics = data.analytics;
+  const [now, setNow] = useState(new Date());
+  const [focusMode, setFocusMode] = useState(false),
+    [zenOpen, setZenOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false),
+    [generateOpen, setGenerateOpen] = useState(false);
+  const [available, setAvailable] = useState(null),
+    [selectedId, setSelectedId] = useState(null);
+  const [saving, setSaving] = useState(false),
+    [saveError, setSaveError] = useState('');
+  const savingRef = useRef(false),
+    scheduleRef = useRef(schedule);
+  scheduleRef.current = schedule;
+  const [showCompleted, setShowCompleted] = useState(false),
+    [allRevision, setAllRevision] = useState(false);
+  const [reflectionOpen, setReflectionOpen] = useState(false),
+    [reflectionMood, setReflectionMood] = useState(''),
+    [reflectionNote, setReflectionNote] = useState('');
+  const [moveIds, setMoveIds] = useState([]);
+  const [dismissed, setDismissed] = useState(() => readUser(user.id, 'adjustDismissed', {}));
+  const [reflectionDay, setReflectionDay] = useState(() => readUser(user.id, 'reflectionDay', ''));
+  const [restoreSchedule, setRestoreSchedule] = useState(() => readUser(user.id, 'pendingScheduleRestore', null));
+  const ownerAlive = useRef(true);
+  useEffect(() => {
+    ownerAlive.current = true;
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => {
+      ownerAlive.current = false;
+      clearInterval(interval);
+    };
+  }, []);
+  async function commitSchedule(next, {
+    baseline = scheduleRef.current,
+    compare = true
+  } = {}) {
+    if (savingRef.current) throw new Error('A timetable save is already in progress.');
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError('');
+    try {
+      if (compare) {
+        const {
+          data: latest
+        } = await api.get('/api/schedule', {
+          params: {
+            userId: user.id
+          }
+        });
+        if (!Array.isArray(latest) || scheduleFingerprint(latest) !== scheduleFingerprint(baseline)) throw new Error('Your timetable changed elsewhere. Refresh before saving to keep those changes.');
+      }
+      const response = await api.post('/api/schedule/custom', {
+        userId: user.id,
+        schedule: next
+      });
+      if (!Array.isArray(response.data) || scheduleFingerprint(response.data) !== scheduleFingerprint(next)) throw new Error('The timetable save was not confirmed. Refresh before retrying.');
+      if (ownerAlive.current) resource.update({
+        schedule: response.data
+      });
+      try {
+        localStorage.setItem(`tutovia_schedule_${user.id}`, JSON.stringify(response.data));
+      } catch {
+        addToast('Plan saved; the browser cache could not be updated.', 'info');
+      }
+      return response.data;
+    } catch (error) {
+      if (ownerAlive.current) setSaveError(error.message || 'Timetable could not be saved.');
+      throw error;
+    } finally {
+      savingRef.current = false;
+      if (ownerAlive.current) setSaving(false);
+    }
   }
 
-  return (
-    <div
-      onClick={() => navigate(`/subject/${subject.id}`)}
-      className={`glass-panel p-5 rounded-2xl border ${subject.questionsAttempted === 0 ? 'border-surface-border' : c.border} cursor-pointer hover:-translate-y-1 hover:border-indigo-500/40 transition-all group relative overflow-hidden`}
-    >
-      <div className="flex justify-between items-start mb-4">
-        <h4 className="font-bold text-white text-sm group-hover:text-indigo-300 transition-colors pr-8 leading-tight">{subject.title}</h4>
-        <div className={`w-8 h-8 rounded-lg ${subject.questionsAttempted === 0 ? 'bg-slate-800 text-slate-500' : `${c.bg} ${c.text}`} flex items-center justify-center shrink-0`}>
-          <BookOpen className="w-4 h-4" />
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <div className="flex justify-between text-xs mb-1">
-          <span className="text-slate-400">Progress</span>
-          <span className="font-bold text-slate-200">{subject.progress}%</span>
-        </div>
-        <div className="w-full h-1.5 bg-surface-card rounded-full overflow-hidden">
-          <div
-            className={`h-full ${progressColor} rounded-full`}
-            style={{ width: `${subject.progress}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 text-xs mb-4">
-        <div className="p-2 bg-surface-card rounded-lg border border-surface-border">
-          <span className="text-slate-500 block mb-0.5">Accuracy</span>
-          <span className={`font-bold ${subject.accuracy !== null ? 'text-slate-200' : 'text-slate-500'}`}>
-            {subject.accuracy !== null ? `${subject.accuracy}%` : '—'}
-          </span>
-        </div>
-        <div className="p-2 bg-surface-card rounded-lg border border-surface-border">
-          <span className="text-slate-500 block mb-0.5">Attempted</span>
-          <span className="font-bold text-slate-300">{subject.questionsAttempted}</span>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between pt-3 border-t border-surface-border">
-        <span className={`text-[10px] font-bold uppercase tracking-wider ${statusColor}`}>
-          {statusText}
-        </span>
-        {statusText === "Needs Attention" && (
-          <span className="text-[10px] bg-rose-500/10 text-rose-300 px-2 py-0.5 rounded border border-rose-500/20">
-            Practice Recommended
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
-
-
-export default function Dashboard({ onOpenTutor }) {
-  const [progress, setProgress] = useState(null);
-  const [schedule, setSchedule] = useState([]);
-  const [moods, setMoods] = useState([]);
-  const [profile, setProfile] = useState(null);
-  const [subjects, setSubjects] = useState([]);
-  const [analytics, setAnalytics] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const { user } = useAuth();
-  const { addToast } = useToast();
-  const { currentPhaseInfo } = useTheme();
-
-  // Mood State & Check-in Modal
-  const [showMoodCheckIn, setShowMoodCheckIn] = useState(false);
-  const [selectedMood, setSelectedMood] = useState('Focused');
-  const [moodNote, setMoodNote] = useState('');
-
-  // Timetable Generator Modal State
-  const [showTimetableModal, setShowTimetableModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [reschedulePrompt, setReschedulePrompt] = useState(null);
-
-  // Focus Mode & Zen Desk State
-  const [isFocusMode, setIsFocusMode] = useState(false);
-  const [showZenRoom, setShowZenRoom] = useState(false);
-
-  // 12-Hour Clock
-  const [clock12Str, setClock12Str] = useState('');
-
-  useEffect(() => {
-    const update12HourClock = () => {
-      const now = new Date();
-      let hours = now.getHours();
-      const minutes = now.getMinutes().toString().padStart(2, '0');
-      const seconds = now.getSeconds().toString().padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12;
-      const formattedH = hours.toString().padStart(2, '0');
-      setClock12Str(`${formattedH}:${minutes}:${seconds} ${ampm}`);
-    };
-
-    update12HourClock();
-    const interval = setInterval(update12HourClock, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [user?.id]);
-
-  const fetchDashboardData = async (forceRefresh = false) => {
-    const uid = user?.id;
-    if (!uid) {
-      setLoading(false);
+  // The legacy progress route changes a pending task as a side effect. Preserve
+  // the fresh task statuses: a finished focus block is not a completed study task.
+  async function recordFocus(event) {
+    if (savingRef.current) {
+      addToast('Focus time is saved on this device. Server totals were not updated while your timetable was being saved.', 'info');
       return;
     }
-
-    const now = Date.now();
-    // 1. Instant Cache Hit (0ms)
-    if (!forceRefresh && dashboardMemoryCache.data && dashboardMemoryCache.userId === uid && (now - dashboardMemoryCache.timestamp < 120000)) {
-      const c = dashboardMemoryCache.data;
-      if (c.profile) setProfile(c.profile);
-      if (c.progress) setProgress(c.progress);
-      if (c.schedule) setSchedule(c.schedule);
-      if (c.moods) setMoods(c.moods);
-      if (c.subjects) setSubjects(c.subjects);
-      if (c.analytics) setAnalytics(c.analytics);
-      setLoading(false);
-      return;
-    }
-
-    // If stale cache exists, render it immediately while revalidating
-    if (dashboardMemoryCache.data && dashboardMemoryCache.userId === uid) {
-      const c = dashboardMemoryCache.data;
-      if (c.profile) setProfile(c.profile);
-      if (c.progress) setProgress(c.progress);
-      if (c.schedule) setSchedule(c.schedule);
-      if (c.moods) setMoods(c.moods);
-      if (c.subjects) setSubjects(c.subjects);
-      if (c.analytics) setAnalytics(c.analytics);
-      setLoading(false);
-    }
-
-    setIsRefreshing(true);
+    savingRef.current = true;
+    setSaving(true);
     try {
-      // 1-Roundtrip Bundled Dashboard Request
-      const bundleRes = await axios.get(`/api/dashboard/bundle?userId=${uid}`).catch(() => null);
-      if (bundleRes?.data) {
-        const d = bundleRes.data;
-        if (d.profile) setProfile(d.profile);
-        if (d.progress) setProgress(d.progress);
-        if (d.schedule) setSchedule(d.schedule);
-        if (d.moods) setMoods(d.moods);
-        if (d.subjects) setSubjects(d.subjects);
-        if (d.analytics) setAnalytics(d.analytics);
-
-        dashboardMemoryCache = {
-          data: d,
-          timestamp: Date.now(),
-          userId: uid
-        };
-
-        const today = new Date().toDateString();
-        const hasLoggedMoodToday = (d.moods || []).some(m => m.date && m.date.includes('Today'));
-        if (!hasLoggedMoodToday) {
-          setTimeout(() => setShowMoodCheckIn(true), 2000);
+      const {
+        data: before
+      } = await api.get('/api/schedule', {
+        params: {
+          userId: user.id
         }
-      } else {
-        // Fallback to individual requests if bundle fails
-        const [profRes, progRes, schedRes, moodRes, subRes, analyticsRes] = await Promise.all([
-          axios.get(`/api/profile?userId=${uid}`).catch(() => ({ data: {} })),
-          axios.get(`/api/progress?userId=${uid}`).catch(() => ({ data: null })),
-          axios.get(`/api/schedule?userId=${uid}`).catch(() => ({ data: [] })),
-          axios.get(`/api/mood?userId=${uid}`).catch(() => ({ data: [] })),
-          axios.get(`/api/subjects?userId=${uid}`).catch(() => ({ data: [] })),
-          axios.get(`/api/analytics?userId=${uid}`).catch(() => ({ data: null }))
-        ]);
-        if (profRes?.data) setProfile(profRes.data);
-        if (progRes?.data) setProgress(progRes.data);
-        if (schedRes?.data) setSchedule(Array.isArray(schedRes.data) ? schedRes.data : []);
-        if (moodRes?.data) setMoods(Array.isArray(moodRes.data) ? moodRes.data : []);
-        if (subRes?.data) setSubjects(Array.isArray(subRes.data) ? subRes.data : []);
-        if (analyticsRes?.data) setAnalytics(analyticsRes.data);
+      });
+      if (!Array.isArray(before)) throw new Error('Timetable could not be checked before recording focus time.');
+      const result = await api.post('/api/progress/study-hours', {
+        userId: user.id,
+        minutesAdded: Math.max(1, Math.round(event.seconds / 60)),
+        isPomodoro: true,
+        activityType: 'study'
+      });
+      if (!Array.isArray(result.data?.schedule)) throw new Error('Server focus update could not be confirmed.');
+      const corrected = result.data.schedule.map(task => {
+        const previous = before.find(item => String(item.id) === String(task.id));
+        return previous ? {
+          ...task,
+          done: previous.done,
+          status: previous.status
+        } : task;
+      });
+      if (scheduleFingerprint(corrected) !== scheduleFingerprint(result.data.schedule)) {
+        writeUser(user.id, 'pendingScheduleRestore', {
+          before: result.data.schedule,
+          corrected
+        });
+        if (ownerAlive.current) setRestoreSchedule({
+          before: result.data.schedule,
+          corrected
+        });
+        const restored = await api.post('/api/schedule/custom', {
+          userId: user.id,
+          schedule: corrected
+        });
+        if (!Array.isArray(restored.data) || scheduleFingerprint(restored.data) !== scheduleFingerprint(corrected)) throw new Error('Focus time saved; timetable needs a retry.');
+        writeUser(user.id, 'pendingScheduleRestore', null);
+        if (ownerAlive.current) setRestoreSchedule(null);
       }
-
-      if (!initialNotificationsShown) {
-        initialNotificationsShown = true;
-        const affirmations = [
-          "Believe you can and you're halfway there.",
-          "Success is the sum of small efforts repeated daily.",
-          "You don't have to be perfect to be amazing.",
-          "A little progress each day adds up to big results.",
-          "Focus on the step in front of you, not the whole staircase."
-        ];
-        const randomAffirmation = affirmations[Math.floor(Math.random() * affirmations.length)];
-        setTimeout(() => {
-          addToast(`Daily Affirmation: ${randomAffirmation}`, 'motivation', 8000);
-        }, 500);
+      if (ownerAlive.current) {
+        resource.update({
+          schedule: corrected
+        });
+        addToast('Focus time saved. Your study task remains open until you mark it completed.', 'success');
+        resource.refresh();
       }
-    } catch (err) {
-      console.error('Error fetching dashboard data:', err);
+    } catch {
+      if (ownerAlive.current) addToast('Focus time is recorded on this device. The server update could not be fully confirmed; refresh to check your totals.', 'error');
     } finally {
-      setLoading(false);
-      setIsRefreshing(false);
+      savingRef.current = false;
+      if (ownerAlive.current) setSaving(false);
     }
-  };
-
-  const handleToggleSchedule = async (id) => {
+  }
+  const controller = useDailySession(user.id, recordFocus, addToast);
+  const today = dayIST(now);
+  const todayTasks = schedule.filter(task => !taskDate(task) || taskDate(task) <= today);
+  const unfinished = todayTasks.filter(task => !isComplete(task));
+  const done = todayTasks.filter(isComplete);
+  const selectedTask = schedule.find(task => String(task.id) === String(selectedId) && !isComplete(task));
+  const nextTask = selectedTask || chooseTask(schedule, {
+    now,
+    available,
+    activeId: !controller.session?.finished && (!available || controller.active || controller.session?.remaining <= available * 60) ? controller.session?.taskId : null
+  });
+  const practice = readUser(user.id, 'practiceResume', null);
+  const hasPractice = practice?.kind === 'exam' && practice.userId === user.id && Object.keys(practice.answers || {}).length > 0;
+  const resumeFocus = controller.session && !controller.session.finished && (!available || controller.active || controller.session.remaining <= available * 60);
+  const resumeTask = resumeFocus ? {
+    id: controller.session.taskId,
+    activity: controller.session.title,
+    focus: controller.session.topic,
+    subject_id: controller.session.subjectId,
+    link: controller.session.link
+  } : null;
+  const workingSource = resumeTask || (!selectedTask && !available && hasPractice ? {
+    id: `practice-${practice.examId}`,
+    activity: practice.title,
+    focus: practice.topic,
+    subject_id: practice.subjectId,
+    link: `/exams?examId=${encodeURIComponent(practice.examId)}`
+  } : nextTask);
+  const workingTask = workingSource ? {
+    ...workingSource,
+    subject_id: workingSource.subject_id || workingSource.link?.match(/^\/subject\/([^/?#]+)/)?.[1]
+  } : null;
+  const cards = useMemo(() => {
+    let local = {};
     try {
-      const res = await axios.post('/api/schedule/toggle', { id });
-      setSchedule(res.data);
-    } catch (err) {
-      console.error('Error toggling schedule item:', err);
+      local = JSON.parse(localStorage.getItem(`tutovia_fc_progress_${user.id}`) || '{}');
+    } catch {}
+    return Array.isArray(data.flashcards) ? data.flashcards.map(card => ({
+      ...card,
+      ...(local[card.id]?.confirmed === true ? local[card.id] : {})
+    })) : [];
+  }, [data.flashcards, user.id]);
+  const due = dueCards(cards, profile, now);
+  const daily = focusToday(controller.events, now);
+  const reviewEvents = cards.filter(card => card.confirmed && card.reviewed_at).map(card => ({
+    kind: 'revision',
+    at: card.reviewed_at
+  }));
+  const days = weekActivity(progress, [...controller.events, ...reviewEvents], progress?.attempts, now);
+  const dailyGoal = Number(profile.daily_study_hours) > 0 ? Number(profile.daily_study_hours) * 60 : Number(progress?.daily_goal_minutes) > 0 ? Number(progress.daily_goal_minutes) : null;
+  const stage = profile.ca_stage || 'intermediate';
+  const stageSubjects = getPapersForStage(stage, profile.ca_group);
+  const displayedSubjects = stage === 'intermediate' ? (Array.isArray(data.subjects) ? data.subjects : []).filter(subject => !profile.ca_group || profile.ca_group === 'Both Groups' || subject.group === profile.ca_group) : stageSubjects.map(paper => ({
+    ...paper,
+    ...(data.subjects || []).find(subject => subject.id === paper.id)
+  }));
+  const weaknesses = Array.isArray(analytics?.weaknesses) ? analytics.weaknesses.filter(group => stage === 'intermediate' || displayedSubjects.some(subject => subject.id === group.subject_id || subject.title === group.subject)).flatMap(group => (group.topics || []).map(topic => ({
+    subject: group.subject,
+    topic
+  }))) : [];
+  const missed = unfinished.find(task => taskLabel(task, now) === 'Missed session');
+  const visibleMissed = missed && dismissed[today] !== String(missed.id);
+  const examCount = Number.isFinite(progress?.total_exams) ? progress.total_exams : progress?.attempts?.length ?? analytics?.examsTaken;
+  const readiness = examCount > 0 && Number.isFinite(analytics?.readinessScore) ? `${analytics.readinessScore}%` : examCount === 0 ? 'Not assessed yet' : 'Unavailable';
+  async function startTask(task) {
+    if (!task || savingRef.current) return;
+    if (!studyTask(task)) {
+      addToast('Breaks stay separate from recorded focus time. Open the wellness space for this activity.', 'info');
+      return;
     }
-  };
-
-  const handleGenerateAIClick = () => {
-    setShowTimetableModal(true);
-  };
-
-  const submitGenerateAI = async (config) => {
-    setIsGeneratingAI(true);
-    addToast('Analyzing exemption goals and generating AI Timetable...', 'info');
+    if (controller.active && controller.session.taskId !== task.id) {
+      addToast('Pause or end your current session before switching tasks.', 'info');
+      return;
+    }
     try {
-      const res = await axios.post('/api/schedule/ai-generate', {
+      const savedTask = schedule.find(item => String(item.id) === String(task.id));
+      if (savedTask && !isResumable(savedTask)) await commitSchedule(schedule.map(item => item.id === savedTask.id ? {
+        ...item,
+        done: false,
+        status: 'In Progress'
+      } : item));
+      controller.start(task, available || Math.min(taskDuration(task) || 25, 25));
+      setSelectedId(task.id);
+      document.querySelector('[data-testid="pomodoro"]')?.scrollIntoView({
+        behavior: 'instant',
+        block: 'nearest'
+      });
+    } catch (error) {
+      addToast(error.message, 'error');
+    }
+  }
+  async function updateStatus(task, status) {
+    try {
+      await commitSchedule(schedule.map(item => item.id === task.id ? {
+        ...item,
+        status,
+        done: status === 'Completed'
+      } : item));
+      addToast('Task status saved.', 'success');
+    } catch (error) {
+      addToast(error.message, 'error');
+    }
+  }
+  async function generatePlan(config) {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError('');
+    try {
+      const {
+        data: next
+      } = await api.post('/api/schedule/ai-generate', {
         userId: user.id,
         ...config
       });
-      setSchedule(res.data);
-      // Fetch updated profile for immediate whyThisSchedule reflection
-      const profRes = await axios.get(`/api/profile?userId=${user.id}`).catch(() => null);
-      if (profRes?.data) setProfile(profRes.data);
-      addToast('AI Timetable successfully generated!', 'success');
-    } catch (err) {
-      console.error('Error generating AI schedule:', err);
-      addToast('Failed to generate AI Timetable.', 'error');
-    } finally {
-      setIsGeneratingAI(false);
-    }
-  };
-
-  const handleSaveEditedSchedule = async (newSchedule) => {
-    setSchedule(newSchedule);
-    addToast('Timetable schedule updated successfully!', 'success');
-    try {
-      await axios.post('/api/schedule/custom', { userId: user.id, schedule: newSchedule }).catch(() => {});
-      if (user?.id) {
-        supabase.from('schedule').upsert(newSchedule.map(s => ({
-          user_id: user.id,
-          time_range: s.timeRange || s.time12 || s.time,
-          activity: s.activity,
-          focus: s.focus,
-          type: s.type,
-          status: s.status,
-          done: s.done
-        }))).catch(() => {});
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleStatusUpdate = async (item, newStatus) => {
-    try {
-      const res = await axios.post('/api/schedule/update-status', { id: item.id, status: newStatus });
-      setSchedule(res.data);
-    } catch (err) {
-      setSchedule(prev => prev.map(s => s.id === item.id ? { ...s, status: newStatus, done: newStatus === 'Completed' } : s));
-    }
-
-    if (newStatus === 'Not Completed' || newStatus === 'Partially Completed') {
-      setReschedulePrompt(item);
-    }
-  };
-
-  const handleConfirmReschedule = () => {
-    if (!reschedulePrompt) return;
-    addToast(`"${reschedulePrompt.activity}" flagged for tomorrow's priority revision!`, 'motivation');
-    setReschedulePrompt(null);
-  };
-
-  const handleSaveMood = async () => {
-    try {
-      await axios.post('/api/mood', { mood: selectedMood, note: moodNote, userId: user?.id });
-      setShowMoodCheckIn(false);
-      addToast(`Emotional Check-in saved. Have a great session!`, 'success');
-      // Refresh moods
-      const moodRes = await axios.get(`/api/mood?userId=${user?.id}`);
-      setMoods(moodRes.data);
-    } catch (err) {
-      console.error(err);
-      addToast('Could not save mood. Is the backend server running?', 'error');
-      setShowMoodCheckIn(false); // Don't trap the user
-    }
-  };
-
-  // --- Official ICAI Exam Countdown Logic (Group-Aware) ---
-  const [daysToExam, setDaysToExam] = useState(null);
-  const [officialExamMeta, setOfficialExamMeta] = useState(null);
-
-  useEffect(() => {
-    const attempt = profile?.attempt && profile.attempt !== 'Not set' && !profile.attempt.includes('2024') && !profile.attempt.includes('2025') && !profile.attempt.includes('September 2026')
-      ? profile.attempt
-      : "January 2027";
-    const group = profile?.ca_group || "Both Groups";
-    const stage = profile?.ca_stage || "intermediate";
-
-    axios.get(`/api/icai-exam-dates?attempt=${encodeURIComponent(attempt)}&group=${encodeURIComponent(group)}&stage=${encodeURIComponent(stage)}`)
-      .then(res => {
-        if (res?.data) {
-          setOfficialExamMeta(res.data);
-          if (res.data.isOfficial && res.data.daysLeft !== null && res.data.daysLeft !== undefined) {
-            setDaysToExam(res.data.daysLeft);
-          } else {
-            setDaysToExam(null);
-          }
-        }
-      })
-      .catch(() => {
-        setDaysToExam(null);
+      if (!Array.isArray(next)) throw new Error('Plan generation was not confirmed.');
+      resource.update({
+        schedule: next
       });
-  }, [profile?.attempt, profile?.ca_group, profile?.ca_stage]);
-
-  // Client-side strict group filter safeguard for subjects
-  const displayedSubjects = useMemo(() => {
-    if (!profile?.ca_group || profile.ca_group === 'Both Groups') {
-      return subjects;
+      setGenerateOpen(false);
+      addToast('Your study plan has been saved.', 'success');
+    } catch (error) {
+      setSaveError('Your plan could not be generated. Please retry.');
+      throw error;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-    return subjects.filter(s => s.group === profile.ca_group);
-  }, [subjects, profile?.ca_group]);
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-400 text-sm">Syncing study workspace...</p>
-      </div>
-    );
   }
+  async function moveToTomorrow(ids) {
+    if (!ids.length) return;
+    await commitSchedule(schedule.map(task => ids.includes(String(task.id)) && !isComplete(task) ? {
+      ...task,
+      scheduled_date: nextDayIST(now),
+      status: 'Not Completed',
+      done: false
+    } : task));
+    addToast(`${ids.length} unfinished ${ids.length === 1 ? 'task' : 'tasks'} moved to tomorrow.`, 'success');
+  }
+  function dismissReflection() {
+    setReflectionOpen(false);
+    setReflectionDay(today);
+    try {
+      writeUser(user.id, 'reflectionDay', today);
+    } catch {
+      addToast('Reflection dismissal could not be saved.', 'error');
+    }
+  }
+  async function saveReflection() {
+    if (savingRef.current) return;
+    try {
+      if (moveIds.length) {
+        await moveToTomorrow(moveIds);
+        setMoveIds([]);
+      }
+      if (reflectionMood || reflectionNote.trim()) {
+        savingRef.current = true;
+        setSaving(true);
+        await api.post('/api/mood', {
+          userId: user.id,
+          mood: reflectionMood || 'Reflection',
+          note: reflectionNote.trim()
+        });
+        setReflectionMood('');
+        setReflectionNote('');
+        addToast('Your reflection has been saved.', 'success');
+      }
+      dismissReflection();
+    } catch (error) {
+      addToast(error.message || 'Reflection could not be saved. Please retry.', 'error');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+  const taskRow = task => <article key={task.id} className={`daily-task ${String(workingTask?.id) === String(task.id) ? 'daily-task-current' : ''}`} aria-label={`${task.activity || task.title}, ${taskLabel(task, now)}`}>
+    <div className="daily-task-time"><Clock size={14} /><span>{task.timeRange || task.time12 || task.time || 'Flexible time'}{taskDate(task) && taskDate(task) !== today && <span className="block">{taskDate(task)}</span>}</span></div>
+    <div className="min-w-0"><h3 className="font-semibold text-sm break-words">{task.activity || task.title}</h3><p className="daily-muted mt-1">{task.focus || 'Choose a focus for this study block.'}</p><span className="daily-badge mt-2">{String(workingTask?.id) === String(task.id) ? 'Current / next session' : taskLabel(task, now)}</span></div>
+    <div className="flex flex-wrap gap-2 items-center"><label className="daily-muted"><span className="sr-only">Status for {task.activity || task.title}</span><select className="daily-select" value={isComplete(task) ? 'Completed' : /in progress/i.test(task.status || '') ? 'In Progress' : /partially/i.test(task.status || '') ? 'Partially Completed' : 'Not Completed'} disabled={saving} onChange={event => updateStatus(task, event.target.value)}><option value="Not Completed">{taskLabel(task, now) === 'Missed session' ? 'Missed session' : 'Not started'}</option><option value="In Progress">In progress</option><option value="Partially Completed">Partially completed</option><option value="Completed">Completed</option></select></label>{!isComplete(task) && studyTask(task) && <button className="daily-secondary" disabled={saving || controller.active && controller.session.taskId !== task.id} onClick={() => {
+        setSelectedId(task.id);
+        startTask(task);
+      }}>Start</button>}{task.link && /^\/(subject\/|exams|flashcards|pyq)/.test(task.link) && <Link className="daily-link min-h-10 inline-flex items-center" to={task.link}>Open task ↗</Link>}{!studyTask(task) && <Link className="daily-secondary" to="/wellness">Open break</Link>}</div>
+  </article>;
+  if (resource.loading && !resource.data) return <div className="space-y-5" role="status" aria-label="Loading study dashboard"><div className="glass-panel daily-card h-36">Loading your study plan…</div><div className="grid md:grid-cols-3 gap-4">{[1, 2, 3].map(index => <div key={index} className="glass-panel daily-card h-24" />)}</div><div className="glass-panel daily-card h-64" /></div>;
+  return <div className="daily-dashboard space-y-5 md:space-y-6" data-testid="daily-dashboard">
+    {resource.errors.length > 0 && <div className="daily-notice" role="alert">Some data could not be refreshed ({resource.errors.join(', ')}). Previously loaded records are kept where available. <button className="daily-link min-h-10" onClick={() => resource.refresh()} disabled={resource.refreshing}>Retry dashboard data</button></div>}
+    {saveError && <div className="daily-notice daily-error" role="alert">{saveError}<button className="daily-link min-h-10" onClick={() => resource.refresh()}>Refresh timetable</button></div>}
+    {restoreSchedule && <div className="daily-notice" role="alert">Focus time was recorded, but timetable statuses need to be checked. <button className="daily-secondary" disabled={saving} onClick={async () => {
+        try {
+          await commitSchedule(restoreSchedule.corrected, {
+            baseline: restoreSchedule.before
+          });
+          writeUser(user.id, 'pendingScheduleRestore', null);
+          setRestoreSchedule(null);
+          addToast('Timetable statuses restored.', 'success');
+        } catch (error) {
+          addToast(error.message, 'error');
+        }
+      }}>Retry timetable sync</button></div>}
 
-  const overdueItem = schedule.find(s => !s.done && s.isOverdue);
-
-  return (
-    <div className="space-y-8 animate-in fade-in duration-500 relative">
-
-      {/* --- MOOD CHECK-IN MODAL --- */}
-      {showMoodCheckIn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="glass-panel max-w-md w-full p-8 rounded-3xl border border-indigo-500/30 shadow-2xl relative">
-            <button onClick={() => setShowMoodCheckIn(false)} aria-label="Close mood check-in" className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4 border border-indigo-500/30">
-              <Smile className="w-6 h-6" />
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-2">Daily Emotional Check-in</h3>
-            <p className="text-slate-400 text-sm mb-6">How are you feeling about your studies today?</p>
-
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {['Focused', 'Overwhelmed', 'Anxious', 'Motivated', 'Exhausted', 'Calm'].map(m => (
-                <button
-                  key={m}
-                  onClick={() => setSelectedMood(m)}
-                  className={`p-3 rounded-xl border text-sm font-semibold transition-all ${
-                    selectedMood === m
-                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                      : 'bg-surface-card border-surface-border text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-
-            <textarea
-              placeholder="Any quick thoughts? (optional)"
-              value={moodNote}
-              onChange={(e) => setMoodNote(e.target.value)}
-              className="w-full bg-surface-card border border-surface-border rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors mb-6 resize-none h-20"
-            />
-
-            <button
-              onClick={handleSaveMood}
-              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-static-white text-sm font-bold transition-all shadow-lg shadow-indigo-600/20"
-            >
-              Start My Day
-            </button>
-          </div>
-        </div>
-      )}
-
-
-      {/* 1. Header Banner with 12-Hour Time */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl relative overflow-hidden border border-indigo-500/20 shadow-xl">
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold mb-3">
-              <Clock className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Current Time: <strong>{clock12Str}</strong></span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-white tracking-tight">
-              {currentPhaseInfo.greeting}, {user?.name || 'Scholar'}
-            </h1>
-            <p className="text-slate-300 font-medium text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-              {currentPhaseInfo.tagline} &bull; {currentPhaseInfo.subtext}
-            </p>
-            <p className="text-indigo-400 font-bold text-xs mt-1">
-              CA Intermediate &bull; {profile?.ca_group || 'Group 1'}
-            </p>
-          </div>
-
-          <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto max-w-full">
-            {officialExamMeta?.isOfficial && daysToExam !== null ? (
-              <div className="flex flex-col items-center bg-emerald-950/40 border border-emerald-500/30 rounded-xl px-4 py-2 backdrop-blur-sm">
-                <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-0.5">Days to {profile?.attempt || 'Exam'}</span>
-                <div className="text-2xl font-black text-white leading-none tracking-tight">{daysToExam}</div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center bg-amber-950/40 border border-amber-500/30 rounded-xl px-4 py-2 backdrop-blur-sm">
-                <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider mb-0.5">{profile?.attempt || 'Target Attempt'}</span>
-                <div className="text-xs font-bold text-amber-200 mt-0.5">Tentative ICAI</div>
-              </div>
-            )}
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <button
-              onClick={() => fetchDashboardData(true)}
-              disabled={isRefreshing}
-              title="Refresh Dashboard"
-              className="px-3 py-2.5 rounded-xl bg-surface-card hover:bg-slate-800 text-slate-200 border border-surface-border flex items-center gap-2 transition-all text-sm font-semibold"
-            >
-              <RotateCcw className={`w-4 h-4 text-indigo-400 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-            <button
-              onClick={onOpenTutor}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-static-white text-sm font-semibold shadow-lg shadow-indigo-600/20 flex items-center gap-2 transition-all hover:scale-105"
-            >
-              <Brain className="w-4 h-4 text-indigo-200" />
-              <span>Ask AI Tutor</span>
-            </button>
-            <button
-              onClick={() => setShowZenRoom(true)}
-              className="px-4 py-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 text-sm font-semibold flex items-center gap-2 transition-all hover:scale-105 shadow-md shadow-sky-500/10"
-              title="Launch Distraction-Free Fullscreen Zen Study Desk"
-            >
-              <Moon className="w-4 h-4 text-sky-400" />
-              <span>Zen Study Desk</span>
-            </button>
-            <button
-              onClick={() => setIsFocusMode(!isFocusMode)}
-              className={`px-4 py-2.5 rounded-xl text-sm font-semibold border flex items-center gap-2 transition-all ${isFocusMode ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'bg-surface-card hover:bg-slate-800 text-slate-200 border-surface-border'}`}
-            >
-              <Target className="w-4 h-4" />
-              <span>{isFocusMode ? 'Exit Focus Mode' : 'Focus Mode'}</span>
-            </button>
-            <Link
-              to="/exams"
-              className="px-4 py-2.5 rounded-xl bg-surface-card hover:bg-slate-800 text-slate-200 text-sm font-semibold border border-surface-border flex items-center gap-2 transition-all"
-            >
-              <Play className="w-4 h-4 text-emerald-400 fill-emerald-400" />
-              <span>Start Mock</span>
-            </Link>
-          </div>
-          </div>
-        </div>
+    <header className="glass-panel daily-card" data-section="welcome">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div className="min-w-0"><p className="daily-eyebrow">YOUR DAILY STUDY COMPANION</p><h1 className="text-xl sm:text-2xl font-heading font-extrabold mt-1">{currentPhaseInfo.greeting}, {user.name || 'Scholar'}</h1><p className="daily-muted mt-2">{CA_STAGES.find(item => item.id === stage)?.label || 'CA student'} · {profile.ca_group || 'Group not selected'} <span className="mx-2">·</span><time>{now.toLocaleTimeString('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              })} IST</time></p></div>
+        <div className="flex flex-wrap gap-2"><button className="daily-secondary" title="Refresh Dashboard" aria-label="Refresh Dashboard" onClick={() => resource.refresh()} disabled={resource.refreshing}><RotateCcw size={16} />{resource.refreshing ? 'Refreshing…' : 'Refresh'}</button><button className="daily-secondary" onClick={onOpenTutor}><Brain size={16} />Ask AI Tutor</button><div className="flex flex-wrap gap-2 rounded-2xl border border-surface-border p-1" role="group" aria-label="Study environment"><button className="daily-secondary border-0" onClick={() => setZenOpen(true)}><Moon size={16} />Zen Study Desk</button><button className="daily-secondary border-0" aria-pressed={focusMode} onClick={() => setFocusMode(value => !value)}><Target size={16} />{focusMode ? 'Exit Focus Mode' : 'Focus Mode'}</button></div></div>
       </div>
+      <ExamCountdown profile={profile} onAttemptChange={attempt => resource.update({
+        profile: {
+          ...profile,
+          attempt
+        }
+      })} />
+    </header>
 
-      {/* Official Exam Dates Announcement Popup Modal */}
-      <OfficialDatesAnnouncementModal
-        currentAttempt={profile?.attempt || 'January 2027'}
-      />
+    <section aria-labelledby="today-summary-title" data-section="today">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-3"><h2 id="today-summary-title" className="daily-title">Today’s study summary</h2><button className="daily-link min-h-10 text-sm" disabled={controller.active} onClick={() => setReflectionOpen(true)}>Reflect on today</button></div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><Summary label="Focus time / saved goal" value={daily.recorded ? `${daily.minutes} min / ${dailyGoal ? `${dailyGoal} min` : 'goal not set'}` : `— / ${dailyGoal ? `${dailyGoal} min` : 'goal not set'}`} note={daily.recorded ? 'Dated V3 focus sessions on this device' : 'No dated focus sessions recorded here yet'} /><Summary label="Completed study sessions" value={daily.recorded ? daily.completed : '—'} note={daily.recorded ? 'Finished V3 focus blocks today' : 'No dated session count is available'} /><Summary label="Current study streak" value={Number.isFinite(progress?.current_streak) ? `${progress.current_streak} days` : 'Unavailable'} note="Reported by the existing IST streak service" /></div>
+      <p className="daily-muted mt-3 text-xs">Daily focus totals use dated sessions recorded here. Older server focus totals are cumulative and are shown under progress.</p>
+      <div className="flex flex-wrap items-center gap-4 mt-4"><span className="daily-muted">Weekly consistency</span><div className="flex gap-2 sm:gap-3" role="list" aria-label="Seven-day activity in IST">{days.map(day => <div role="listitem" key={day.date}><button className={`daily-day ${day.active ? 'daily-day-active' : ''}`} title={`${day.date}: ${day.description}`} aria-label={`${new Date(`${day.date}T12:00:00+05:30`).toLocaleDateString('en-IN', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'short',
+              timeZone: 'Asia/Kolkata'
+            })}: ${day.description}`} onClick={() => addToast(`${day.date}: ${day.description}`, 'info')}><span>{new Date(`${day.date}T12:00:00+05:30`).toLocaleDateString('en-IN', {
+                  weekday: 'narrow',
+                  timeZone: 'Asia/Kolkata'
+                })}</span>{day.active ? <CheckCircle2 size={14} /> : <span aria-hidden="true">—</span>}</button></div>)}</div><span className="daily-muted text-xs">Filled = confirmed activity or check-in · — = history unavailable</span></div>
+    </section>
 
-      {!isFocusMode && (
-        <ExamCountdown
-          profile={profile}
-          onAttemptChange={(newAttempt) => setProfile(prev => ({ ...prev, attempt: newAttempt }))}
-        />
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          {!isFocusMode && (<>
-          {/* 2. NEXT BEST ACTION (AI Coach Recommendation) */}
-          <div className="h-full glass-panel p-6 rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/30 to-background flex items-center justify-between shadow-lg shadow-indigo-500/10">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/40 shrink-0">
-                <Sparkles className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-1 block">AI Study Coach Recommendation</span>
-                <h3 className="text-lg font-bold text-white leading-tight">{analytics?.nextAction || "Take a mock exam to get started."}</h3>
-                <p className="text-sm text-slate-400 mt-1">Based on your recent performance and weaknesses.</p>
-              </div>
-            </div>
-            <Link to="/exams" className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-static-white text-sm font-bold transition-all shadow-md">
-              Action <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-          </>)}
-        </div>
-        <div className="lg:col-span-1">
-          <PomodoroTimer userId={user?.id} />
-        </div>
+    <section className="grid grid-cols-1 lg:grid-cols-3 gap-4" aria-label="Your next study session" data-section="next-session">
+      <div className="glass-panel daily-card lg:col-span-2 flex flex-col">
+        <div className="flex flex-wrap justify-between items-center gap-3"><h2 className="daily-title">{resumeFocus || hasPractice && !selectedTask && !available ? 'Resume where you left off' : 'Next study session'}</h2><div className="flex flex-wrap gap-1" role="group" aria-label="Available time today">{[[15, '15 minutes'], [30, '30 minutes'], [null, 'My usual plan']].map(([value, label]) => <button key={label} className={`daily-choice ${available === value ? 'daily-choice-active' : ''}`} aria-pressed={available === value} onClick={() => {
+              setAvailable(value);
+              setSelectedId(null);
+            }}>{label}</button>)}</div></div>
+        <p className="daily-muted mt-2">Available time is temporary; your saved timetable stays unchanged.</p>
+        {workingTask ? <div className="mt-5 flex-1 flex flex-col"><p className="daily-eyebrow">{resumeFocus ? controller.active ? 'SESSION IN PROGRESS' : 'SAVED UNFINISHED SESSION' : 'FROM YOUR SAVED STUDY ACTIVITY'}</p><h3 className="text-xl sm:text-2xl font-extrabold mt-2">{workingTask.activity || workingTask.title}</h3><p className="mt-2 text-sm">{workingTask.focus || 'Continue your saved practice activity.'}</p><p className="daily-muted mt-3">{workingTask.timeRange || workingTask.time12 || workingTask.time || 'Flexible start'}{taskDuration(workingTask) && ` · ${taskDuration(workingTask)} minutes planned`}</p><p className="daily-muted mt-3">{resumeFocus || isResumable(workingTask) ? 'This activity was explicitly started and is still unfinished.' : available ? `This saved task fits your ${available}-minute window.` : 'The next relevant unfinished task in your timetable.'}</p>{analytics?.nextAction && <p className="daily-inset daily-muted mt-4"><Sparkles size={14} className="inline mr-1" />Coach guidance: {analytics.nextAction}</p>}<div className="flex flex-wrap gap-3 mt-5"><button className="daily-primary px-6" disabled={saving || controller.active && controller.session.taskId !== workingTask.id} onClick={() => startTask(workingTask)}><Play size={18} />{controller.active ? 'Session running' : resumeFocus ? 'Resume session' : 'Start session'}</button>{workingTask.link && /^\/(subject\/|exams|flashcards|pyq)/.test(workingTask.link) && <Link className="daily-secondary" to={workingTask.link}>Continue activity <ArrowRight size={16} /></Link>}</div></div> : <div className="my-auto py-6"><h3 className="text-lg font-bold">{!Array.isArray(data.schedule) ? 'Your plan is unavailable' : schedule.length === 0 ? 'Let’s give today a clear direction' : unfinished.length === 0 ? 'Today’s tasks are complete. Well done.' : 'No saved task fits this time window'}</h3><p className="daily-muted mt-2">{available && unfinished.length ? 'Choose your usual plan, or use this time to review your due flashcards.' : 'Create a plan or choose a short revision activity when you’re ready.'}</p><div className="flex flex-wrap gap-3 mt-5"><button className="daily-primary" disabled={saving} onClick={() => setGenerateOpen(true)}>Create today’s plan</button><Link className="daily-secondary" to="/flashcards">Optional revision</Link></div></div>}
       </div>
+      <DailySessionTimer controller={controller} />
+    </section>
 
-      {/* 3. Recovery Mode / Uncompleted Session Reminder Notification */}
-      {overdueItem && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/40 text-rose-200 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg animate-pulse">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center text-rose-400">
-              <BellRing className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-rose-400">Recovery Mode (Overdue Task)</span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono font-bold">{overdueItem.time12}</span>
-              </div>
-              <h4 className="text-sm font-bold text-white">{overdueItem.title}</h4>
-            </div>
-          </div>
+    <section className="glass-panel daily-card" aria-labelledby="timetable-title" data-section="timetable">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 id="timetable-title" className="daily-title flex items-center gap-2"><Calendar size={19} />Daily Timetable</h2><p className="daily-muted mt-1">Your saved times and ordering, with unfinished work kept in view.</p></div><div className="flex flex-wrap gap-2"><button className="daily-secondary" disabled={saving} onClick={() => setEditOpen(true)}>Edit timetable</button><button className="daily-secondary" disabled={!schedule.length} onClick={() => exportTimetableToICS(todayTasks, user.name)}>Export calendar</button><button className="daily-secondary" disabled={saving} onClick={() => setGenerateOpen(true)}>Plan settings &amp; regenerate</button></div></div>
+      {visibleMissed && <div className="daily-notice my-4"><div><strong className="text-sm">Adjust your plan</strong><p className="daily-muted mt-1">{missed.activity || missed.title} is still unfinished. Choose what works for you.</p></div><div className="flex flex-wrap gap-2"><button className="daily-secondary" disabled={saving} onClick={() => startTask(missed)}>Resume task</button><button className="daily-secondary" disabled={saving} onClick={() => moveToTomorrow([String(missed.id)]).catch(error => addToast(error.message, 'error'))}>Move to tomorrow</button><button className="daily-link min-h-10" onClick={() => {
+            const next = {
+              ...dismissed,
+              [today]: String(missed.id)
+            };
+            setDismissed(next);
+            try {
+              writeUser(user.id, 'adjustDismissed', next);
+            } catch {
+              addToast('Dismissal could not be saved.', 'error');
+            }
+          }}>Dismiss reminder</button></div></div>}
+      <div className="space-y-3 mt-4">{unfinished.map(taskRow)}{!todayTasks.length && <p className="daily-muted py-5">{Array.isArray(data.schedule) ? 'No sessions planned for today.' : 'The timetable could not be loaded. Use Retry dashboard data above.'}</p>}</div>
+      {done.length > 0 && <div className="mt-4"><button className="daily-secondary" aria-expanded={showCompleted} aria-controls="completed-tasks" onClick={() => setShowCompleted(value => !value)}>{showCompleted ? 'Hide' : 'Show'} completed tasks ({done.length})</button><div id="completed-tasks" hidden={!showCompleted} className="space-y-3 mt-3">{done.map(taskRow)}</div></div>}
+      {schedule.some(task => taskDate(task) > today) && <details className="mt-4"><summary className="daily-link cursor-pointer py-3 min-h-10">Future sessions ({schedule.filter(task => taskDate(task) > today).length})</summary><div className="space-y-3">{schedule.filter(task => taskDate(task) > today).map(task => <div key={task.id} className="daily-inset"><strong className="text-sm">{task.activity || task.title}</strong><p className="daily-muted">{taskDate(task)} · {task.timeRange || task.time12 || task.time || 'Flexible time'}</p></div>)}</div></details>}
+      {profile.whyThisSchedule && <details className="mt-4"><summary className="daily-link cursor-pointer py-3 min-h-10">Why this schedule?</summary><p className="daily-muted">{profile.whyThisSchedule}</p></details>}
+    </section>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-            <Link
-              to={overdueItem.link || '/exams'}
-              className="flex-1 sm:flex-none justify-center px-4 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/30 text-xs font-bold transition-colors flex items-center gap-1.5"
-            >
-              <Play className="w-4 h-4" />
-              <span>Start Task</span>
-            </Link>
-            <button
-              onClick={() => handleToggleSchedule(overdueItem.id)}
-              className="flex-1 sm:flex-none justify-center px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-static-white text-xs font-bold shadow-md shadow-rose-600/20 flex items-center gap-1.5 transition-colors"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Mark Completed</span>
-            </button>
-          </div>
-        </div>
-      )}
+    <section data-section="subjects" aria-labelledby="subjects-title" hidden={focusMode}>
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 id="subjects-title" className="daily-title flex gap-2 items-center"><BookOpen size={19} />My Subjects</h2><Link className="daily-secondary" to="/syllabus">Open Syllabus Hub <ArrowRight size={15} /></Link></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{displayedSubjects.map(subject => <DailySubjectCard key={subject.id} subject={subject} resume={workingTask?.subject_id === subject.id && (resumeFocus || hasPractice) ? {
+          title: workingTask.activity,
+          topic: workingTask.focus,
+          link: workingTask.link || `/subject/${subject.id}`
+        } : null} />)}</div>{!displayedSubjects.length && <p className="glass-panel daily-card daily-muted">No subject records available for your selected stage and group. <Link className="daily-link" to="/profile">Review study goals</Link></p>}
+    </section>
 
-      {!isFocusMode && (
-        <>
-      {/* 4. Core Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <section className="glass-panel daily-card" data-section="revision" aria-labelledby="revision-title" hidden={focusMode}>
+      <div className="flex justify-between gap-3 items-center"><h2 id="revision-title" className="daily-title">Priority revision</h2><button className="daily-link min-h-10" aria-expanded={allRevision} onClick={() => setAllRevision(value => !value)}>{allRevision ? 'Show less' : 'View all'}</button></div>
+      <div className="grid md:grid-cols-2 gap-5 mt-4"><div><h3 className="font-semibold text-sm">Revision due today · {due.length}</h3><p className="daily-muted mt-1">Includes overdue cards with saved review dates.</p>{resource.errors.includes('flashcards') && <p className="daily-error text-xs mt-2">Revision data could not be refreshed. <button className="underline min-h-10" onClick={() => resource.refresh()}>Retry revision data</button></p>}<ul className="space-y-3 mt-3">{(allRevision ? due : due.slice(0, 3)).map(card => <li key={card.id} className="daily-inset"><strong className="text-sm">{card.chapter || card.topic || 'Flashcard revision'}</strong><p className="daily-muted mt-1">{displayedSubjects.find(subject => subject.id === card.subject_id)?.title || card.subject_id} · Due {dayIST(card.next_review_date)}</p><Link className="daily-link min-h-10 inline-flex items-center" to={`/flashcards?subject=${encodeURIComponent(card.subject_id)}&due=1&card=${encodeURIComponent(card.id)}`}>Review flashcards →</Link></li>)}</ul>{!due.length && <p className="daily-muted mt-4">No dated revision is due in the available records. <Link className="daily-link min-h-10 inline-flex items-center" to="/flashcards">Build a revision rhythm →</Link></p>}</div><div><h3 className="font-semibold text-sm">Weak topics from your mock attempts</h3><ul className="space-y-3 mt-3">{(allRevision ? weaknesses : weaknesses.slice(0, 3)).map((weakness, index) => <li className="daily-inset" key={`${weakness.topic}-${index}`}><strong className="text-sm">{weakness.topic}</strong><p className="daily-muted mt-1">{weakness.subject}</p><Link className="daily-link min-h-10 inline-flex items-center" to={`/exams?subject=${encodeURIComponent(displayedSubjects.find(subject => subject.title === weakness.subject)?.id || '')}`}>Practise topic →</Link></li>)}</ul>{!weaknesses.length && <p className="daily-muted mt-4">{examCount === 0 ? 'Take your first mock to identify topics needing practice.' : 'No diagnosed weak topics in the available records.'} <Link className="daily-link min-h-10 inline-flex items-center" to="/exams">Open mock exams →</Link></p>}</div></div>
+    </section>
 
-                {/* Daily Study Goal Ring */}
-        <div className="glass-card p-4 rounded-2xl border border-surface-border flex items-center gap-4">
-          <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
-            <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="16" fill="none" className="stroke-surface-border" strokeWidth="3" />
-              <circle cx="18" cy="18" r="16" fill="none" className="stroke-purple-500" strokeWidth="3" strokeDasharray="100" strokeDashoffset={100 - Math.min(100, Math.round(((parseFloat(progress?.study_hours_today || 0)) / (parseFloat(progress?.daily_goal_minutes ? progress.daily_goal_minutes / 60 : 3))) * 100))} strokeLinecap="round" />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-xs font-bold text-white">{Math.min(100, Math.round(((parseFloat(progress?.study_hours_today || 0)) / (parseFloat(progress?.daily_goal_minutes ? progress.daily_goal_minutes / 60 : 3))) * 100))}%</span>
-            </div>
-          </div>
-          <div>
-            <span className="text-xs text-slate-400 font-medium">Daily Goal</span>
-            <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-xl font-bold text-white">{progress?.study_hours_today || '0.0'}</span>
-              <span className="text-xs font-medium text-slate-500">/ {progress?.daily_goal_minutes ? (progress.daily_goal_minutes / 60).toFixed(1) : '3.0'} hrs</span>
-            </div>
-          </div>
-        </div>
+    <div hidden={focusMode} data-section="progress"><DailyCollapsible userId={user.id} name="progress" title="Progress and achievements" description={`Readiness: ${readiness} · ${Number.isFinite(progress?.xp) ? `${progress.xp} XP` : 'XP unavailable'} · Explore your score history and badges`} onError={addToast}>{open => <div className="space-y-5"><div className="grid sm:grid-cols-3 gap-3"><Summary label="Exam readiness" value={readiness} note={examCount > 0 ? 'Average mock score plus a capped practice-coverage bonus; an estimate, not a prediction.' : 'A mock attempt is required for assessment.'} /><Summary label="XP and level" value={Number.isFinite(progress?.xp) ? `${progress.xp} XP · Level ${progress.level ?? '—'}` : 'Unavailable'} note="From your recorded focus time and exam completions" /><Summary label="Total recorded focus" value={Number.isFinite(progress?.total_study_minutes) ? `${progress.total_study_minutes} min` : 'Unavailable'} note="Cumulative server total, not today’s focus time" /></div><div className="flex flex-wrap gap-4"><span className="daily-muted">Average mock score: {examCount > 0 && Number.isFinite(progress?.avg_score) ? `${progress.avg_score}%` : examCount === 0 ? 'No attempts yet' : 'Unavailable'}</span><Link className="daily-link" to="/analytics">Open full analytics →</Link></div><BadgeGallery progress={{
+            ...progress,
+            completed_exams: examCount,
+            mastered_flashcards: cards.filter(card => card.status === 'mastered').length,
+            best_accuracy: Math.max(0, ...(progress?.attempts || []).map(attempt => attempt.score_pct || 0))
+          }} compact={false} /><div><h3 className="font-semibold">Mock Exam Score Progression</h3>{open && progress?.trend?.length > 0 ? <div className="h-56 mt-4" role="img" aria-label="Scores from your last five saved mock attempts"><ResponsiveContainer width="100%" height="100%"><LineChart data={progress.trend} margin={{
+                  top: 10,
+                  right: 10,
+                  left: -20,
+                  bottom: 0
+                }}><CartesianGrid strokeDasharray="3 3" stroke="var(--bg-surface-border)" /><XAxis dataKey="name" stroke="var(--text-secondary)" tick={{
+                    fontSize: 12
+                  }} /><YAxis domain={[0, 100]} stroke="var(--text-secondary)" tick={{
+                    fontSize: 12
+                  }} /><Tooltip contentStyle={{
+                    background: 'var(--bg-surface)',
+                    borderColor: 'var(--bg-surface-border)',
+                    borderRadius: 12,
+                    color: 'var(--text-primary)'
+                  }} /><Line type="monotone" dataKey="score" stroke="#6366F1" strokeWidth={3} isAnimationActive={false} /></LineChart></ResponsiveContainer></div> : <p className="daily-muted mt-3">{examCount === 0 ? 'No mock attempts yet.' : 'Score history is unavailable.'}</p>}</div></div>}</DailyCollapsible></div>
+    <div hidden={focusMode} data-section="strategy"><DailyCollapsible userId={user.id} name="strategy" title="Exam strategy" description="Passing simulator and your study milestone checklist" onError={addToast}><p className="daily-muted mb-4">Simulator marks are planning scenarios, not recorded student scores. Milestones are checked off by you.</p><CaAggregateSimulator defaultGroup={profile.ca_group || 'Both Groups'} onGenerate={generatePlan} /><div className="mt-5"><StudyMilestoneTimeline /></div></DailyCollapsible></div>
+    {!controller.active && minuteIST(now) >= 17 * 60 && reflectionDay !== today && <div className="daily-notice"><p className="daily-muted">A quiet moment to close the day: review {done.length} completed tasks and decide what carries forward.</p><button className="daily-secondary" onClick={() => setReflectionOpen(true)}>Optional daily reflection</button><button className="daily-link min-h-10" onClick={dismissReflection}>Not today</button></div>}
 
-        {/* Average Quiz Score */}
-        <div className="glass-card p-5 rounded-2xl border border-surface-border flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-            <Award className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs text-slate-400 font-medium">Average Quiz Score</span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-white">{progress?.avg_score || 0}%</span>
-              <span className="text-xs font-medium text-emerald-400">Mock Exams</span>
-            </div>
-          </div>
-        </div>
-
-        {/* XP & Level Tracker */}
-        <div className="glass-card p-5 rounded-2xl border border-surface-border flex items-center gap-4 relative overflow-hidden">
-          <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 z-10 shrink-0">
-            <Award className="w-6 h-6" />
-          </div>
-          <div className="z-10 flex-1">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-xs text-slate-400 font-medium">Level {progress?.level || 1}</span>
-              <span className="text-[10px] font-bold text-purple-400">{progress?.xp || 0} XP</span>
-            </div>
-            <div className="w-full h-1.5 bg-surface-card rounded-full overflow-hidden mt-1">
-              <div
-                className="h-full bg-purple-500 rounded-full shadow-[0_0_10px_rgba(168,85,247,0.5)]"
-                style={{ width: `${progress?.levelProgress || 0}%` }}
-              />
-            </div>
-          </div>
-          <div className="absolute right-0 top-0 w-24 h-24 bg-purple-500/10 blur-2xl rounded-full -mr-8 -mt-8"></div>
-        </div>
-
-        {/* Exam Readiness Score */}
-        <div className="glass-card p-5 rounded-2xl border border-surface-border flex items-center gap-4 relative overflow-hidden">
-          <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-            <Target className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs text-slate-400 font-medium">Exam Readiness Score</span>
-            <div className="flex items-baseline gap-2">
-              {analytics?.readinessScore > 0 ? (
-                <>
-                  <span className="text-2xl font-bold text-white">{analytics.readinessScore}%</span>
-                  <span className="text-[10px] text-amber-400">Calculated</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-2xl font-bold text-slate-400">0%</span>
-                  <Link to="/exams" className="text-[10px] text-amber-400 hover:underline">Take 1st Mock</Link>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Gamification Badge Row */}
-      <BadgeGallery progress={progress} compact={true} />
-
-      {/* 5. Weak Topics Spotlight */}
-      {analytics?.weaknesses && analytics.weaknesses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-rose-400" />
-            Priority Focus Areas
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {analytics.weaknesses.map((weakness, idx) => (
-              <div key={idx} className="p-5 rounded-2xl bg-surface-card border border-surface-border hover:border-rose-500/30 transition-all">
-                <h3 className="font-bold text-slate-200 mb-3">{weakness.subject}</h3>
-                <div className="space-y-2">
-                  {weakness.topics.map((topic, tidx) => (
-                    <div key={tidx} className="text-xs text-rose-300 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/20">
-                      • {topic}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 6. Subject Cards */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-indigo-400" />
-            My Subjects
-          </h2>
-          {(profile?.ca_stage === 'intermediate' || profile?.ca_stage === 'final' || !profile?.ca_stage) && profile?.ca_group && (
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-              {profile.ca_group === 'Both Groups' ? '📚 Both Groups (6 Subjects)' : `📂 ${profile.ca_group} (3 Subjects)`}
-            </span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {displayedSubjects.length > 0 ? (
-            displayedSubjects.map(sub => (
-              <SubjectCard key={sub.id} subject={sub} />
-            ))
-          ) : (
-            <div className="col-span-full p-8 text-center bg-surface-card border border-surface-border rounded-2xl">
-              <BookOpen className="w-8 h-8 text-slate-500 mx-auto mb-3" />
-              <h3 className="text-white font-bold mb-1">No Subjects Found</h3>
-              <p className="text-slate-400 text-sm">Please check your profile settings and ensure your CA Stage is selected correctly.</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Dedicated Syllabus Hub Link Card */}
-      <div className="glass-panel p-6 rounded-3xl border border-indigo-500/20 bg-gradient-to-r from-indigo-950/20 via-surface-card to-background flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-6 shadow-lg">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shrink-0">
-            <BookOpen className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
-                Dedicated Section
-              </span>
-              <span className="text-[10px] font-bold text-slate-400">
-                • ICAI Official 2026/27 Curriculum
-              </span>
-            </div>
-            <h4 className="font-bold text-white text-base">ICAI Official Syllabus Hub</h4>
-            <p className="text-slate-400 text-xs mt-0.5">Explore chapter checklists, marks weightage, module PDFs, and revision statuses under the dedicated Syllabus section.</p>
-          </div>
-        </div>
-        <Link
-          to="/syllabus"
-          className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-static-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2 shrink-0 hover:scale-105"
-        >
-          <span>Open Syllabus</span>
-          <ArrowRight className="w-4 h-4" />
-        </Link>
-      </div>
-
-      {/* ICAI Passing & Aggregate Simulator */}
-      <CaAggregateSimulator defaultGroup={profile?.ca_group || 'Both Groups'} />
-
-      {/* 3-Phase Study Milestone Timeline */}
-      <StudyMilestoneTimeline />
-
-            </>
-      )}
-
-      {/* 7. Chart & Timetable Schedule Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {!isFocusMode && (<>
-          {/* Performance Chart */}
-        <div className="lg:col-span-3 glass-panel p-6 rounded-3xl border border-surface-border flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-bold text-white">Mock Exam Score Progression</h3>
-              <p className="text-xs text-slate-400">Score history across practice quizzes</p>
-            </div>
-            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-              Last 5 Attempts
-            </span>
-          </div>
-
-          <div className="h-64 w-full">
-            {progress?.trend && progress.trend.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={progress.trend} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.5} />
-                  <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fontSize: 12 }} />
-                  <YAxis domain={[0, 100]} stroke="#9CA3AF" tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', borderRadius: '12px', color: '#fff' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="score"
-                    stroke="#6366F1"
-                    strokeWidth={3}
-                    dot={{ fill: '#818CF8', r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-                No mock exam history yet. Take your first test!
-              </div>
-            )}
-          </div>
-        </div>
-        </>)}
-
-        {/* Timetable Schedule Checklist */}
-        <div className="lg:col-span-3 glass-panel p-6 rounded-3xl border border-surface-border flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-lg font-bold text-white">Daily Timetable</h3>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={() => setShowEditModal(true)}
-                  className="px-3 py-1.5 rounded-lg bg-surface-card hover:bg-surface-border text-slate-300 text-xs font-bold border border-surface-border flex items-center gap-1.5 transition-all"
-                  title="Edit session details or add custom slots"
-                >
-                  ✏️ Edit
-                </button>
-                <button
-                  onClick={() => exportTimetableToICS(schedule, user?.name)}
-                  className="px-3 py-1.5 rounded-lg bg-surface-card hover:bg-surface-border text-emerald-300 text-xs font-bold border border-emerald-500/30 flex items-center gap-1.5 transition-all"
-                  title="Download .ics file for Google Calendar / Apple Calendar"
-                >
-                  📅 Export
-                </button>
-                <button
-                  onClick={() => submitGenerateAI({
-                    studyHours: profile?.daily_study_hours || 8,
-                    availableHours: profile?.daily_study_hours || 8,
-                    wakeTime: profile?.wake_time || '07:00',
-                    sleepTime: profile?.sleep_time || '23:00',
-                    commitmentsStr: profile?.commitments || ''
-                  })}
-                  disabled={isGeneratingAI}
-                  className="px-3 py-1.5 rounded-lg bg-surface-card hover:bg-surface-border text-slate-300 text-xs font-bold border border-surface-border flex items-center gap-1.5 transition-all disabled:opacity-50"
-                >
-                  <Sparkles className={`w-3.5 h-3.5 ${isGeneratingAI ? 'animate-spin' : ''}`} />
-                  🔄 Regenerate
-                </button>
-                <button
-                  onClick={handleGenerateAIClick}
-                  disabled={isGeneratingAI}
-                  className="px-3 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-bold border border-indigo-500/30 flex items-center gap-1.5 transition-all disabled:opacity-50"
-                >
-                  ⚙️ Change Study Hours
-                </button>
-              </div>
-            </div>
-
-            {/* Exemption Master Strategy Banner */}
-            {schedule.some(s => s.isExemption || s.focus?.includes('Exemption') || s.activity?.includes('Exemption')) && (
-              <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 flex items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2.5 text-amber-200">
-                  <div className="w-7 h-7 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
-                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-amber-300 block">60+ Exemption Practice Protocol Active</span>
-                    <span className="text-[11px] text-slate-300">Specialized sessions allocated for ICAI PYQ Writing, RTP Solving & Timed Tests!</span>
-                  </div>
-                </div>
-                <Link
-                  to="/pyq"
-                  className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs font-bold shrink-0 transition-all flex items-center gap-1"
-                >
-                  <span>Open PYQs</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            )}
-
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-surface-border text-xs text-slate-400">
-                    <th className="py-2 font-medium">Time</th>
-                    <th className="py-2 font-medium">Subject/Activity</th>
-                    <th className="py-2 font-medium">Focus</th>
-                    <th className="py-2 font-medium text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schedule.map((item) => {
-                    const isExemptionDrill = item.isExemption || item.focus?.includes('Exemption') || item.activity?.includes('Exemption');
-                    return (
-                      <tr
-                        key={item.id}
-                        className={`border-b border-surface-border/50 transition-colors ${
-                          item.status === 'Completed'
-                            ? 'opacity-50 text-slate-500 hover:bg-surface-card/20'
-                            : isExemptionDrill
-                              ? 'text-slate-200 hover:bg-amber-500/10 bg-amber-500/5'
-                              : 'text-slate-200 hover:bg-surface-card'
-                        }`}
-                      >
-                        <td className="py-3 pr-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[11px] font-mono font-bold ${
-                              item.status === 'Completed'
-                                ? 'line-through text-slate-500'
-                                : isExemptionDrill
-                                  ? 'text-amber-400'
-                                  : 'text-indigo-400'
-                            }`}>
-                              {item.timeRange || item.time12 || item.time}
-                            </span>
-                          </div>
-                        </td>
-                        <td className={`py-3 pr-4 text-xs font-semibold ${item.status === 'Completed' ? 'line-through' : ''}`}>
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span>{item.activity || item.title}</span>
-                              {isExemptionDrill && (
-                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                                  <Star className="w-2.5 h-2.5 fill-amber-300" /> 60+ Drill
-                                </span>
-                              )}
-                            </div>
-                            {isExemptionDrill && item.link && item.status !== 'Completed' && (
-                              <Link
-                                to={item.link}
-                                className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 hover:text-amber-300 transition-colors mt-0.5"
-                              >
-                                <Play className="w-2.5 h-2.5 fill-amber-400" />
-                                <span>Start Practice Drill →</span>
-                              </Link>
-                            )}
-                          </div>
-                        </td>
-                        <td className={`py-3 text-[11px] ${item.status === 'Completed' ? 'line-through' : ''}`}>
-                          {item.focus ? (
-                            <span className={`px-2 py-0.5 rounded-full whitespace-nowrap ${
-                              isExemptionDrill ? 'bg-amber-500/20 text-amber-200 border border-amber-500/30 font-medium' :
-                              item.type === 'study' ? 'bg-indigo-500/10 text-indigo-300' :
-                              item.type === 'break' ? 'bg-emerald-500/10 text-emerald-300' :
-                              item.type === 'commitment' ? 'bg-amber-500/10 text-amber-300' :
-                              'bg-slate-500/10 text-slate-300'
-                            }`}>
-                              {item.focus}
-                            </span>
-                          ) : (
-                             item.duration && <span className="text-slate-400">{item.duration}</span>
-                          )}
-                        </td>
-                        <td className="py-3 text-right">
-                          <select
-                            value={item.status || (item.done ? 'Completed' : 'Not Completed')}
-                            onChange={(e) => handleStatusUpdate(item, e.target.value)}
-                            className="bg-surface-card border border-surface-border rounded-lg text-xs px-2 py-1 text-slate-300 focus:outline-none focus:border-indigo-500"
-                          >
-                            <option value="Not Completed">❌ Not Completed</option>
-                            <option value="Partially Completed">⚠️ Partially Completed</option>
-                            <option value="Completed">✅ Completed</option>
-                          </select>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {profile?.whyThisSchedule && (
-              <div className="mt-4 p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-2xl">
-                <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center gap-1.5"><Brain className="w-3 h-3" /> Why this schedule?</h4>
-                <div className="text-xs text-slate-300 leading-relaxed prose prose-invert prose-p:my-1 prose-strong:text-indigo-300">
-                  <span dangerouslySetInnerHTML={{__html: profile.whyThisSchedule.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}}></span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-      </div>
-
-      <TimetableGeneratorModal
-        isOpen={showTimetableModal}
-        onClose={() => setShowTimetableModal(false)}
-        onGenerate={submitGenerateAI}
-        defaultHours={profile?.daily_study_hours || 8}
-      />
-
-      <EditTimetableModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        schedule={schedule}
-        onSave={handleSaveEditedSchedule}
-      />
-
-      {/* Adaptive Reschedule Dialog */}
-      {reschedulePrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-surface border border-surface-border w-full max-w-md rounded-3xl p-6 shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-white text-base">Adaptive AI Rescheduling</h3>
-                <p className="text-xs text-slate-400">Keep your revision streak on track</p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-300 mb-6 leading-relaxed">
-              You marked <strong className="text-amber-300">{reschedulePrompt.activity || 'this session'}</strong> as <em>{reschedulePrompt.status || 'Pending'}</em>. Would you like Tutovia AI to automatically reschedule this topic with top priority in tomorrow's timetable?
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setReschedulePrompt(null)}
-                className="flex-1 py-2.5 rounded-xl bg-surface-card hover:bg-surface-border text-slate-300 text-xs font-semibold border border-surface-border transition-colors"
-              >
-                Skip
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmReschedule}
-                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Prioritize Tomorrow
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Zen Distraction-Free Study Desk */}
-      <ZenStudyRoom
-        isOpen={showZenRoom}
-        onClose={() => setShowZenRoom(false)}
-        defaultSubject={subjects[0]?.title || 'CA Intermediate Revision'}
-      />
-    </div>
-  );
+    <EditTimetableModal isOpen={editOpen} onClose={() => setEditOpen(false)} schedule={schedule} onSave={async next => {
+      await commitSchedule(next);
+      addToast('Timetable saved.', 'success');
+    }} />
+    <TimetableGeneratorModal isOpen={generateOpen} onClose={() => setGenerateOpen(false)} onGenerate={generatePlan} defaultHours={profile.daily_study_hours} />
+    <ZenStudyRoom isOpen={zenOpen} onClose={() => setZenOpen(false)} defaultSubject={workingTask?.activity || 'Study revision'} />
+    {reflectionOpen && <DailyDialog titleId="reflection-title" busy={saving} onClose={dismissReflection}><div className="flex justify-between items-center gap-3"><h2 id="reflection-title" className="daily-title">End-of-day reflection</h2><button className="daily-secondary" disabled={saving} onClick={dismissReflection} aria-label="Close reflection"><X size={17} /></button></div><p className="daily-muted mt-3">{done.length} tasks completed · {unfinished.length} unfinished. Reflection is optional.</p><label className="block mt-4 text-sm">How did today feel? (optional)<select className="daily-select w-full mt-2" value={reflectionMood} onChange={event => setReflectionMood(event.target.value)}><option value="">Skip mood</option>{['Focused', 'Overwhelmed', 'Anxious', 'Motivated', 'Exhausted', 'Calm'].map(mood => <option key={mood}>{mood}</option>)}</select></label><label className="block mt-4 text-sm">A note for tomorrow (optional)<textarea className="daily-select w-full mt-2 min-h-20" value={reflectionNote} onChange={event => setReflectionNote(event.target.value)} /></label><fieldset className="mt-4"><legend className="font-semibold text-sm">Choose unfinished tasks to move to tomorrow</legend><div className="space-y-2 mt-3">{unfinished.map(task => <label className="daily-inset flex items-center gap-3 text-sm" key={task.id}><input type="checkbox" checked={moveIds.includes(String(task.id))} onChange={event => setMoveIds(ids => event.target.checked ? [...ids, String(task.id)] : ids.filter(id => id !== String(task.id)))} />{task.activity || task.title}</label>)}</div></fieldset><div className="flex flex-wrap gap-2 mt-5"><button className="daily-primary" disabled={saving} onClick={saveReflection}>{saving ? 'Saving…' : 'Save reflection & selected tasks'}</button><button className="daily-secondary" disabled={saving} onClick={dismissReflection}>Skip reflection</button></div></DailyDialog>}
+  </div>;
+}
+function Summary({
+  label,
+  value,
+  note
+}) {
+  return <div className="glass-panel daily-card"><p className="daily-muted">{label}</p><strong className="block text-xl font-extrabold mt-2">{value}</strong><p className="daily-muted mt-2 text-xs">{note}</p></div>;
 }
