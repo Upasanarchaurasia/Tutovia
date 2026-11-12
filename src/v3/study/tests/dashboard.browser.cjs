@@ -25,7 +25,7 @@ async function fixture(browser, { userId = 'qa-daily-a', signedIn = true, empty 
   const subjects = [{ id: 'advanced-accounting', title: 'Advanced Accounting', group: 'Group 1', progress: 0, questionsAttempted: 0, accuracy: null }, { id: 'taxation', title: 'Taxation', group: 'Group 1', progress: 0, questionsAttempted: 0, accuracy: null }];
   const analytics = { readinessScore: 0, examsTaken: 0, weaknesses: [], nextAction: 'A supporting recommendation from saved records.' };
   const cards = [
-    { id: 'due', subject_id: 'advanced-accounting', group: 'Group 1', chapter: 'AS 10 due revision', status: 'hard', next_review_date: new Date(Date.now() - 86400000).toISOString(), question: 'Recognise an asset?', points: ['Apply the recognition criteria.'] },
+    { id: 'due', subject_id: 'advanced-accounting', group: 'Group 1', chapter: 'AS 10 due revision', status: 'hard', next_review_date: new Date(Date.now() - 86400000).toISOString(), title: 'AS 10 quick review', prompt: 'Recognise an asset?', points: ['Apply the recognition criteria.'] },
     { id: 'future', subject_id: 'taxation', group: 'Group 1', chapter: 'Future GST revision', status: 'good', next_review_date: new Date(Date.now() + 86400000 * 3).toISOString(), question: 'GST?', points: ['Review later.'] },
     { id: 'undated', subject_id: 'taxation', group: 'Group 1', chapter: 'Undated revision', status: 'hard', question: 'Undated?', points: ['Not due without a date.'] }
   ];
@@ -151,7 +151,7 @@ async function fixture(browser, { userId = 'qa-daily-a', signedIn = true, empty 
     assert.equal(await page.getByRole('button', { name: /Progress and achievements/ }).getAttribute('aria-expanded'), 'true');
     await page.getByRole('button', { name: /^Exam strategy/ }).click();
     await page.getByText('CA Passing & Aggregate Simulator', { exact: true }).waitFor();
-    assert((await page.locator('[data-section="strategy"]').innerText()).includes('0/12'));
+    assert((await page.locator('.daily-dashboard > [data-section="strategy"]').innerText()).includes('0/12'));
     await page.getByRole('button', { name: /^Exam strategy/ }).click();
     await page.getByRole('button', { name: 'Focus Mode', exact: true }).click();
     assert(await page.getByTestId('pomodoro').isVisible());
@@ -222,6 +222,13 @@ async function fixture(browser, { userId = 'qa-daily-a', signedIn = true, empty 
     assert((await other.page.locator('[data-section="today"]').innerText()).includes('No dated focus sessions'));
     assert((await other.page.locator('[data-section="next-session"]').innerText()).includes('Create today’s plan'));
     console.log('PASS: account-separated activity/preferences and useful empty state');
+    const noFit = current = await fixture(browser, { userId: 'qa-daily-revision' });
+    noFit.model.schedule = noFit.model.schedule.filter(task => task.id !== 'short');
+    await noFit.page.goto(`${root}/v3/dashboard`, { waitUntil: 'domcontentloaded' }); await noFit.ready();
+    await noFit.page.getByRole('button', { name: '15 minutes', exact: true }).click();
+    await noFit.page.getByRole('heading', { name: 'Revision: AS 10 quick review', exact: true }).waitFor();
+    assert.equal(noFit.model.saves, 0);
+    console.log('PASS: a real due card is suggested when no timetable task fits the available time');
     const failed = current = await fixture(browser, { userId: 'qa-daily-failure', fail: true });
     await failed.page.goto(`${root}/v3/dashboard`, { waitUntil: 'domcontentloaded' }); await failed.ready();
     await failed.page.getByRole('button', { name: 'Retry dashboard data', exact: true }).waitFor();

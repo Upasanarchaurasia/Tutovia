@@ -218,7 +218,7 @@ function DailyDashboard({
     subject_id: practice.subjectId,
     link: `/exams?examId=${encodeURIComponent(practice.examId)}`
   } : nextTask);
-  const workingTask = workingSource ? {
+  const scheduledWorkingTask = workingSource ? {
     ...workingSource,
     subject_id: workingSource.subject_id || workingSource.link?.match(/^\/subject\/([^/?#]+)/)?.[1]
   } : null;
@@ -233,6 +233,14 @@ function DailyDashboard({
     })) : [];
   }, [data.flashcards, user.id]);
   const due = dueCards(cards, profile, now);
+  const workingTask = scheduledWorkingTask || (available && due.length ? {
+    id: `revision-${due[0].id}`,
+    activity: `Revision: ${due[0].title || due[0].chapter || 'Flashcards'}`,
+    focus: due[0].chapter || due[0].topic || 'Due flashcard review',
+    subject_id: due[0].subject_id,
+    revision: true,
+    link: `/flashcards?subject=${encodeURIComponent(due[0].subject_id)}&due=1&card=${encodeURIComponent(due[0].id)}`
+  } : null);
   const daily = focusToday(controller.events, now);
   const reviewEvents = cards.filter(card => card.confirmed && card.reviewed_at).map(card => ({
     kind: 'revision',
@@ -430,7 +438,7 @@ function DailyDashboard({
               setSelectedId(null);
             }}>{label}</button>)}</div></div>
         <p className="daily-muted mt-2">Available time is temporary; your saved timetable stays unchanged.</p>
-        {workingTask ? <div className="mt-5 flex-1 flex flex-col"><p className="daily-eyebrow">{resumeFocus ? controller.active ? 'SESSION IN PROGRESS' : 'SAVED UNFINISHED SESSION' : 'FROM YOUR SAVED STUDY ACTIVITY'}</p><h3 className="text-xl sm:text-2xl font-extrabold mt-2">{workingTask.activity || workingTask.title}</h3><p className="mt-2 text-sm">{workingTask.focus || 'Continue your saved practice activity.'}</p><p className="daily-muted mt-3">{workingTask.timeRange || workingTask.time12 || workingTask.time || 'Flexible start'}{taskDuration(workingTask) && ` · ${taskDuration(workingTask)} minutes planned`}</p><p className="daily-muted mt-3">{resumeFocus || isResumable(workingTask) ? 'This activity was explicitly started and is still unfinished.' : available ? `This saved task fits your ${available}-minute window.` : 'The next relevant unfinished task in your timetable.'}</p>{analytics?.nextAction && <p className="daily-inset daily-muted mt-4"><Sparkles size={14} className="inline mr-1" />Coach guidance: {analytics.nextAction}</p>}<div className="flex flex-wrap gap-3 mt-5"><button className="daily-primary px-6" disabled={saving || controller.active && controller.session.taskId !== workingTask.id} onClick={() => startTask(workingTask)}><Play size={18} />{controller.active ? 'Session running' : resumeFocus ? 'Resume session' : 'Start session'}</button>{workingTask.link && /^\/(subject\/|exams|flashcards|pyq)/.test(workingTask.link) && <Link className="daily-secondary" to={workingTask.link}>Continue activity <ArrowRight size={16} /></Link>}</div></div> : <div className="my-auto py-6"><h3 className="text-lg font-bold">{!Array.isArray(data.schedule) ? 'Your plan is unavailable' : schedule.length === 0 ? 'Let’s give today a clear direction' : unfinished.length === 0 ? 'Today’s tasks are complete. Well done.' : 'No saved task fits this time window'}</h3><p className="daily-muted mt-2">{available && unfinished.length ? 'Choose your usual plan, or use this time to review your due flashcards.' : 'Create a plan or choose a short revision activity when you’re ready.'}</p><div className="flex flex-wrap gap-3 mt-5"><button className="daily-primary" disabled={saving} onClick={() => setGenerateOpen(true)}>Create today’s plan</button><Link className="daily-secondary" to="/flashcards">Optional revision</Link></div></div>}
+        {workingTask ? <div className="mt-5 flex-1 flex flex-col"><p className="daily-eyebrow">{resumeFocus ? controller.active ? 'SESSION IN PROGRESS' : 'SAVED UNFINISHED SESSION' : 'FROM YOUR SAVED STUDY ACTIVITY'}</p><h3 className="text-xl sm:text-2xl font-extrabold mt-2">{workingTask.activity || workingTask.title}</h3><p className="mt-2 text-sm">{workingTask.focus || 'Continue your saved practice activity.'}</p><p className="daily-muted mt-3">{workingTask.timeRange || workingTask.time12 || workingTask.time || 'Flexible start'}{taskDuration(workingTask) && ` · ${taskDuration(workingTask)} minutes planned`}</p><p className="daily-muted mt-3">{resumeFocus || isResumable(workingTask) ? 'This activity was explicitly started and is still unfinished.' : workingTask.revision ? `A flashcard with a saved due date. Use a ${available}-minute focus block; review duration is not estimated.` : available ? `This saved task fits your ${available}-minute window.` : 'The next relevant unfinished task in your timetable.'}</p>{analytics?.nextAction && <p className="daily-inset daily-muted mt-4"><Sparkles size={14} className="inline mr-1" />Coach guidance: {analytics.nextAction}</p>}<div className="flex flex-wrap gap-3 mt-5"><button className="daily-primary px-6" disabled={saving || controller.active && controller.session.taskId !== workingTask.id} onClick={() => startTask(workingTask)}><Play size={18} />{controller.active ? 'Session running' : resumeFocus ? 'Resume session' : 'Start session'}</button>{workingTask.link && /^\/(subject\/|exams|flashcards|pyq)/.test(workingTask.link) && <Link className="daily-secondary" to={workingTask.link}>Continue activity <ArrowRight size={16} /></Link>}{!schedule.length && <button className="daily-secondary" onClick={() => setGenerateOpen(true)}>Create a study plan</button>}</div></div> : <div className="my-auto py-6"><h3 className="text-lg font-bold">{!Array.isArray(data.schedule) ? 'Your plan is unavailable' : schedule.length === 0 ? 'Let’s give today a clear direction' : unfinished.length === 0 ? 'Today’s tasks are complete. Well done.' : 'No saved task fits this time window'}</h3><p className="daily-muted mt-2">{available && unfinished.length ? 'Choose your usual plan, or use this time to review your due flashcards.' : 'Create a plan or choose a short revision activity when you’re ready.'}</p><div className="flex flex-wrap gap-3 mt-5"><button className="daily-primary" disabled={saving} onClick={() => setGenerateOpen(true)}>Create today’s plan</button><Link className="daily-secondary" to="/flashcards">Optional revision</Link></div></div>}
       </div>
       <DailySessionTimer controller={controller} />
     </section>
