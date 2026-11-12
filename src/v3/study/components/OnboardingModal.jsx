@@ -86,7 +86,7 @@ export default function OnboardingModal({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-      <div className="bg-surface border border-surface-border w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+      <div className="bg-surface border border-surface-border w-full max-w-xl max-h-[90dvh] rounded-3xl overflow-y-auto shadow-2xl flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-surface-border bg-surface-card flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">

@@ -471,7 +471,7 @@ export default function Dashboard({ onOpenTutor }) {
             </p>
           </div>
 
-          <div className="flex flex-col md:flex-row items-center gap-4">
+          <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto max-w-full">
             {officialExamMeta?.isOfficial && daysToExam !== null ? (
               <div className="flex flex-col items-center bg-emerald-950/40 border border-emerald-500/30 rounded-xl px-4 py-2 backdrop-blur-sm">
                 <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-0.5">Days to {profile?.attempt || 'Exam'}</span>
@@ -483,7 +483,7 @@ export default function Dashboard({ onOpenTutor }) {
                 <div className="text-xs font-bold text-amber-200 mt-0.5">Tentative ICAI</div>
               </div>
             )}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <button
               onClick={() => fetchDashboardData(true)}
               disabled={isRefreshing}
@@ -1055,12 +1055,3 @@ export default function Dashboard({ onOpenTutor }) {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

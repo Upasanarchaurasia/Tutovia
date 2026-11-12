@@ -50,7 +50,7 @@ const output = process.env.V3_QA_OUTPUT || '/home/ubuntu/tutovia_v3_dashboard_bu
     await page.waitForURL('**/v3/login');
     console.log('PASS: signed-out dashboard redirects to V3 login');
     await page.getByLabel('Email Address').fill(user.email);
-    await page.getByLabel('Password', { exact: true }).fill('browser-verification-only');
+    await page.locator('#login-password').fill('browser-verification-only');
     await page.getByRole('button', { name: /Sign In|Sign in/i }).click();
     await page.waitForURL('**/v3/dashboard');
     await settleDashboard();
@@ -70,16 +70,16 @@ const output = process.env.V3_QA_OUTPUT || '/home/ubuntu/tutovia_v3_dashboard_bu
 
     const bundleCount = bundleResponses.length;
     await page.getByTitle('Refresh Dashboard', { exact: true }).click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2600);
     assert(bundleResponses.length > bundleCount, 'Refresh must request fresh dashboard data');
-    await page.getByRole('button', { name: 'Close mood check-in' }).click().catch(() => {});
+    if (await page.getByRole('button', { name: 'Close mood check-in' }).isVisible()) await page.getByRole('button', { name: 'Close mood check-in' }).click();
 
     await page.getByRole('button', { name: 'Focus Mode', exact: true }).click();
     await page.getByRole('button', { name: 'Exit Focus Mode', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Exit Focus Mode', exact: true }).click();
     await page.getByRole('button', { name: 'Zen Study Desk', exact: true }).click();
     await page.getByTitle('Exit Zen Room', { exact: true }).click();
-    await page.getByRole('button', { name: 'Ask AI Tutor', exact: true }).click();
+    await page.getByRole('main').getByRole('button', { name: 'Ask AI Tutor', exact: true }).click();
     await page.waitForTimeout(300);
     assert(await page.getByText('Your AI Tutor', { exact: false }).count() || await page.locator('textarea, input[placeholder*="Ask"]').count());
     await page.goto(`${base}/v3/dashboard`, { waitUntil: 'domcontentloaded' });
@@ -112,6 +112,12 @@ const output = process.env.V3_QA_OUTPUT || '/home/ubuntu/tutovia_v3_dashboard_bu
     await page.goto(`${base}/v3/dashboard`, { waitUntil: 'domcontentloaded' });
     await settleDashboard();
     await assertV3Links();
+    const actionBounds = await page.getByRole('main').locator('button, a').evaluateAll(elements => elements.filter(element => /^(Ask AI Tutor|Zen Study Desk|Focus Mode|Start Mock)$/.test(element.textContent.trim())).map(element => {
+      const bounds = element.getBoundingClientRect();
+      return { label: element.textContent.trim(), left: bounds.left, right: bounds.right, viewport: innerWidth };
+    }));
+    assert.equal(actionBounds.length, 4);
+    assert(actionBounds.every(bounds => bounds.left >= 0 && bounds.right <= bounds.viewport), 'All mobile header actions must fit the viewport');
     const widths = await page.evaluate(() => ({ content: document.documentElement.scrollWidth, viewport: innerWidth }));
     assert(widths.content <= widths.viewport, `Mobile overflow: ${JSON.stringify(widths)}`);
     await page.screenshot({ path: `${output}/dashboard-mobile.png`, fullPage: true });
@@ -127,6 +133,9 @@ const output = process.env.V3_QA_OUTPUT || '/home/ubuntu/tutovia_v3_dashboard_bu
     assert.deepEqual(errors, [], 'No browser runtime errors');
     console.log('PASS: V3 landing preserved; no runtime errors');
     console.log(`Screenshots: ${output}`);
+  } catch (error) {
+    await page.screenshot({ path: `${output}/failure.png`, fullPage: true }).catch(() => {});
+    throw error;
   } finally {
     await browser.close();
   }
