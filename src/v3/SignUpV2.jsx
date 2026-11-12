@@ -8,6 +8,7 @@ import { useTheme } from './ThemeContextV2.jsx';
 import { V2_THEMES } from './themes.js';
 import InputField from './auth/InputField.jsx';
 import PasswordField from './auth/PasswordField.jsx';
+import { authDestination } from './authDestination.js';
 
 export default function SignUpV2() {
   const navigate = useNavigate();
@@ -40,10 +41,7 @@ export default function SignUpV2() {
   }, []);
 
   // Validate redirect URL to prevent open-redirect vulnerabilities
-  const isSafeRedirect = (url) => {
-    return url && typeof url === 'string' && url.startsWith('/') && !url.startsWith('//');
-  };
-  const destination = isSafeRedirect(location.state?.from) ? location.state.from : '/';
+  const destination = authDestination(location.state?.from);
 
   // If user is already authenticated, redirect them away to destination
   useEffect(() => {

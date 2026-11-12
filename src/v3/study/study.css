@@ -1,0 +1,340 @@
+
+  .v3-study {
+    /* Base default design tokens */
+    --bg-main: #0B0E17;
+    --bg-surface: #121828;
+    --bg-surface-card: #172036;
+    --bg-surface-border: rgba(148, 163, 184, 0.16);
+    --border: rgba(148, 163, 184, 0.16);
+
+    --text-primary: #F1F5F9;
+    --text-secondary: #CBD5E1;
+    --text-muted: #94A3B8;
+    --text-faint: #64748B;
+
+    --input-bg: #111726;
+    --input-border: rgba(148, 163, 184, 0.24);
+
+    --glass-bg: rgba(18, 24, 40, 0.88);
+    --glass-card-bg: rgba(23, 32, 54, 0.82);
+    --glass-card-hover: rgba(30, 41, 69, 0.95);
+    --glass-border: rgba(148, 163, 184, 0.16);
+    --glass-shadow: rgba(0, 0, 0, 0.45);
+
+    --phase-accent: #818CF8;
+    --phase-soft: rgba(129, 140, 248, 0.18);
+    --accent: var(--phase-accent);
+    --accent-soft: var(--phase-soft);
+    --background: var(--bg-main);
+    --surface: var(--bg-surface);
+    --surface-secondary: var(--bg-surface-card);
+    --shadow: var(--glass-shadow);
+    --input-background: var(--input-bg);
+
+    /* Purpose-driven semantic accents */
+    --color-progress: #10B981;
+    --color-streak: #F59E0B;
+    --color-urgency: #F43F5E;
+  }
+
+/* 🌅 1. MORNING THEME — 05:00 AM – 10:59 AM (Fresh, warm, positive, energetic, clean, motivating) */
+
+.v3-study.phase-morning {
+    --bg-main: #FFF8F1;
+    --bg-surface: #FFFFFF;
+    --bg-surface-card: #FFFDF9;
+    --bg-surface-border: rgba(234, 138, 86, 0.22);
+    --border: rgba(234, 138, 86, 0.22);
+
+    --text-primary: #2B2338;
+    --text-secondary: #584F66;
+    --text-muted: #837A92;
+    --text-faint: #ACA4B8;
+
+    --input-bg: #FFFFFF;
+    --input-border: rgba(234, 138, 86, 0.32);
+
+    --glass-bg: rgba(255, 252, 248, 0.92);
+    --glass-card-bg: rgba(255, 255, 255, 0.95);
+    --glass-card-hover: #FFFFFF;
+    --glass-border: rgba(234, 138, 86, 0.24);
+    --glass-shadow: rgba(234, 138, 86, 0.12);
+
+    --phase-accent: #E06D38;
+    --phase-soft: #FDE6D2;
+    --phase-peach: #FFD1B8;
+    --phase-ambient-1: rgba(253, 230, 210, 0.45);
+    --phase-ambient-2: rgba(254, 215, 170, 0.28);
+
+    --accent: var(--phase-accent);
+    --accent-soft: var(--phase-soft);
+    --background: var(--bg-main);
+    --surface: var(--bg-surface);
+    --surface-secondary: var(--bg-surface-card);
+    --shadow: var(--glass-shadow);
+    --input-background: var(--input-bg);
+  }
+
+/* ☀️ 2. DAY THEME — 11:00 AM – 04:59 PM (Bright, focused, productive, clean, clear, energetic) */
+
+.v3-study.phase-day {
+    --bg-main: #F8FAFC;
+    --bg-surface: #FFFFFF;
+    --bg-surface-card: #FFFFFF;
+    --bg-surface-border: #E2E8F0;
+    --border: #E2E8F0;
+
+    --text-primary: #0F172A;
+    --text-secondary: #334155;
+    --text-muted: #64748B;
+    --text-faint: #94A3B8;
+
+    --input-bg: #F8FAFC;
+    --input-border: #CBD5E1;
+
+    --glass-bg: rgba(255, 255, 255, 0.92);
+    --glass-card-bg: rgba(255, 255, 255, 0.96);
+    --glass-card-hover: #FFFFFF;
+    --glass-border: rgba(79, 70, 229, 0.16);
+    --glass-shadow: rgba(79, 70, 229, 0.08);
+
+    --phase-accent: #4F46E5;
+    --phase-soft: #EEF2FF;
+    --phase-mint: #DDF5E9;
+    --phase-ambient-1: rgba(224, 242, 254, 0.45);
+    --phase-ambient-2: rgba(238, 242, 255, 0.35);
+
+    --accent: var(--phase-accent);
+    --accent-soft: var(--phase-soft);
+    --background: var(--bg-main);
+    --surface: var(--bg-surface);
+    --surface-secondary: var(--bg-surface-card);
+    --shadow: var(--glass-shadow);
+    --input-background: var(--input-bg);
+  }
+
+/* 🌇 3. EVENING THEME — 05:00 PM – 07:59 PM (Warm, calm, comfortable, reflective, relaxing sunset tones) */
+
+.v3-study.phase-evening {
+    --bg-main: #FAF5F0;
+    --bg-surface: #FFFDFB;
+    --bg-surface-card: #FDF8F3;
+    --bg-surface-border: rgba(217, 119, 87, 0.22);
+    --border: rgba(217, 119, 87, 0.22);
+
+    --text-primary: #2C2237;
+    --text-secondary: #584A68;
+    --text-muted: #827493;
+    --text-faint: #A89CB7;
+
+    --input-bg: #FFFDFB;
+    --input-border: rgba(217, 119, 87, 0.32);
+
+    --glass-bg: rgba(253, 248, 243, 0.92);
+    --glass-card-bg: rgba(255, 255, 255, 0.95);
+    --glass-card-hover: #FFFFFF;
+    --glass-border: rgba(217, 119, 87, 0.24);
+    --glass-shadow: rgba(217, 119, 87, 0.12);
+
+    --phase-accent: #D96041;
+    --phase-soft: #FCE8E2;
+    --phase-peach: #FBCFE8;
+    --phase-ambient-1: rgba(252, 232, 226, 0.40);
+    --phase-ambient-2: rgba(233, 213, 255, 0.28);
+
+    --accent: var(--phase-accent);
+    --accent-soft: var(--phase-soft);
+    --background: var(--bg-main);
+    --surface: var(--bg-surface);
+    --surface-secondary: var(--bg-surface-card);
+    --shadow: var(--glass-shadow);
+    --input-background: var(--input-bg);
+  }
+
+/* 🌙 4. NIGHT THEME — 08:00 PM – 04:59 AM (Calm, peaceful, comfortable, eye-friendly, soft dark surfaces) */
+
+.v3-study.phase-night {
+    --bg-main: #0B0E17;
+    --bg-surface: #121828;
+    --bg-surface-card: #172036;
+    --bg-surface-border: rgba(148, 163, 184, 0.16);
+    --border: rgba(148, 163, 184, 0.16);
+
+    --text-primary: #F1F5F9;
+    --text-secondary: #CBD5E1;
+    --text-muted: #94A3B8;
+    --text-faint: #64748B;
+
+    --input-bg: #111726;
+    --input-border: rgba(148, 163, 184, 0.24);
+
+    --glass-bg: rgba(18, 24, 40, 0.88);
+    --glass-card-bg: rgba(23, 32, 54, 0.82);
+    --glass-card-hover: rgba(30, 41, 69, 0.95);
+    --glass-border: rgba(148, 163, 184, 0.16);
+    --glass-shadow: rgba(0, 0, 0, 0.45);
+
+    --phase-accent: #818CF8;
+    --phase-soft: rgba(129, 140, 248, 0.18);
+    --phase-deep-accent: #4C4A6D;
+    --phase-ambient-1: rgba(129, 140, 248, 0.10);
+    --phase-ambient-2: rgba(167, 139, 250, 0.08);
+
+    --accent: var(--phase-accent);
+    --accent-soft: var(--phase-soft);
+    --background: var(--bg-main);
+    --surface: var(--bg-surface);
+    --surface-secondary: var(--bg-surface-card);
+    --shadow: var(--glass-shadow);
+    --input-background: var(--input-bg);
+  }
+
+:where(.v3-study) h1, :where(.v3-study) h2, :where(.v3-study) h3, :where(.v3-study) .font-heading {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    letter-spacing: -0.025em;
+  }
+
+.v3-study {
+    position: relative;
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+.v3-study::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100vw;
+    height: 700px;
+    background: radial-gradient(circle 900px at 50% -120px, var(--phase-ambient-1, rgba(56, 189, 248, 0.05)), var(--phase-ambient-2, rgba(99, 102, 241, 0.04)), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    transition: background 0.8s ease;
+  }
+
+/* Smooth atmosphere transitions across entire UI */
+
+:where(.v3-study) header,
+  :where(.v3-study) nav,
+  :where(.v3-study) aside,
+  :where(.v3-study) .glass-panel,
+  :where(.v3-study) .glass-card,
+  :where(.v3-study) input,
+  :where(.v3-study) textarea,
+  :where(.v3-study) select,
+  :where(.v3-study) button {
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+/* Respect user accessibility preference for reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+    :where(.v3-study) *, :where(.v3-study) ::before, :where(.v3-study) ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+/* Glassmorphism & Custom Effects */
+:where(.v3-study) .glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+}
+
+:where(.v3-study) .glass-card {
+  background: var(--glass-card-bg);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
+}
+
+:where(.v3-study) .glass-card-hover {
+  transition: all 0.25s ease-in-out;
+}
+:where(.v3-study) .glass-card-hover:hover {
+  background: var(--glass-card-hover);
+  border-color: rgba(56, 189, 248, 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px var(--glass-shadow);
+}
+
+/* Custom Scrollbar */
+:where(.v3-study) ::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+:where(.v3-study) ::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+:where(.v3-study) ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+:where(.v3-study) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* Markdown Styling */
+:where(.v3-study) .markdown-content strong {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+:where(.v3-study) .markdown-content p {
+  margin-bottom: 0.5rem;
+}
+:where(.v3-study) .markdown-content p:last-child {
+  margin-bottom: 0;
+}
+:where(.v3-study) .markdown-content ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+:where(.v3-study) .markdown-content ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+:where(.v3-study) .perspective-1000 { perspective: 1000px; }
+:where(.v3-study) .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+:where(.v3-study) .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+:where(.v3-study) .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 10px; }
+:where(.v3-study) .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.6); }
+
+:where(.v3-study) .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+:where(.v3-study) .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+:where(.v3-study) .safe-area-pb {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+:where(.v3-study) .preserve-3d { transform-style: preserve-3d; }
+:where(.v3-study) .backface-hidden { backface-visibility: hidden; }
+:where(.v3-study) .rotate-y-180 { transform: rotateY(180deg); }
+:where(.v3-study) .rotate-y-\[-5deg\] { transform: rotateY(-5deg); }
+:where(.v3-study) .rotate-x-\[5deg\] { transform: rotateX(5deg); }
+:where(.v3-study) .hover\:rotate-y-0:hover { transform: rotateY(0deg) rotateX(0deg); }
+:where(.v3-study) .hover\:rotate-x-0:hover { transform: rotateY(0deg) rotateX(0deg); }
+:where(.v3-study) .mask-image-fade { mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); }
