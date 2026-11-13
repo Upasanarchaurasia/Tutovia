@@ -7,9 +7,14 @@ const root = 'http://161.118.173.142';
 const output = '/home/ubuntu/tutovia_v3_daily_build/qa';
 fs.mkdirSync(output, { recursive: true });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+const waitFor = async (condition, description) => {
+  const deadline = Date.now() + 15000;
+  while (!condition() && Date.now() < deadline) await wait(100);
+  assert(condition(), description);
+};
 
 async function fixture(browser, { userId = 'qa-daily-a', signedIn = true, empty = false, fail = false, storageState } = {}) {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, storageState });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce', storageState });
   const user = { id: userId, name: 'V3 verification student', email: `${userId}@example.invalid` };
   const today = new Date(Date.now() + 19800000).toISOString().slice(0, 10);
   const model = {
@@ -77,6 +82,7 @@ async function fixture(browser, { userId = 'qa-daily-a', signedIn = true, empty 
     return reply([]);
   });
   const page = await context.newPage(), errors = [];
+  page.setDefaultTimeout(45000);
   page.on('pageerror', error => errors.push(error.message));
   const ready = async () => { await page.getByRole('heading', { name: /V3 verification student/ }).waitFor({ timeout: 45000 }); await page.getByRole('heading', { name: 'Daily Timetable', exact: true }).waitFor(); };
   return { context, page, model, ready, errors, user, profile };
@@ -138,7 +144,7 @@ async function fixture(browser, { userId = 'qa-daily-a', signedIn = true, empty 
     assert.equal(model.zeroWrites, 0, 'Zero-minute background sync must not reach the legacy study endpoint');
     assert((await page.locator('[data-section="today"]').innerText()).includes('15 min / 360 min'));
     await page.getByLabel('Status for Taxation quick revision').selectOption('Completed');
-    await wait(300);
+    await waitFor(() => model.schedule.find(task => task.id === 'short').done, 'Explicit completion must reach the saved timetable');
     assert.equal(model.schedule.find(task => task.id === 'short').done, true);
     await page.getByRole('button', { name: /Show completed tasks \(2\)/ }).click();
     await page.getByRole('button', { name: /Hide completed tasks \(2\)/ }).waitFor();
@@ -171,18 +177,35 @@ async function fixture(browser, { userId = 'qa-daily-a', signedIn = true, empty 
     await page.getByRole('checkbox', { name: 'Advanced Accounting', exact: true }).check();
     model.failSave = true;
     await page.getByRole('button', { name: 'Save reflection & selected tasks', exact: true }).click();
-    await wait(500);
+    await page.getByText(/Request failed with status code 503/).first().waitFor();
     assert(!model.schedule.find(task => task.id === 'long').scheduled_date);
     assert(await page.getByRole('dialog', { name: 'End-of-day reflection' }).isVisible());
     model.failSave = false;
     await page.getByLabel('How did today feel? (optional)').selectOption('Calm');
     await page.getByRole('button', { name: 'Save reflection & selected tasks', exact: true }).click();
-    await wait(500);
+    await waitFor(() => Boolean(model.schedule.find(task => task.id === 'long').scheduled_date) && model.moodWrites === 1, 'Carry-forward and mood must both be saved');
+    await page.getByRole('dialog', { name: 'End-of-day reflection' }).waitFor({ state: 'hidden' });
     assert(model.schedule.find(task => task.id === 'long').scheduled_date);
     assert.equal(model.moodWrites, 1);
     await page.reload({ waitUntil: 'domcontentloaded' }); await f.ready();
     assert(await page.getByText('No sessions planned for today.', { exact: true }).count() === 0); // Completed tasks remain accessible.
     console.log('PASS: reflection failure/success, saved carry-forward and completed task access');
+
+    await page.getByRole('button', { name: 'Edit timetable', exact: true }).click();
+    const editor = page.getByRole('heading', { name: 'Edit Timetable Schedule', exact: true });
+    await editor.waitFor();
+    await page.getByPlaceholder('Focus or notes').first().fill('AS 10 depreciation review');
+    await page.getByRole('button', { name: 'Save Timetable', exact: true }).click();
+    await editor.waitFor({ state: 'hidden' });
+    assert.equal(model.schedule.find(task => task.id === 'long').focus, 'AS 10 depreciation review');
+    await page.reload({ waitUntil: 'domcontentloaded' }); await f.ready();
+    await page.getByRole('button', { name: 'Edit timetable', exact: true }).click();
+    assert.equal(await page.getByPlaceholder('Focus or notes').first().inputValue(), 'AS 10 depreciation review');
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export calendar', exact: true }).click();
+    assert.match((await download).suggestedFilename(), /\.ics$/i);
+    console.log('PASS: timetable edits persist after reload and calendar export downloads');
 
     // Recording answers creates a resumable activity; merely visiting an exam does not.
     await page.goto(`${root}/v3/exams?examId=advanced-accounting-qa`, { waitUntil: 'domcontentloaded' });
@@ -235,7 +258,7 @@ async function fixture(browser, { userId = 'qa-daily-a', signedIn = true, empty 
     assert((await failed.page.locator('[data-section="today"]').innerText()).includes('Unavailable'));
     failed.model.fail = false;
     await failed.page.getByRole('button', { name: 'Retry dashboard data', exact: true }).click();
-    await failed.page.getByRole('heading', { name: 'Taxation quick revision', exact: true }).waitFor();
+    await failed.page.locator('[data-section="next-session"]').getByRole('heading', { name: 'Taxation quick revision', exact: true }).waitFor();
     assert.deepEqual(failed.errors, []);
     console.log('PASS: loading/failure/empty states and retry recovery');
 
